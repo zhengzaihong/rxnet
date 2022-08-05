@@ -1,20 +1,81 @@
 
 import 'dart:async';
-
+import 'dart:collection';
+import 'dart:core';
+import 'dart:core';
+import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:rxnet/callback/NetCallBack.dart';
+import 'package:rxnet/utils/NetUtils.dart';
 
 import '../utils/DatabaseUtil.dart';
 import '../utils/TextUtil.dart';
 import 'cache_mode.dart';
 typedef JsonTransformation<T> = T Function(String);
 
-class RxNet<T> {
-  String _baseurl="";
-  String _path="";
-  REQUEST_METHORD _requestMethord;
-  CacheMode _cacheMode = CacheMode.noCache;
-  Map<String, String> _params;
+
+///http请求成功回调
+typedef HttpSuccessCallback<T> = void Function(T data);
+
+///失败回调
+typedef HttpFailureCallback = void Function(dynamic data);
+
+
+class RxNet {
+
+  ///超时时间
+  static const int connectTimeout = 30 * 1000;
+  static const int receiveTimeout = 30 * 1000;
+
+  Dio? _client;
+
+  static final RxNet _instance = RxNet._internal();
+
+  factory RxNet() => _instance;
+
+
+  Dio? get client => _client;
+
+  /// 创建 dio 实例对象
+  RxNet._internal() {
+    if (_client == null) {
+      /// 全局属性：请求前缀、连接超时时间、响应超时时间
+      BaseOptions options = BaseOptions(
+          connectTimeout: connectTimeout,
+          receiveTimeout: receiveTimeout,
+          contentType: Headers.jsonContentType,
+          responseType: ResponseType.json);
+      _client = Dio(options);
+    }
+  }
+
+  ///初始化公共属性
+  /// [baseUrl] 地址前缀
+  /// [interceptors] 基础拦截器
+  void init({required String baseUrl, List<Interceptor>? interceptors}) {
+    _client?.options.baseUrl = baseUrl;
+    if (interceptors != null) {
+      _client?.interceptors.addAll(interceptors);
+    }
+  }
+
+  static BuildRequest get<T>(){
+    return  BuildRequest<T>(
+        RequestType.GET,
+        RxNet().client?.options?.baseUrl);
+  }
+
+
+}
+
+typedef ParamCallBack = void Function(Map<String, dynamic> params);
+class BuildRequest<T>{
+
+  RequestType requestType;
+  String? baseUrl;
+  BuildRequest(this.requestType,this.baseUrl);
+
   JsonTransformation<T> _jsonTransformation = (data) {
     return data as T;
   };
@@ -28,102 +89,95 @@ class RxNet<T> {
   }
 
 
-  void setBaseUrl(String url) {
-    this._baseurl = url;
-  }
+  String? _path;
 
-  void setPath(String path) {
+  CacheMode? _cacheMode = CacheMode.noCache;
+
+  Map<String,dynamic> _params = HashMap();
+
+
+  BuildRequest setPath(String path) {
     if (TextUtil.isEmpty(path)) {
-      throw new Exception("path can not be null!");
-      return;
+      throw Exception("path can not be null!");
     }
-    this._path = path;
+    _path = path;
+    return this;
   }
 
-  void setMethord(REQUEST_METHORD requestMethord) {
-    this._requestMethord = requestMethord;
+  BuildRequest setParam(String key,dynamic value) {
+    _params[key] = value;
+    return this;
   }
 
-  void setParams(Map<String, String> params) {
-    this._params = params;
+  BuildRequest setNewParams(Map<String,dynamic> param) {
+    _params = param;
+    return this;
   }
 
-  void setCacheMode(CacheMode cacheMode) {
-    this._cacheMode = cacheMode;
+  BuildRequest addParams(Map<String,dynamic> param) {
+    _params.addAll(param);
+    return this;
   }
 
-  void setJsonTransFrom(JsonTransformation<T> jsonTransformation) {
+  BuildRequest getParams(ParamCallBack callBack) {
+    callBack.call(_params);
+    return this;
+  }
+
+
+
+  BuildRequest setCacheMode(CacheMode cacheMode) {
+    _cacheMode = cacheMode;
+    return this;
+  }
+
+  BuildRequest setJsonTransFrom(JsonTransformation<T> jsonTransformation) {
     _jsonTransformation = jsonTransformation;
+    return this;
   }
 
-  void call(NetCallback<T> netCallback) {
-    StreamController<RequestData<T>> controller =
-    new StreamController<RequestData<T>>();
 
-    Observable(controller.stream).listen((requestData) {
-      if (requestData.requestType == RequestType.NET) {
-        netCallback.onNetFinish(requestData.data);
-      } else if (requestData.requestType == RequestType.CACHE) {
-        netCallback.onCacheFinish(requestData.data);
-      } else {
-        netCallback.onUnkownFinish(requestData.data);
-      }
-    });
 
-    if (_cacheMode == CacheMode.NO_CACHE) {
+  void doWorkRequest({Function? work}){
+    switch(requestType){
+      case RequestType.GET:
+        ///todo
+        break;
+      case RequestType.POST:
+
+
+        break;
+    }
+
+    work?.call();
+  }
+
+
+  BuildRequest call({
+    HttpSuccessCallback? success,
+    HttpFailureCallback? failure}) {
+
+    if (_cacheMode == CacheMode.noCache) {
       //只获取网络
-      if (_requestMethord == REQUEST_METHORD.GET) {
-        Future<Response<String>> future =
-        NetUtils.getNet<String>(_baseurl + _path, _params);
+     doWorkRequest();
 
-        future.then((response) {
-          controller.add(new RequestData(
-              requestType: RequestType.NET,
-              data: _jsonTransformation(response.data)));
+    } else if (_cacheMode == CacheMode.firstCacheThenRequest) {
+       ///先获取缓存，在获取网络
+
+        NetUtils.getCache("$baseUrl$_path", _params).then((list) {
+          if (list.isNotEmpty) {
+
+          } else {
+
+          }
         });
-      } else if (_requestMethord == REQUEST_METHORD.GET) {
-        Future<Response<String>> future =
-        NetUtils.postNet<String>(_baseurl + _path, _params);
-        future.then((response) {
-          controller.add(new RequestData(
-              requestType: RequestType.NET,
-              data: _jsonTransformation(response.data)));
+      doWorkRequest(work: (){
+        NetUtils.postNet<String>("$baseUrl$_path", _params).then((response) {
+
         });
-      }
-    } else if (_cacheMode == CacheMode.FIRST_CACHE_THEN_REQUEST) {
-      //先获取缓存，在获取网络
-      NetUtils.getCache(_baseurl + _path, _params).then((list) {
-        if (list.length > 0) {
-          controller.add(new RequestData(
-              requestType: RequestType.CACHE,
-              data: _jsonTransformation(json.decoder.convert(list[0]["value"])),
-              statusCode: 200));
-        } else {
-          controller.add(new RequestData(
-              requestType: RequestType.CACHE, data: null, statusCode: 400));
-        }
       });
 
-      if (_requestMethord == REQUEST_METHORD.GET) {
-        NetUtils.getNet<String>(_baseurl + _path, _params).then((response) {
-          controller.add(new RequestData(
-              requestType: RequestType.NET,
-              data: _jsonTransformation(response.data)));
-          NetUtils.saveCache(
-              NetUtils.getCacheKeyFromPath(_baseurl + _path, _params),
-              json.encoder.convert(response.data));
-        });
-      } else if (_requestMethord == REQUEST_METHORD.GET) {
-        NetUtils.postNet<String>(_baseurl + _path, _params).then((response) {
-          controller.add(new RequestData(
-              requestType: RequestType.NET,
-              data: _jsonTransformation(response.data)));
-          NetUtils.saveCache(
-              NetUtils.getCacheKeyFromPath(_baseurl + _path, _params),
-              json.encoder.convert(response.data));
-        });
-      }
-    } else if (_cacheMode == CacheMode.REQUEST_FAILED_READ_CACHE) {
+    } else if (_cacheMode == CacheMode.requestFailedReadCache) {
       if (_requestMethord == REQUEST_METHORD.GET) {
         NetUtils.getNet<String>(_baseurl + _path, _params).then((response) {
           if (response.statusCode == 200) {
@@ -172,10 +226,13 @@ class RxNet<T> {
         });
       }
     } else if (_cacheMode == CacheMode.DEFAULT) {}
+
+    return this;
   }
+
 }
 
-enum REQUEST_METHORD {
+enum RequestType {
   GET,
   POST,
 }

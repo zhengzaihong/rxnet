@@ -11,8 +11,8 @@ class NetUtils {
   static Future<Response<T>> getNet<T>(
       String path, Map<String, String> params) async {
     Dio dio = new Dio();
-    print("地址："+path);
-    print("参数："+fromMap2ParamsString(params));
+    print("地址：$path");
+    print("参数：${fromMap2ParamsString(params)}");
     return await dio.get<T>(path + fromMap2ParamsString(params));
   }
 
@@ -21,17 +21,17 @@ class NetUtils {
    * 获取post网络请求
    */
   static Future<Response<T>> postNet<T>(
-      String path, Map<String, String> params) async {
+      String path, Map<String, dynamic> params) async {
     Dio dio = new Dio();
-    print("地址："+path);
-    print("参数："+fromMap2ParamsString(params));
+    print("地址：$path");
+    print("参数：${fromMap2ParamsString(params)}");
     return await dio.post<T>(path,queryParameters:params);
   }
 
   /*
    * 获取get缓存请求
    */
-  static Future<List<Map<String,dynamic>>> getCache(String path, Map<String, String> params) async {
+  static Future<List<Map<String,dynamic>>> getCache(String path, Map<String, dynamic> params) async {
     return DatabaseUtil.queryHttp(
         DatabaseUtil.database, getCacheKeyFromPath(path, params));
   }
@@ -39,63 +39,41 @@ class NetUtils {
   /*
    * 拼接get参数
    */
-  static String fromMap2ParamsString(Map<String, String> params) {
-    if (params == null || params.length <= 0) {
+  static String fromMap2ParamsString(Map<String, dynamic> params) {
+    if (params.isEmpty) {
       return "";
     }
     String paramsStr = "?";
     params.forEach((key, value) {
-      paramsStr = paramsStr + key + "=" + value + "&";
+      paramsStr = "${"$key=$value"}&";
     });
     return paramsStr;
   }
 
-  /*
-   * 生成Dio对象，确定是否需要缓存
-   */
-  static Dio createDio(String path, Map<String, String> params,
-      Function(Object, bool) stringCallback, bool useCache) {
-    Dio dio = new Dio();
 
-    //需要缓存时，生成cacheKey
-    if (useCache) {
-      dio.interceptors.add(createInterceptor(
-          getCacheKeyFromPath(path, params), dio, stringCallback));
-    }
-    return dio;
-  }
-
-  /*
-   * 生成缓存拦截器
-   */
-  static InterceptorsWrapper createInterceptor(
-      String cacheKey, Dio dio, Function(Object, bool) stringCallback) {
-    InterceptorsWrapper interceptor =
-        InterceptorsWrapper(onRequest: (RequestOptions options) async {
-      DatabaseUtil.queryHttp(DatabaseUtil.database, cacheKey).then((cacheList) {
-        if (cacheList.length > 0 &&
-            !TextUtil.isEmpty(cacheList[0].toString())) {
-          //返回数据库内容
-          stringCallback(cacheList[0]["value"].toString(), true);
-        }
-      });
-      return options;
-    }, onResponse: (Response response) {
-      return response;
-    }, onError: (DioError e) {
-      return e;
+  ///restful处理
+  static String _restfulUrl(String url, Map<String, dynamic> params) {
+    // restful 请求处理
+    // /gysw/search/hist/:user_id        user_id=27
+    // 最终生成 url 为
+    // /gysw/search/hist/27
+    params.forEach((key, value) {
+      if (url.contains(key)) {
+        url = url.replaceAll(':$key', value.toString());
+      }
     });
-    return interceptor;
+    return url;
   }
 
-  static String getCacheKeyFromPath(String path, Map<String, String> params) {
+
+  static String getCacheKeyFromPath(String path, Map<String, dynamic> params) {
     String cacheKey = "";
     if (!(TextUtil.isEmpty(path))) {
       cacheKey = cacheKey + MD5Util.generateMd5(path);
     } else {
-      throw new Exception("请求地址不能为空！");
+      throw Exception("请求地址不能为空！");
     }
-    if (params != null && params.length > 0) {
+    if (params.isNotEmpty) {
       String paramsStr = "";
       params.forEach((key, value) {
         paramsStr = paramsStr + key + value;
@@ -107,7 +85,7 @@ class NetUtils {
 
   static void saveCache(String cacheKey, String value) {
     DatabaseUtil.queryHttp(DatabaseUtil.database, cacheKey).then((list) {
-      if (list != null && list.length > 0) {
+      if (list.isNotEmpty) {
         //更新数据库数据
         DatabaseUtil.updateHttp(DatabaseUtil.database, cacheKey, value);
       } else {

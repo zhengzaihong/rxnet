@@ -1,4 +1,7 @@
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
+import 'package:rxnet/net/RxNet.dart';
 
 void main() {
   runApp(const MyApp());
@@ -10,6 +13,15 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
+
+    RxNet.get<String>()
+    .setParam("key", "value")
+    .setParam("key", "value")
+    .setParam("key", "value")
+    .getParams((params) {
+
+    }).addParams(HashMap());
+
     return MaterialApp(
       title: 'Flutter Demo',
       theme: ThemeData(
