@@ -52,7 +52,7 @@ class NetUtils {
 
 
   ///restful处理
-  static String _restfulUrl(String url, Map<String, dynamic> params) {
+  static String restfulUrl(String url, Map<String, dynamic> params) {
     // restful 请求处理
     // /gysw/search/hist/:user_id        user_id=27
     // 最终生成 url 为
@@ -95,3 +95,4 @@ class NetUtils {
     });
   }
 }
+
