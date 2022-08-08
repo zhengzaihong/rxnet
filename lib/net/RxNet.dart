@@ -1,9 +1,11 @@
 
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:core';
+import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
-import 'package:rxnet/bean/base_bean.dart';
+import 'package:rxnet/net/json_convert_adapter.dart';
 import 'package:rxnet/utils/HttpError.dart';
 import 'package:rxnet/utils/LogUtil.dart';
 import 'package:rxnet/utils/NetUtils.dart';
@@ -11,11 +13,12 @@ import 'package:rxnet/utils/NetUtils.dart';
 import '../utils/DatabaseUtil.dart';
 import '../utils/TextUtil.dart';
 import 'cache_mode.dart';
-typedef JsonTransformation<T> = T Function(String);
+
+typedef JsonTransformation<T> = T? Function(Map<String,dynamic> data);
 
 
 ///http请求成功回调
-typedef HttpSuccessCallback<T,DataModel> = void Function(T data,DataModel model);
+typedef HttpSuccessCallback<Dynamic,DataModel> = void Function(dynamic data,DataModel model);
 
 ///失败回调
 typedef HttpFailureCallback = void Function(dynamic data);
@@ -47,28 +50,40 @@ class RxNet {
   ///初始化公共属性
   /// [baseUrl] 地址前缀
   /// [interceptors] 基础拦截器
-  void init({required String baseUrl,
+  RxNet init({
+    required String baseUrl,
+    String dbName = "dataMapper",
     List<Interceptor>? interceptors,
     BaseOptions? options,
    }) {
     /// 全局属性：请求前缀、连接超时时间、响应超时时间
 
     options ??= BaseOptions(
+           baseUrl: baseUrl ,
           connectTimeout: connectTimeout,
           receiveTimeout: receiveTimeout,
           contentType: Headers.jsonContentType,
           responseType: ResponseType.json);
 
     _client?.options = options;
-    _client?.options.baseUrl = baseUrl;
     if (interceptors != null) {
       _client?.interceptors.addAll(interceptors);
     }
-    DatabaseUtil.initDatabase();
-  }
+    print("_client:${_client == null}");
+    print("options:${_client?.options == null}");
 
-  static BuildRequest get<T>(){
-    return  BuildRequest<T>(
+    try{
+      if(Platform.isAndroid || Platform.isIOS){
+        DatabaseUtil.initDatabase(dbName);
+      }
+    }catch(e){
+      LogUtil.v("环境：web");
+    }
+
+    return this;
+  }
+  static BuildRequest get(){
+    return  BuildRequest(
         RequestType.get,
         RxNet._internal(),
     );
@@ -85,34 +100,16 @@ class RxNet {
     }
   }
 
-
 }
 
 typedef ParamCallBack = void Function(Map<String, dynamic> params);
 
-class BuildRequest<T>{
+class BuildRequest{
 
   RequestType requestType;
   String? _baseUrl;
   final RxNet _rxNet;
   String? _cancleTag;
-
-  BuildRequest(this.requestType,this._rxNet){
-    _baseUrl = _rxNet.client?.options.baseUrl;
-  }
-
-  JsonTransformation<T> _jsonTransformation = (data) {
-    return data as T;
-  };
-
-  static Future initDatabase() {
-    return DatabaseUtil.initDatabase();
-  }
-
-  static bool isDatabaseReady() {
-    return DatabaseUtil.isDatabaseReady;
-  }
-
 
   String? _path;
 
@@ -123,6 +120,33 @@ class BuildRequest<T>{
   Map<String,dynamic> _headers = HashMap();
 
   Map<String,dynamic> _bodyData = HashMap();
+
+  bool _useJsonAdapter = true;
+  JsonConvertAdapter? _jsonConvertAdapter;
+
+  BaseOptions? _options;
+
+  BuildRequest(this.requestType,this._rxNet){
+    _options = _rxNet.client?.options;
+    _baseUrl = _options?.baseUrl;
+    print("0000000${_baseUrl}");
+  }
+
+
+  BuildRequest setUseJsonAdapter(bool use) {
+    _useJsonAdapter = use;
+    return this;
+  }
+
+
+  BuildRequest setJsonConvertAdapter(JsonConvertAdapter adapter){
+    _jsonConvertAdapter = adapter;
+    return this;
+  }
+  JsonConvertAdapter? getJsonConvertAdapter(){
+    return _jsonConvertAdapter;
+  }
+
 
 
   BuildRequest setPath(String path) {
@@ -190,8 +214,8 @@ class BuildRequest<T>{
     return this;
   }
 
-  BuildRequest setJsonTransFrom(JsonTransformation<T> jsonTransformation) {
-    _jsonTransformation = jsonTransformation;
+  BuildRequest setOptions(BaseOptions options) {
+    _options = options;
     return this;
   }
 
@@ -200,22 +224,24 @@ class BuildRequest<T>{
   void doWorkRequest({
     HttpSuccessCallback? success,
     HttpFailureCallback? failure,
-    Function? work,
     bool cache =false,
     Function? readCache,
    }){
 
-    Request<T>().request(
-        url: _path!,
+    Request().request(
+        url:_path!,
         method: requestType.name,
         tag: "$_cancleTag",
         client: _rxNet.client,
         params: _params,
         data: _bodyData,
+        options: _options,
         successCallback: success,
         errorCallback: failure,
         cache: cache,
         readCache: readCache,
+        useJsonAdapter: _useJsonAdapter,
+        adapter: getJsonConvertAdapter()
 
     );
 
@@ -256,6 +282,7 @@ class BuildRequest<T>{
         doWorkRequest(
             success: success,
             failure: failure,
+            cache: true,
             readCache: (){
               NetUtils.getCache("$_baseUrl$_path", _params).then((list) {
                 if (list.isNotEmpty) {
@@ -268,6 +295,13 @@ class BuildRequest<T>{
         );
         break;
       }
+      default:
+        doWorkRequest(
+            success: success,
+            failure: failure,
+            cache: true
+        );
+        break;
     }
 
 
@@ -288,7 +322,7 @@ enum DataModel {
 
 
 
-class Request<T>{
+class Request{
 
   ///统一网络请求
   ///
@@ -304,14 +338,15 @@ class Request<T>{
     required String method,
     dynamic  data,
     Map<String, dynamic>? params,
-    Options? options,
-    HttpSuccessCallback<T,DataModel>? successCallback,
+    BaseOptions? options,
+    HttpSuccessCallback? successCallback,
     HttpFailureCallback? errorCallback,
     required String? tag,
     required Dio? client,
     bool cache =false,
     Function? readCache,
-    Function? work,
+    bool useJsonAdapter = true,
+    JsonConvertAdapter? adapter,
   }) async {
     ///检查网络是否连接
     ConnectivityResult connectivityResult =
@@ -324,44 +359,48 @@ class Request<T>{
       return;
     }
 
-    print("-------------1");
-
     params = params ?? {};
     options?.method = method;
-    options = options ??
-        Options(
-          method: method,
-        );
+    print("options:${options==null}");
 
     url = NetUtils.restfulUrl(url, params);
+    print("url:${options?.baseUrl}$url");
     try {
       client?.options.method = method;
-      Response<Map<String, dynamic>> response = await client!.request(url,
+      Response<Map<String,dynamic>> response = await client!.request(url,
           data: data,
           queryParameters: params,
-          options: options,
           cancelToken: _cancelTokens[tag]);
 
-
+       ///成功
       if(response.statusCode ==200){
-        print("-------------122");
-        ///成功
-        successCallback?.call(response.data as T,DataModel.net);
-
-        if(cache){
-          /// 存储数据
-
+        if(useJsonAdapter && adapter!=null){
+          LogUtil.v("useJsonAdapter：true");
+          var data = adapter.jsonTransformation.call(response.data!);
+          successCallback?.call(data,DataModel.net);
+        }else{
+          LogUtil.v("useJsonAdapter：false");
+          successCallback?.call(response.data,DataModel.net);
         }
-        work?.call();
+
+        /// 数据库目前只支持 android 和 ios
+        try{
+          if(cache && (Platform.isIOS || Platform.isAndroid)){
+            /// 存储数据
+
+          }
+        }catch(e){
+          LogUtil.v("catch环境：web");
+        }
+
       }else{
         if(readCache!=null){
           readCache.call();
         }else{
           ///失败
-          errorCallback?.call(response);
+          errorCallback?.call(response.data);
         }
       }
-      // ParseJson<T>(response, successCallback, errorCallback, url: url).parse();
     } on DioError catch (e, s) {
       LogUtil.v("请求出错：$e\n$s");
       if (errorCallback != null && e.type != DioErrorType.cancel) {

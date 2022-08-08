@@ -2,10 +2,12 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseUtil {
-   static late Database database;
+   static  Database? database;
   static bool isDatabaseReady = false;
+  static String dbName = "";
 
-  static Future initDatabase() {
+  static Future initDatabase(String dbName) {
+    dbName = dbName;
     Future future = Future(() async {
       String databasePath = await createDatabase();
       Database database = await openHttpDatabase(databasePath);
@@ -21,7 +23,7 @@ class DatabaseUtil {
    */
   static Future<String> createDatabase() async {
     var databasesPath = await getDatabasesPath();
-    return join(databasesPath, 'ugrownews.db');
+    return join(databasesPath, "$dbName.db");
   }
 
   /*
@@ -57,10 +59,13 @@ class DatabaseUtil {
   }
 
   /*
-   * 查询 
+   * 查询
    */
   static Future<List<Map<String, dynamic>>> queryHttp(
-      Database database, String cacheKey) async {
+      Database? database, String cacheKey) async {
+    if(database==null){
+      return Future.value([]);
+    }
     return await database.rawQuery(
         'SELECT value FROM UGrownewsHttp WHERE cacheKey = \'' +
             cacheKey +
@@ -68,12 +73,14 @@ class DatabaseUtil {
   }
 
   /*
-   * 插入 
+   * 插入
    */
   static Future insertHttp(
-      Database database, String cacheKey, String value) async {
+      Database? database, String cacheKey, String value) async {
     cacheKey = cacheKey.replaceAll("\"", "\"\"");
-
+    if(database==null){
+      return Future.value(-1);
+    }
     return await database.transaction((txn) async {
       await txn.rawInsert(
           'INSERT INTO UGrownewsHttp(cacheKey, value) VALUES( \'' +
@@ -88,8 +95,11 @@ class DatabaseUtil {
    * 更新
    */
   static Future<int> updateHttp(
-      Database database, String cacheKey, String value) async {
+      Database? database, String cacheKey, String value) async {
     cacheKey = cacheKey.replaceAll("\"", "\\\"");
+    if(database==null){
+      return Future.value(-1);
+    }
     return await database
         .rawUpdate('UPDATE UGrownewsHttp SET  value = \'' +
             value +
