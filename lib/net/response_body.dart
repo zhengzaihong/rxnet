@@ -1,9 +1,0 @@
-
-
-class ResponseBody{
-
-  dynamic body;
-
-
-
-}

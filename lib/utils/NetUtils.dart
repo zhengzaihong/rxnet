@@ -5,40 +5,15 @@ import 'MD5Util.dart';
 import 'TextUtil.dart';
 
 class NetUtils {
-  /*
-   * 获取get网络请求
-   */
-  static Future<Response<T>> getNet<T>(
-      String path, Map<String, String> params) async {
-    Dio dio = new Dio();
-    print("地址：$path");
-    print("参数：${fromMap2ParamsString(params)}");
-    return await dio.get<T>(path + fromMap2ParamsString(params));
-  }
 
 
-  /*
-   * 获取post网络请求
-   */
-  static Future<Response<T>> postNet<T>(
-      String path, Map<String, dynamic> params) async {
-    Dio dio = new Dio();
-    print("地址：$path");
-    print("参数：${fromMap2ParamsString(params)}");
-    return await dio.post<T>(path,queryParameters:params);
-  }
-
-  /*
-   * 获取get缓存请求
-   */
+  ///获取get缓存请求
   static Future<List<Map<String,dynamic>>> getCache(String path, Map<String, dynamic> params) async {
     return DatabaseUtil.queryHttp(
         DatabaseUtil.database, getCacheKeyFromPath(path, params));
   }
 
-  /*
-   * 拼接get参数
-   */
+  /// 拼接get参数
   static String fromMap2ParamsString(Map<String, dynamic> params) {
     if (params.isEmpty) {
       return "";

@@ -1,6 +1,4 @@
-
-import 'package:rxnet/bean/base_bean.dart';
-import 'package:rxnet/net/RxNet.dart';
+import 'package:rxnet/net/fun/fun_apply.dart';
 
 ///
 /// create_user: zhengzaihong

@@ -2,10 +2,7 @@ import 'dart:collection';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:rxnet/net/RxNet.dart';
-import 'package:rxnet/net/cache_mode.dart';
-import 'package:rxnet/net/interceptor/CustomLogInterceptor.dart';
-import 'package:rxnet/net/json_convert_adapter.dart';
+import 'package:rxnet/rxnet_lib.dart';
 import 'package:rxnet/test/BaseBean.dart';
 import 'package:rxnet/test/test_json_convert_entity.dart';
 
@@ -54,12 +51,11 @@ class _MyHomePageState extends State<MyHomePage> {
            var base =  BaseBean<TestJsonConvertEntity>.fromJson(data);
            return base.data;
          }))
-        .call(success: (data,mo){
+        .execute(success: (data,mo){
           if(data is TestJsonConvertEntity){
             print("---------->${data.pageId}");
           }
-          print("---------22222->${data}");
-          print("----------333>${(mo as DataModel).name}");
+          print("----------333>${(mo as SourcesType).name}");
     });
 
     return Scaffold(
