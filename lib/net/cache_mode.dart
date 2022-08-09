@@ -13,4 +13,6 @@ enum CacheMode {
   ///先使用缓存，不管是否存在，仍然请求网络
   firstCacheThenRequest,
 
+  ///只使用缓存
+  onlyCache;
 }
