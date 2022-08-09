@@ -363,6 +363,18 @@ class BuildRequest {
               });
           break;
         }
+
+      case CacheMode.onlyCache:
+        {
+          NetUtils.getCache("$_baseUrl$_path", _params).then((list) {
+            if (list.isNotEmpty) {
+              success?.call(list, SourcesType.cache);
+            } else {
+              failure?.call({});
+            }
+          });
+          break;
+        }
       default:
         _doWorkRequest(success: success, failure: failure, cache: true);
         break;
