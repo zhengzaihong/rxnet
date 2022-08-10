@@ -2,11 +2,12 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseUtil {
-   static  Database? database;
+  static  Database? database;
   static bool isDatabaseReady = false;
   static String dbName = "";
   static String tableName= "cacheTable";
 
+  static List<Function> _checkDataBaseListener = [];
   static Future initDatabase(String db,{String? tabname}) {
     dbName = db;
     if(null!=tabname){
@@ -17,12 +18,23 @@ class DatabaseUtil {
       Database database = await openHttpDatabase(databasePath);
       DatabaseUtil.database = database;
       isDatabaseReady = true;
-      return "DatabaseReady";
+      for (var callBack in _checkDataBaseListener) {
+        callBack.call(isDatabaseReady);
+      }
+      _checkDataBaseListener.clear();
+      return isDatabaseReady;
     });
     return future;
   }
 
-  
+  ///数据库还没初始完成，可能已经纯在网络请求，先将其缓存
+  ///等待数据库完成后并返回数据后，将其全部回调全部清除。
+  static void setDataBaseReadListener(Function(bool isOk) function){
+    if(!isDatabaseReady){
+      _checkDataBaseListener.add(function);
+    }
+  }
+
   ///生成数据库
   static Future<String> createDatabase() async {
     var databasesPath = await getDatabasesPath();

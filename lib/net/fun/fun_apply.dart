@@ -10,3 +10,6 @@ typedef HttpFailureCallback = void Function(dynamic data);
 
 
 typedef ParamCallBack = void Function(Map<String, dynamic> params);
+
+///检查网络的方法
+typedef CheckNetwork = void Function();

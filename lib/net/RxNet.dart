@@ -1,7 +1,8 @@
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:core';
 import 'dart:io';
-import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/adapter.dart';
 import 'package:dio/dio.dart';
 import 'package:rxnet/net/cache_mode.dart';
 import 'package:rxnet/net/fun/fun_apply.dart';
@@ -31,6 +32,9 @@ class RxNet {
 
   static final RxNet _instance = RxNet._internal();
 
+  /// 是否使用代理
+  bool _isProxyEnable = false;
+
   factory RxNet() => _instance;
 
   Dio? get client => _client;
@@ -52,6 +56,7 @@ class RxNet {
   RxNet init({
     required String baseUrl,
     String dbName = "dataMapper",
+    String? tableName,
     List<Interceptor>? interceptors,
     BaseOptions? options,
   }) {
@@ -60,22 +65,39 @@ class RxNet {
     if (options != null) {
       _client?.options = options;
     }
-
     _client?.options.baseUrl = baseUrl;
-
     if (interceptors != null) {
       _client?.interceptors.addAll(interceptors);
     }
-
     try {
       if (Platform.isAndroid || Platform.isIOS) {
-        DatabaseUtil.initDatabase(dbName);
+        DatabaseUtil.initDatabase(dbName,tabname: tableName);
       }
     } catch (e) {
-      LogUtil.v("环境：web");
+      LogUtil.v("不支持环境的环境：web, windows");
     }
-
     return this;
+  }
+
+  RxNet setEnableProxy(bool enable){
+    _isProxyEnable = enable;
+    return this;
+  }
+  bool isEnableProxy(){
+    return _isProxyEnable;
+  }
+
+  /// isProxyEnable 为true 才会生效
+  /// 前置方法 setEnableProxy
+  void setProxy(String ip,int port){
+    if(isEnableProxy()){
+      (_instance.client?.httpClientAdapter as DefaultHttpClientAdapter).onHttpClientCreate = (client) {
+        client.findProxy = (uri) {
+          return "PROXY $ip:$port";
+        };
+        client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+      };
+    }
   }
 
   static BuildRequest get() {
@@ -143,7 +165,7 @@ class BuildRequest {
 
   Map<String, dynamic> _headers = HashMap();
 
-  Map<String, dynamic> _bodyData = HashMap();
+   dynamic _bodyData;
 
   bool _useJsonAdapter = true;
 
@@ -188,7 +210,7 @@ class BuildRequest {
     return this;
   }
 
-  BuildRequest setBodyData(Map<String, dynamic> param) {
+  BuildRequest setBodyData(dynamic param) {
     _bodyData = param;
     return this;
   }
@@ -234,7 +256,7 @@ class BuildRequest {
   }
 
   BuildRequest covertParamToBody() {
-    _bodyData.addAll(_params);
+    _bodyData = _params;
     _params.clear();
     return this;
   }
@@ -249,6 +271,13 @@ class BuildRequest {
     return this;
   }
 
+  ///提供一个检查网络的方法，外部需要自行实现
+  BuildRequest setCheckNetwork(CheckNetwork? checkNetwork){
+    checkNetwork?.call();
+    return this;
+  }
+
+
   void _doWorkRequest({
     HttpSuccessCallback? success,
     HttpFailureCallback? failure,
@@ -256,23 +285,15 @@ class BuildRequest {
     Function? readCache,
   }) async {
 
-    ///检查网络是否连接
-    ConnectivityResult connectivityResult =
-        await (Connectivity().checkConnectivity());
-    if (connectivityResult == ConnectivityResult.none) {
-      if (failure != null) {
-        failure(HttpError(HttpError.NETWORK_ERROR, "网络异常，请稍后重试！"));
-      }
-      LogUtil.v("请求网络异常，请稍后重试！");
-      return;
-    }
-
     String url = _path.toString();
     if (getEnableRestfulUrl()) {
       url = NetUtils.restfulUrl(_path.toString(), _params);
     }
     try {
       _options?.method = httpType.name;
+      if(_headers.isNotEmpty){
+        _options?.headers = _headers;
+      }
       Response<Map<String, dynamic>> response = await _rxNet.client!.request(
           url,
           data: _bodyData,
@@ -284,9 +305,8 @@ class BuildRequest {
       if (response.statusCode == 200) {
         if (_useJsonAdapter && getJsonConvertAdapter() != null) {
           LogUtil.v("useJsonAdapter：true");
-          var data =
-              getJsonConvertAdapter()?.jsonTransformation.call(response.data!);
-          success?.call(data, SourcesType.net);
+          var data = getJsonConvertAdapter()?.jsonTransformation.call(response.data!);
+          success?.call(data!, SourcesType.net);
         } else {
           LogUtil.v("useJsonAdapter：false");
           success?.call(response.data, SourcesType.net);
@@ -295,8 +315,9 @@ class BuildRequest {
         /// 数据库目前只支持 android 和 ios
         try {
           if (cache && (Platform.isIOS || Platform.isAndroid)) {
+            String cacheKey = NetUtils.getCacheKeyFromPath("$_path", _params);
             /// 存储数据
-
+            NetUtils.saveCache(cacheKey, response.data==null?"":jsonEncode(response.data));
           }
         } catch (e) {
           LogUtil.v("catch环境：web");
@@ -317,9 +338,43 @@ class BuildRequest {
     } catch (e, s) {
       LogUtil.v("未知异常出错：$e\n$s");
       if (failure != null) {
-        failure(HttpError(HttpError.UNKNOWN, "网络异常，请稍后重试！"));
+        failure(HttpError(HttpError.UNKNOWN, "未知错误"));
       }
     }
+  }
+
+
+  ///解析本地缓存数据
+  void _parseLocalData(
+      HttpSuccessCallback? success,
+      HttpFailureCallback? failure,
+      List<Map<String,dynamic>> list,
+      ){
+    var datas = list[0]["value"];
+    if (_useJsonAdapter && getJsonConvertAdapter() != null) {
+      LogUtil.v("useJsonAdapter：true");
+      var data = getJsonConvertAdapter()?.jsonTransformation.call(jsonDecode(datas));
+      success?.call(data, SourcesType.cache);
+    } else {
+      LogUtil.v("useJsonAdapter：false");
+      success?.call(datas, SourcesType.cache);
+    }
+  }
+
+
+  void _readCache(
+      HttpSuccessCallback? success,
+      HttpFailureCallback? failure,
+      ){
+    DatabaseUtil.setDataBaseReadListener((isOk){
+      NetUtils.getCache("$_path", _params).then((list) {
+        if (list.isNotEmpty) {
+          _parseLocalData(success,failure,list);
+        } else {
+          failure?.call({});
+        }
+      });
+    });
   }
 
   BuildRequest execute({HttpSuccessCallback? success, HttpFailureCallback? failure}) {
@@ -333,11 +388,7 @@ class BuildRequest {
      ///先获取缓存，在获取网络
       case CacheMode.firstCacheThenRequest:
         {
-          NetUtils.getCache("$_baseUrl$_path", _params).then((list) {
-            if (list.isNotEmpty) {
-              success?.call(list, SourcesType.cache);
-            }
-          });
+          _readCache(success,failure);
           _doWorkRequest(
               success: success,
               failure: failure,
@@ -353,26 +404,14 @@ class BuildRequest {
               failure: failure,
               cache: true,
               readCache: () {
-                NetUtils.getCache("$_baseUrl$_path", _params).then((list) {
-                  if (list.isNotEmpty) {
-                    success?.call(list, SourcesType.cache);
-                  } else {
-                    failure?.call({});
-                  }
-                });
+                _readCache(success,failure);
               });
           break;
         }
 
       case CacheMode.onlyCache:
         {
-          NetUtils.getCache("$_baseUrl$_path", _params).then((list) {
-            if (list.isNotEmpty) {
-              success?.call(list, SourcesType.cache);
-            } else {
-              failure?.call({});
-            }
-          });
+          _readCache(success,failure);
           break;
         }
       default:
@@ -389,22 +428,15 @@ class BuildRequest {
     HttpSuccessCallback? success,
     HttpFailureCallback? failure,
   }) async {
-    ///检查网络是否连接
-    ConnectivityResult connectivityResult =
-    await (Connectivity().checkConnectivity());
-    if (connectivityResult == ConnectivityResult.none) {
-      if (failure != null) {
-        failure(HttpError(HttpError.NETWORK_ERROR, "网络异常，请稍后重试！"));
-      }
-      LogUtil.v("请求网络异常，请稍后重试！");
-      return;
-    }
-
     String url = _path.toString();
     if (getEnableRestfulUrl()) {
       url = NetUtils.restfulUrl(_path.toString(), _params);
     }
     try {
+      _options?.method = httpType.name;
+      if(_headers.isNotEmpty){
+        _options?.headers = _headers;
+      }
       Response<Map<String, dynamic>> response = await _rxNet.client!.request(
           url,
           onSendProgress: onSendProgress,
@@ -434,25 +466,13 @@ class BuildRequest {
 
 
   ///下载文件
-  ///[url] 下载地址
   ///[savePath]  文件保存路径
   void download({
-    required String url,
     required String savePath,
     ProgressCallback? onReceiveProgress,
     HttpSuccessCallback? success,
     HttpFailureCallback? failure,
   }) async {
-    ///检查网络是否连接
-    ConnectivityResult connectivityResult =
-    await (Connectivity().checkConnectivity());
-    if (connectivityResult == ConnectivityResult.none) {
-      if (failure != null) {
-        failure(HttpError(HttpError.NETWORK_ERROR, "网络异常，请稍后重试！"));
-      }
-      LogUtil.v("请求网络异常，请稍后重试！");
-      return;
-    }
 
     ///0代表不设置超时
     int receiveTimeout = 0;
@@ -465,6 +485,10 @@ class BuildRequest {
       url = NetUtils.restfulUrl(_path.toString(), _params);
     }
     try {
+      _options?.method = httpType.name;
+      if(_headers.isNotEmpty){
+        _options?.headers = _headers;
+      }
       Response<dynamic> response = await _rxNet.client!.download(
           url,
           savePath,
