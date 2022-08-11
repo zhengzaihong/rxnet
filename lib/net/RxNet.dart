@@ -59,9 +59,10 @@ class RxNet {
     String? tableName,
     List<Interceptor>? interceptors,
     BaseOptions? options,
+    bool isDebug = true,
   }) {
-    /// 全局属性：请求前缀、连接超时时间、响应超时时间
 
+    LogUtil.init(isDebug: isDebug);
     if (options != null) {
       _client?.options = options;
     }
@@ -151,15 +152,13 @@ class BuildRequest {
 
   final HttpType httpType;
 
-  late String? _baseUrl;
-
   final RxNet _rxNet;
 
   String? _cancleTag;
 
   String? _path;
 
-  CacheMode _cacheMode = CacheMode.noCache;
+  CacheMode _cacheMode = CacheMode.onlyRequest;
 
   Map<String, dynamic> _params = HashMap();
 
@@ -175,9 +174,7 @@ class BuildRequest {
 
   bool _enableRestfulUrl = false;
 
-  BuildRequest(this.httpType, this._rxNet) {
-    _baseUrl = _rxNet.client?.options?.baseUrl;
-  }
+  BuildRequest(this.httpType, this._rxNet);
 
   BuildRequest setUseJsonAdapter(bool use) {
     _useJsonAdapter = use;
@@ -379,24 +376,20 @@ class BuildRequest {
 
   BuildRequest execute({HttpSuccessCallback? success, HttpFailureCallback? failure}) {
     switch (_cacheMode) {
-      ///只获取网络
-      case CacheMode.noCache:
+      case CacheMode.onlyRequest:
         {
           _doWorkRequest(success: success, failure: failure);
           break;
         }
-     ///先获取缓存，在获取网络
       case CacheMode.firstCacheThenRequest:
         {
           _readCache(success,failure);
           _doWorkRequest(
               success: success,
               failure: failure,
-              /// 存储数据
               cache: true);
           break;
         }
-     ///先请求网络，如果请求网络失败，则读取缓存，如果读取缓存失败，本次请求失败
       case CacheMode.requestFailedReadCache:
         {
           _doWorkRequest(
@@ -414,9 +407,12 @@ class BuildRequest {
           _readCache(success,failure);
           break;
         }
-      default:
-        _doWorkRequest(success: success, failure: failure, cache: true);
-        break;
+
+      case CacheMode.requestAndSaveCache:
+        {
+          _doWorkRequest(success: success, failure: failure, cache: true);
+          break;
+        }
     }
     return this;
   }

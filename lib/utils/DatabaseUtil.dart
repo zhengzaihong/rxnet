@@ -1,4 +1,5 @@
-import 'package:path/path.dart';
+// ignore: depend_on_referenced_packages
+import 'package:path/path.dart' show join;
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseUtil {
@@ -7,7 +8,7 @@ class DatabaseUtil {
   static String dbName = "";
   static String tableName= "cacheTable";
 
-  static List<Function> _checkDataBaseListener = [];
+  static final List<Function> _checkDataBaseListener = [];
   static Future initDatabase(String db,{String? tabname}) {
     dbName = db;
     if(null!=tabname){

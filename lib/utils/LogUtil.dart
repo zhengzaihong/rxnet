@@ -9,7 +9,7 @@ class LogUtil {
   static const String _TAG_DEFAULT = "###输出日志信息：";
 
   ///是否 debug
-  static bool debug = true;
+  static bool debug = false;
 
   static String tagDefault = _TAG_DEFAULT;
 

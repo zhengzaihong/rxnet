@@ -1,11 +1,18 @@
 
+///
+/// create_user: zhengzaihong
+/// email:1096877329@qq.com
+/// create_date: 2022/8/11
+/// create_time: 9:08
+/// describe: Rxnet 请求缓存策略模式
+///
 enum CacheMode {
 
   ///没有缓存
-  noCache,
+  onlyRequest,
 
-  ///按照HTTP协议的默认缓存规则，例如有304响应头时缓存
-  defaultMode,
+  /// 请求成功后存储缓存
+  requestAndSaveCache,
 
   ///先请求网络，如果请求网络失败，则读取缓存，如果读取缓存失败，本次请求失败
   requestFailedReadCache,
