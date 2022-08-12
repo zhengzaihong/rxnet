@@ -11,7 +11,7 @@ void main() {
   RxNet().init(
       baseUrl: "http://t.weather.sojson.com/",
       interceptors: [
-    CustomLogInterceptor()
+      CustomLogInterceptor()
   ]);
   runApp(const MyApp());
 }

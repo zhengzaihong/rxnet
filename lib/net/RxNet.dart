@@ -21,7 +21,6 @@ import 'package:rxnet/utils/TextUtil.dart';
 /// create_date: 2022/8/9
 /// create_time: 18:03
 /// describe: 网络请求工具库，支持多种缓存模式（目前只支持 android 和 IOS 平台，因为数据缓存基于sqlite）
-///
 
 ///同一个CancelToken可以用于多个请求，当一个CancelToken取消时，所有使用该CancelToken的请求都会被取消。
 final Map<String, CancelToken> _cancelTokens = <String, CancelToken>{};
@@ -75,7 +74,7 @@ class RxNet {
         DatabaseUtil.initDatabase(dbName,tabname: tableName);
       }
     } catch (e) {
-      LogUtil.v("不支持环境的环境：web, windows");
+      LogUtil.v("不支持的环境：web, windows");
     }
     return this;
   }
@@ -164,7 +163,7 @@ class BuildRequest {
 
   Map<String, dynamic> _headers = {};
 
-   dynamic _bodyData;
+  dynamic _bodyData;
 
   bool _useJsonAdapter = true;
 

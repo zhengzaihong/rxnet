@@ -118,8 +118,6 @@ class CustomLogInterceptor extends Interceptor {
       printAll(response.toString());
     }
     logPrint("");
-
-
   }
 
   printKV(String key, Object v) {
