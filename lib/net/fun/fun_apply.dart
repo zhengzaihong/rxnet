@@ -1,6 +1,6 @@
 
 
-typedef JsonTransformation<T> = T? Function(Map<String,dynamic> data);
+typedef JsonTransformation<T> = dynamic Function(Map<String,dynamic> data);
 
 ///http请求成功回调
 typedef HttpSuccessCallback<Dynamic,SourcesType> = void Function(dynamic data,SourcesType model);

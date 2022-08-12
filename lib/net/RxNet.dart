@@ -150,7 +150,7 @@ class RxNet {
 
 class BuildRequest {
 
-  final HttpType httpType;
+  final HttpType _httpType;
 
   final RxNet _rxNet;
 
@@ -160,9 +160,9 @@ class BuildRequest {
 
   CacheMode _cacheMode = CacheMode.onlyRequest;
 
-  Map<String, dynamic> _params = HashMap();
+  Map<String, dynamic> _params = {};
 
-  Map<String, dynamic> _headers = HashMap();
+  Map<String, dynamic> _headers = {};
 
    dynamic _bodyData;
 
@@ -174,7 +174,7 @@ class BuildRequest {
 
   bool _enableRestfulUrl = false;
 
-  BuildRequest(this.httpType, this._rxNet);
+  BuildRequest(this._httpType, this._rxNet);
 
   BuildRequest setUseJsonAdapter(bool use) {
     _useJsonAdapter = use;
@@ -190,6 +190,9 @@ class BuildRequest {
     return _jsonConvertAdapter;
   }
 
+  /// 处理 RestfulUrl格式请求
+  /// 如：xxxx/xxx/weather?city=101030100
+  /// 结果：xxxx/xxx/weather/city/101030100
   BuildRequest setEnableRestfulUrl(bool restful) {
     _enableRestfulUrl = restful;
     return this;
@@ -287,14 +290,14 @@ class BuildRequest {
       url = NetUtils.restfulUrl(_path.toString(), _params);
     }
     try {
-      _options?.method = httpType.name;
+      _options?.method = _httpType.name;
       if(_headers.isNotEmpty){
         _options?.headers = _headers;
       }
       Response<Map<String, dynamic>> response = await _rxNet.client!.request(
           url,
           data: _bodyData,
-          queryParameters: _params,
+          queryParameters: getEnableRestfulUrl()?{}:_params,
           options: _options,
           cancelToken: _cancelTokens[getTag()]);
 
@@ -429,7 +432,7 @@ class BuildRequest {
       url = NetUtils.restfulUrl(_path.toString(), _params);
     }
     try {
-      _options?.method = httpType.name;
+      _options?.method = _httpType.name;
       if(_headers.isNotEmpty){
         _options?.headers = _headers;
       }
@@ -437,9 +440,9 @@ class BuildRequest {
           url,
           onSendProgress: onSendProgress,
           data: _bodyData,
-          queryParameters: _params,
+          queryParameters: getEnableRestfulUrl()?{}:_params,
           options: _options,
-          cancelToken: _cancelTokens[_cancleTag]);
+          cancelToken: _cancelTokens[getTag()]);
 
       if(response.statusCode == 200){
         success?.call(response.data, SourcesType.net);
@@ -481,18 +484,18 @@ class BuildRequest {
       url = NetUtils.restfulUrl(_path.toString(), _params);
     }
     try {
-      _options?.method = httpType.name;
+      _options?.method = _httpType.name;
       if(_headers.isNotEmpty){
-        _options?.headers = _headers;
+        options.headers = _headers;
       }
       Response<dynamic> response = await _rxNet.client!.download(
           url,
           savePath,
           onReceiveProgress: onReceiveProgress,
-          queryParameters: _params,
+          queryParameters: getEnableRestfulUrl()?{}:_params,
           data: _bodyData,
           options: options,
-          cancelToken: _cancelTokens[_cancleTag]);
+          cancelToken: _cancelTokens[getTag() ]);
       ///成功
       if(response.statusCode==200){
         if (success != null) {

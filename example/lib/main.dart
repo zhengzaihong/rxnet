@@ -63,9 +63,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
 
   void test() async{
-
     RxNet.get()
-        .setPath("api/weather/city/101030100")
+        .setPath("api/weather")
+        .setParam("city", "101030100")
+        .setEnableRestfulUrl(true) ///Restful
         .setCacheMode(CacheMode.onlyCache)
         .setJsonConvertAdapter(
           JsonConvertAdapter<WaterInfoEntity>((data){

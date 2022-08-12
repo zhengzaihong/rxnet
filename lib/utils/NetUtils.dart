@@ -13,31 +13,18 @@ class NetUtils {
         DatabaseUtil.database, getCacheKeyFromPath(path, params));
   }
 
-  /// 拼接get参数
-  static String fromMap2ParamsString(Map<String, dynamic> params) {
-    if (params.isEmpty) {
-      return "";
-    }
-    String paramsStr = "?";
-    params.forEach((key, value) {
-      paramsStr = "${"$key=$value"}&";
-    });
-    return paramsStr;
-  }
-
 
   ///restful处理
   static String restfulUrl(String url, Map<String, dynamic> params) {
-    // restful 请求处理
-    // /gysw/search/hist/:user_id        user_id=27
-    // 最终生成 url 为
-    // /gysw/search/hist/27
+    StringBuffer buffer = StringBuffer(url);
     params.forEach((key, value) {
-      if (url.contains(key)) {
-        url = url.replaceAll(':$key', value.toString());
-      }
+      buffer.write("/");
+      buffer.write(key);
+      buffer.write("/");
+      buffer.write(value);
     });
-    return url;
+
+    return buffer.toString().replaceAll("//", "/");
   }
 
 
