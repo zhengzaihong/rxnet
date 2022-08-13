@@ -1,4 +1,4 @@
-import 'package:rxnet/net/fun/fun_apply.dart';
+import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 
 ///
 /// create_user: zhengzaihong

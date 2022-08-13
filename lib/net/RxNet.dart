@@ -1,19 +1,9 @@
-import 'dart:collection';
 import 'dart:convert';
 import 'dart:core';
 import 'dart:io';
 import 'package:dio/adapter.dart';
 import 'package:dio/dio.dart';
-import 'package:rxnet/net/cache_mode.dart';
-import 'package:rxnet/net/fun/fun_apply.dart';
-import 'package:rxnet/net/json_convert_adapter.dart';
-import 'package:rxnet/net/type/http_type.dart';
-import 'package:rxnet/net/type/sources_type.dart';
-import 'package:rxnet/utils/DatabaseUtil.dart';
-import 'package:rxnet/utils/HttpError.dart';
-import 'package:rxnet/utils/LogUtil.dart';
-import 'package:rxnet/utils/NetUtils.dart';
-import 'package:rxnet/utils/TextUtil.dart';
+import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 
 ///
 /// create_user: zhengzaihong
@@ -301,7 +291,8 @@ class BuildRequest {
           cancelToken: _cancelTokens[getTag()]);
 
       ///成功
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200)
+      {
         if (_useJsonAdapter && getJsonConvertAdapter() != null) {
           LogUtil.v("useJsonAdapter：true");
           var data = getJsonConvertAdapter()?.jsonTransformation.call(response.data!);
@@ -321,7 +312,8 @@ class BuildRequest {
         } catch (e) {
           LogUtil.v("catch环境：web");
         }
-      } else {
+      }
+      else {
         if (readCache != null) {
           readCache.call();
         } else {
@@ -329,6 +321,7 @@ class BuildRequest {
           failure?.call(response.data);
         }
       }
+
     } on DioError catch (e, s) {
       LogUtil.v("请求出错：$e\n$s");
       if (failure != null && e.type != DioErrorType.cancel) {

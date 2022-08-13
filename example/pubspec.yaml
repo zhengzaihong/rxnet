@@ -18,7 +18,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  rxnet:
+  flutter_rxnet_forzzh:
     # When depending on this package from a real application you should use:
     #   rxnet: ^x.y.z
     # See https://dart.dev/tools/pub/dependencies#version-constraints

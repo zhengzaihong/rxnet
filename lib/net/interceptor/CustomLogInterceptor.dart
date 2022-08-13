@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
-import 'package:rxnet/utils/LogUtil.dart';
+import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 
 
 ///
