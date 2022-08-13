@@ -20,6 +20,7 @@ dependencies:
   flutter:
     sdk: flutter
 
+
   #MD5加密
   crypto:  ^3.0.2
 
@@ -29,11 +30,19 @@ dependencies:
   #sqflite数据库
   sqflite: ^2.0.3+1
 
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
+
+  #MD5加密
+  crypto: ^3.0.2
+
+  #dio网络请求
+  dio: ^4.0.6
+
+  #sqflite数据库
+  sqflite: ^2.0.3+1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

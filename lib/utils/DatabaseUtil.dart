@@ -1,5 +1,4 @@
-// ignore: depend_on_referenced_packages
-import 'package:path/path.dart' show join;
+import 'package:path/path.dart' as path ;
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseUtil {
@@ -39,7 +38,7 @@ class DatabaseUtil {
   ///生成数据库
   static Future<String> createDatabase() async {
     var databasesPath = await getDatabasesPath();
-    return join(databasesPath, "$dbName.db");
+    return path.join(databasesPath, "$dbName.db");
   }
 ///删除数据库
   static deleteMDatabase() async {
