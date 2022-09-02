@@ -89,22 +89,22 @@ Rxnet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
          });
 
 
- 3. 请求原始数据,某些特殊情况，如读取网盘资源文件数据
+ 3.请求原始数据,某些特殊情况，如读取网盘资源文件数据
 
 
 
-    RxNet.get<String>()
-        .setPath("http://www.bestyxlife.com/appInfo/test.json.txt")
-        .setCacheMode(CacheMode.onlyRequest)
-        .execute(success: (data,sourcesType){
-      var source = sourcesType as SourcesType;
-      content = data.toString();
-      ///数据来源是网络 界面上可以分别处理或提示 来源等
-      if(source == SourcesType.net){
-      }else{
-        /// 本地数据库
-      }
-    });
+        RxNet.get<String>()
+            .setPath("http://www.bestyxlife.com/appInfo/test.json.txt")
+            .setCacheMode(CacheMode.onlyRequest)
+            .execute(success: (data,sourcesType){
+          var source = sourcesType as SourcesType;
+          content = data.toString();
+          ///数据来源是网络 界面上可以分别处理或提示 来源等
+          if(source == SourcesType.net){
+          }else{
+            /// 本地数据库
+          }
+        });
 
 
  4.请求数据直接转 Bean对象
