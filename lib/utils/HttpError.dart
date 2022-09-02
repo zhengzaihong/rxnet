@@ -10,14 +10,8 @@ import 'package:dio/dio.dart';
 ///
 class HttpError {
 
-  static const int UNAUTHORIZED = 401;
-  static const int FORBIDDEN = 403;
-  static const int NOT_FOUND = 404;
-  static const int REQUEST_TIMEOUT = 408;
-  static const int INTERNAL_SERVER_ERROR = 500;
-  static const int BAD_GATEWAY = 502;
-  static const int SERVICE_UNAVAILABLE = 503;
-  static const int GATEWAY_TIMEOUT = 504;
+  ///请求失败
+  static const String REQUEST_FAILE = "REQUEST_FAILE";
 
   ///未知错误
   static const String UNKNOWN = "UNKNOWN";
@@ -50,7 +44,9 @@ class HttpError {
 
   String? message;
 
-  HttpError(this.code, this.message);
+  dynamic bodyData;
+
+  HttpError(this.code, this.message,this.bodyData);
 
   HttpError.dioError(DioError error) {
     message = error.message;

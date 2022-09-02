@@ -90,34 +90,34 @@ class RxNet {
     }
   }
 
-  static BuildRequest get() {
+  static BuildRequest get<T>() {
     return BuildRequest(
       HttpType.get,
       RxNet(),
     );
   }
-  static BuildRequest post() {
+  static BuildRequest post<T>() {
     return BuildRequest(
       HttpType.post,
       RxNet(),
     );
   }
 
-  static BuildRequest delete() {
+  static BuildRequest delete<T>() {
     return BuildRequest(
       HttpType.delete,
       RxNet(),
     );
   }
 
-  static BuildRequest put() {
+  static BuildRequest put<T>() {
     return BuildRequest(
       HttpType.put,
       RxNet(),
     );
   }
 
-  static BuildRequest patch() {
+  static BuildRequest patch<T>() {
     return BuildRequest(
       HttpType.patch,
       RxNet(),
@@ -137,7 +137,7 @@ class RxNet {
 
 
 
-class BuildRequest {
+class BuildRequest<T> {
 
   final HttpType _httpType;
 
@@ -157,7 +157,7 @@ class BuildRequest {
 
   bool _useJsonAdapter = true;
 
-  JsonConvertAdapter? _jsonConvertAdapter;
+  JsonConvertAdapter<T>? _jsonConvertAdapter;
 
   Options? _options;
 
@@ -170,12 +170,12 @@ class BuildRequest {
     return this;
   }
 
-  BuildRequest setJsonConvertAdapter(JsonConvertAdapter adapter) {
+  BuildRequest setJsonConvertAdapter(JsonConvertAdapter<T> adapter) {
     _jsonConvertAdapter = adapter;
     return this;
   }
 
-  JsonConvertAdapter? getJsonConvertAdapter() {
+  JsonConvertAdapter<T>? getJsonConvertAdapter() {
     return _jsonConvertAdapter;
   }
 
@@ -283,7 +283,8 @@ class BuildRequest {
       if(_headers.isNotEmpty){
         _options?.headers = _headers;
       }
-      Response<Map<String, dynamic>> response = await _rxNet.client!.request(
+      // Response<Map<String, dynamic>> response = await _rxNet.client!.request(
+      Response<T> response = await _rxNet.client!.request(
           url,
           data: _bodyData,
           queryParameters: getEnableRestfulUrl()?{}:_params,
@@ -295,7 +296,7 @@ class BuildRequest {
       {
         if (_useJsonAdapter && getJsonConvertAdapter() != null) {
           LogUtil.v("useJsonAdapter：true");
-          var data = getJsonConvertAdapter()?.jsonTransformation.call(response.data!);
+          var data = getJsonConvertAdapter()?.jsonTransformation.call(response.data);
           success?.call(data!, SourcesType.net);
         } else {
           LogUtil.v("useJsonAdapter：false");
@@ -318,19 +319,21 @@ class BuildRequest {
           readCache.call();
         } else {
           ///失败
-          failure?.call(response.data);
+          failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败",response.data));
         }
       }
 
     } on DioError catch (e, s) {
       LogUtil.v("请求出错：$e\n$s");
       if (failure != null && e.type != DioErrorType.cancel) {
-        failure(HttpError.dioError(e));
+        var error = HttpError.dioError(e);
+        error.bodyData = e;
+        failure(error);
       }
     } catch (e, s) {
       LogUtil.v("未知异常出错：$e\n$s");
       if (failure != null) {
-        failure(HttpError(HttpError.UNKNOWN, "未知错误"));
+        failure.call(HttpError(HttpError.UNKNOWN, "未知异常出错",e));
       }
     }
   }
@@ -428,7 +431,8 @@ class BuildRequest {
       if(_headers.isNotEmpty){
         _options?.headers = _headers;
       }
-      Response<Map<String, dynamic>> response = await _rxNet.client!.request(
+      Response<T> response = await _rxNet.client!.request(
+      // Response<Map<String, dynamic>> response = await _rxNet.client!.request(
           url,
           onSendProgress: onSendProgress,
           data: _bodyData,
@@ -439,18 +443,20 @@ class BuildRequest {
       if(response.statusCode == 200){
         success?.call(response.data, SourcesType.net);
       }else{
-        failure?.call(response.data);
+        failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败",response.data));
       }
 
     } on DioError catch (e, s) {
       LogUtil.v("请求出错：$e\n$s");
       if (failure != null && e.type != DioErrorType.cancel) {
-        failure(HttpError.dioError(e));
+        var error = HttpError.dioError(e);
+        error.bodyData = e;
+        failure(error);
       }
     } catch (e, s) {
       LogUtil.v("未知异常出错：$e\n$s");
       if (failure != null) {
-        failure(HttpError(HttpError.UNKNOWN, "网络异常，请稍后重试！"));
+        failure(HttpError(HttpError.UNKNOWN, "网络异常，请稍后重试！",e));
       }
     }
   }
@@ -494,7 +500,7 @@ class BuildRequest {
           success(response.data,SourcesType.net);
         }
       }else{
-        failure?.call(response.data);
+        failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败",response.data));
       }
     } on DioError catch (e, s) {
       LogUtil.v("请求出错：$e\n$s");
@@ -504,7 +510,7 @@ class BuildRequest {
     } catch (e, s) {
       LogUtil.v("未知异常出错：$e\n$s");
       if (failure != null) {
-        failure(HttpError(HttpError.UNKNOWN, "网络异常，请稍后重试！"));
+        failure(HttpError(HttpError.UNKNOWN, "网络异常，请稍后重试！",e));
       }
     }
   }

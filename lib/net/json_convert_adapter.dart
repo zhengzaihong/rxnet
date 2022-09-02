@@ -9,7 +9,7 @@ import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 ///
 class JsonConvertAdapter<T>{
 
-  JsonTransformation<T> jsonTransformation;
+  JsonTransformation jsonTransformation;
 
   JsonConvertAdapter(this.jsonTransformation);
 

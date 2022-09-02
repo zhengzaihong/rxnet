@@ -1,11 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:rxnet_example/bean/BaseBean.dart';
-import 'package:rxnet_example/bean/water_info_entity.dart';
-import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
+import 'package:rxnet_example/bean/normal_water_info_entity.dart';
 
 void main() {
   RxNet().init(
@@ -103,36 +102,78 @@ class _MyHomePageState extends State<MyHomePage> {
   String content = "";
 
   void request() {
-    RxNet.get()
+
+    RxNet.get<String>()
+        .setPath("http://www.bestyxlife.com/appInfo/test.json.txt")
+        .setCacheMode(CacheMode.onlyRequest)
+        .execute(success: (data,mo){
+      var source = mo as SourcesType;
+      content = data.toString();
+      ///数据来源是网络
+      /// 界面上可以分别处理或提示 来源等
+      if(source == SourcesType.net){
+      }else{
+        /// 本地数据库
+      }
+    });
+
+
+    // RxNet.get<WaterInfoEntity>()
+    //     .setPath("api/weather")
+    //     .setParam("city", "101030100")
+    //     .setEnableRestfulUrl(true) ///Restful
+    //     .setCacheMode(CacheMode.onlyRequest)
+    //     .setJsonConvertAdapter(
+    //     JsonConvertAdapter<WaterInfoEntity>((data){
+    //       ///这里利用了idea jsonToDart 插件
+    //       var base =  BaseBean<WaterInfoEntity>.fromJson(data);
+    //       if(base.status == 200){
+    //         return base.data;
+    //       }
+    //       /// 返回空数据模板 等
+    //       return WaterInfoEntity();
+    //     }))
+    //     .execute(success: (data,mo){
+    //         var source = mo as SourcesType;
+    //         if(data is WaterInfoEntity){
+    //
+    //         }
+    //         content = data.toString();
+    //         ///数据来源是网络
+    //         /// 界面上可以分别处理或提示 来源等
+    //         if(source == SourcesType.net){
+    //         }else{
+    //           /// 本地数据库
+    //         }
+    //         setState(() {});
+    //   });
+
+
+
+    RxNet.get<NormalWaterInfoEntity>()  //这里可以省略 泛型声明
         .setPath("api/weather")
         .setParam("city", "101030100")
         .setEnableRestfulUrl(true) ///Restful
         .setCacheMode(CacheMode.onlyRequest)
         .setJsonConvertAdapter(
-        JsonConvertAdapter<WaterInfoEntity>((data){
-          ///这里利用了idea jsonToDart 插件
-          var base =  BaseBean<WaterInfoEntity>.fromJson(data);
-          if(base.status == 200){
-            return base.data;
-          }
-          /// 返回空数据模板 等
-          return WaterInfoEntity();
+        JsonConvertAdapter<NormalWaterInfoEntity>((data){
+          return NormalWaterInfoEntity.fromJson(data);
         }))
         .execute(success: (data,mo){
-            var source = mo as SourcesType;
-            if(data is WaterInfoEntity){
-              print("---------->${data.toString()}");
-              content = data.toString();
-            }
-            print("---------->${data.toString()}");
-            ///数据来源是网络
-            /// 界面上可以分别处理或提示 来源等
-            if(source == SourcesType.net){
-            }else{
-              /// 本地数据库
-            }
-            setState(() {});
-      });
+      var source = mo as SourcesType;
+      if(data is NormalWaterInfoEntity){
+        content = data.toString();
+        print("------>${data.message}");
+      }
+      ///数据来源是网络
+      /// 界面上可以分别处理或提示 来源等
+      if(source == SourcesType.net){
+      }else{
+        /// 本地数据库
+      }
+      setState(() {});
+    });
+
   }
 
   String downloadPath = "";
