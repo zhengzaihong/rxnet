@@ -97,13 +97,13 @@ Rxnet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
             .setPath("http://www.bestyxlife.com/appInfo/test.json.txt")
             .setCacheMode(CacheMode.onlyRequest)
             .execute(success: (data,sourcesType){
-          var source = sourcesType as SourcesType;
-          content = data.toString();
-          ///数据来源是网络 界面上可以分别处理或提示 来源等
-          if(source == SourcesType.net){
-          }else{
-            /// 本地数据库
-          }
+              var source = sourcesType as SourcesType;
+              content = data.toString();
+              ///数据来源是网络 界面上可以分别处理或提示 来源等
+              if(source == SourcesType.net){
+              }else{
+                /// 本地数据库
+              }
         });
 
 
