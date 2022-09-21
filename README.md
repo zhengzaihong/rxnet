@@ -94,7 +94,7 @@ Rxnet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
 
 
         RxNet.get<String>()
-            .setPath("http://www.bestyxlife.com/appInfo/test.json.txt")
+            .setPath("http://xxxxx/xxxx/testjson.txt")
             .setCacheMode(CacheMode.onlyRequest)
             .execute(success: (data,sourcesType){
               var source = sourcesType as SourcesType;
