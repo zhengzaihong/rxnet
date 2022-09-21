@@ -17,7 +17,7 @@
 
 CacheMode：支持如下几种模式：
 
-    1.没有缓存
+    1.不做缓存，只网络数据
     onlyRequest,
     
     2.请求成功后存储缓存
@@ -51,7 +51,7 @@ Rxnet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
     RxNet().init(
         baseUrl: "http://t.weather.sojson.com/",
         dbName: "test", ///数据库名字
-        tableName: "project" ,///表明
+        tableName: "project" ,///表名
         isDebug: true, ///是否调试 打印日志
         interceptors: [  ///拦截器
         CustomLogInterceptor()
@@ -114,6 +114,10 @@ Rxnet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
         .setParam("city", "101030100")
         .setEnableRestfulUrl(true) ///Restful
         .setCacheMode(CacheMode.onlyRequest)
+        .setCheckNetwork((){
+          //todo 检查网络的实现（非必要）
+           return true;
+        })
         .setJsonConvertAdapter(
             JsonConvertAdapter<NormalWaterInfoEntity>((data){
               return NormalWaterInfoEntity.fromJson(data);
