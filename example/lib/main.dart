@@ -154,7 +154,11 @@ class _MyHomePageState extends State<MyHomePage> {
         .setPath("api/weather")
         .setParam("city", "101030100")
         .setEnableRestfulUrl(true) ///Restful
-        .setCacheMode(CacheMode.onlyRequest)
+        .setCacheMode(CacheMode.requestFailedReadCache)
+        .setCheckNetwork((){
+            //todo 检查网络的实现
+          return true;
+        })
         .setJsonConvertAdapter(
         JsonConvertAdapter<NormalWaterInfoEntity>((data){
           return NormalWaterInfoEntity.fromJson(data);
@@ -168,8 +172,10 @@ class _MyHomePageState extends State<MyHomePage> {
       ///数据来源是网络
       /// 界面上可以分别处理或提示 来源等
       if(source == SourcesType.net){
+        print("------网络");
       }else{
         /// 本地数据库
+        print("------本地");
       }
       setState(() {});
     });

@@ -10,7 +10,7 @@ import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 /// email:1096877329@qq.com
 /// create_date: 2022/8/9
 /// create_time: 18:03
-/// describe: 网络请求工具库，支持多种缓存模式（目前只支持 android 和 IOS 平台，因为数据缓存基于sqlite）
+/// describe: 网络请求工具库，支持多种缓存模式（缓存策略目前只支持 android 和 IOS  HarmoneyOS平台）
 
 ///同一个CancelToken可以用于多个请求，当一个CancelToken取消时，所有使用该CancelToken的请求都会被取消。
 final Map<String, CancelToken> _cancelTokens = <String, CancelToken>{};
@@ -31,11 +31,8 @@ class RxNet {
   /// 创建 dio 实例对象
   RxNet._internal() {
     var options = BaseOptions(
-        // connectTimeout: connectTimeout,
-        // receiveTimeout: receiveTimeout,
         contentType: Headers.jsonContentType,
         responseType: ResponseType.json);
-
     _client ??= Dio(options);
   }
 
@@ -79,11 +76,12 @@ class RxNet {
 
   /// isProxyEnable 为true 才会生效
   /// 前置方法 setEnableProxy
-  void setProxy(String ip,int port){
+  void setProxy(String address){
     if(isEnableProxy()){
       (_instance.client?.httpClientAdapter as DefaultHttpClientAdapter).onHttpClientCreate = (client) {
         client.findProxy = (uri) {
-          return "PROXY $ip:$port";
+          ///ip:prort
+          return address;
         };
         client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
       };
@@ -125,10 +123,10 @@ class RxNet {
   }
 
   ///取消网络请求
-  void cancel(String tag) {
+  void cancel(String tag,{dynamic reason}) {
     if (_cancelTokens.containsKey(tag)) {
       if (!_cancelTokens[tag]!.isCancelled) {
-        _cancelTokens[tag]?.cancel();
+        _cancelTokens[tag]?.cancel(reason);
       }
       _cancelTokens.remove(tag);
     }
@@ -162,6 +160,8 @@ class BuildRequest<T> {
   Options? _options;
 
   bool _enableRestfulUrl = false;
+
+  CheckNetWork? checkNetWork;
 
   BuildRequest(this._httpType, this._rxNet);
 
@@ -261,8 +261,8 @@ class BuildRequest<T> {
   }
 
   ///提供一个检查网络的方法，外部需要自行实现
-  BuildRequest setCheckNetwork(CheckNetwork? checkNetwork){
-    checkNetwork?.call();
+  BuildRequest setCheckNetwork(CheckNetWork checkNetWork){
+    this.checkNetWork = checkNetWork;
     return this;
   }
 
@@ -303,7 +303,6 @@ class BuildRequest<T> {
           success?.call(response.data, SourcesType.net);
         }
 
-        /// 数据库目前只支持 android 和 ios
         try {
           if (cache && (Platform.isIOS || Platform.isAndroid)) {
             String cacheKey = NetUtils.getCacheKeyFromPath("$_path", _params);
@@ -325,15 +324,25 @@ class BuildRequest<T> {
 
     } on DioError catch (e, s) {
       LogUtil.v("请求出错：$e\n$s");
+      var error = HttpError.dioError(e);
       if (failure != null && e.type != DioErrorType.cancel) {
-        var error = HttpError.dioError(e);
         error.bodyData = e;
-        failure(error);
+      }
+      if (readCache != null) {
+        LogUtil.v("网络请求失败，开始读取缓存：");
+        readCache.call();
+      } else {
+        ///失败
+        failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败",error));
       }
     } catch (e, s) {
       LogUtil.v("未知异常出错：$e\n$s");
-      if (failure != null) {
-        failure.call(HttpError(HttpError.UNKNOWN, "未知异常出错",e));
+      if (readCache != null) {
+        LogUtil.v("网络请求失败，开始读取缓存：");
+        readCache.call();
+      } else {
+        ///失败
+        failure?.call(HttpError(HttpError.UNKNOWN, "未知异常出错",e));
       }
     }
   }
@@ -361,18 +370,42 @@ class BuildRequest<T> {
       HttpSuccessCallback? success,
       HttpFailureCallback? failure,
       ){
-    DatabaseUtil.setDataBaseReadListener((isOk){
-      NetUtils.getCache("$_path", _params).then((list) {
-        if (list.isNotEmpty) {
-          _parseLocalData(success,failure,list);
-        } else {
-          failure?.call({});
-        }
+
+    if(DatabaseUtil.isDatabaseReady){
+      _readCacheAction(success,failure);
+    }else{
+      DatabaseUtil.setDataBaseReadListener((isOk){
+        _readCacheAction(success,failure);
       });
+    }
+  }
+
+  void _readCacheAction(
+      HttpSuccessCallback? success,
+      HttpFailureCallback? failure,
+      ){
+    NetUtils.getCache("$_path", _params).then((list) {
+      if (list.isNotEmpty) {
+        LogUtil.v("缓存数据:$list");
+        _parseLocalData(success,failure,list);
+      } else {
+        failure?.call({});
+      }
     });
   }
 
+
   BuildRequest execute({HttpSuccessCallback? success, HttpFailureCallback? failure}) {
+
+    ///如果设置了网络检查 请返回是否启用请求的状态。
+    if(checkNetWork!=null){
+      bool status = checkNetWork?.call()??true;
+      ///如果网络检查失败 或者 false 将不会执行请求。
+      if(!status){
+        return this;
+      }
+    }
+
     switch (_cacheMode) {
       case CacheMode.onlyRequest:
         {
@@ -422,6 +455,14 @@ class BuildRequest<T> {
     HttpSuccessCallback? success,
     HttpFailureCallback? failure,
   }) async {
+
+    if(checkNetWork!=null){
+      bool status = checkNetWork?.call()??true;
+      if(!status){
+        return;
+      }
+    }
+
     String url = _path.toString();
     if (getEnableRestfulUrl()) {
       url = NetUtils.restfulUrl(_path.toString(), _params);
@@ -471,6 +512,12 @@ class BuildRequest<T> {
     HttpFailureCallback? failure,
   }) async {
 
+    if(checkNetWork!=null){
+      bool status = checkNetWork?.call()??true;
+      if(!status){
+        return;
+      }
+    }
     ///0代表不设置超时
     int receiveTimeout = 0;
     var options = _options??Options(
