@@ -2,19 +2,27 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:rxnet_example/bean/normal_water_info_entity.dart';
+import 'package:flutter_uikit_forzzh/uikitlib.dart';
+import 'package:rxnet_example/get_request_page.dart';
+
+import 'download_page.dart';
 
 void main() {
   RxNet().init(
       baseUrl: "http://t.weather.sojson.com/",
-      dbName: "test", ///数据库名字
-      tableName: "project" ,///表明
-      isDebug: true, ///是否调试 打印日志
-      interceptors: [  ///拦截器
-      CustomLogInterceptor()
-  ]);
+      dbName: "test",
+
+      ///数据库名字
+      tableName: "project",
+
+      ///表明
+      isDebug: true,
+
+      ///是否调试 打印日志
+      interceptors: [
+        ///拦截器
+        CustomLogInterceptor()
+      ]);
   runApp(const MyApp());
 }
 
@@ -23,13 +31,12 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     return MaterialApp(
       title: 'Flutter Rxnet',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const MyHomePage(title: 'Flutter Rxnet Home Page'),
+      home: const MyHomePage(title: 'Flutter RxNet Home Page'),
     );
   }
 }
@@ -44,180 +51,39 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Column(
-        children:  <Widget>[
-          SizedBox(height: 40),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton(
-                  onPressed: (){
-                    request();
-                  },
-                  style: ButtonStyle(
-                    backgroundColor:MaterialStateProperty.all(Colors.cyan),
-                  ),
-                  child: Text("发起get请求",style: TextStyle(color: Colors.black,fontSize: 16)),),
-
-
-                TextButton(
-                  onPressed: (){
-                    download();
-                  },
-                  style: ButtonStyle(
-                    backgroundColor:MaterialStateProperty.all(Colors.cyan),
-                  ),
-                  child: Text("下载",style: TextStyle(color: Colors.black,fontSize: 16)),),
-          ]),
-
-          Expanded(child:Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-
-              Text("数据来源：${sourcesType == SourcesType.net ? "网络" :"缓存"}",style: const TextStyle(color: Colors.black,fontSize: 16)),
-              Expanded(
-                flex: 2,
-                  child: Text(content,style:const TextStyle(color: Colors.black,fontSize: 12))),
-
-              Expanded(child: Row(
-                children: [
-                  Text("保存地址：$downloadPath",style: const TextStyle(color: Colors.black,fontSize: 16)),
-                ],
-              ))
-            ],
-          ))
-
+        children: <Widget>[
+          buildButton("getDemo", const GetRequestPage()),
+          buildButton("download demo", const DownLoadPage())
         ],
       ),
     );
   }
 
-
-  SourcesType sourcesType =SourcesType.net;
-  String content = "";
-
-  void request() {
-    //
-    // RxNet.get<String>()
-    //     .setPath("http://www.bestyxlife.com/appInfo/test.json.txt")
-    //     .setCacheMode(CacheMode.onlyRequest)
-    //     .execute(success: (data,mo){
-    //   var source = mo as SourcesType;
-    //   content = data.toString();
-    //   ///数据来源是网络
-    //   /// 界面上可以分别处理或提示 来源等
-    //   if(source == SourcesType.net){
-    //   }else{
-    //     /// 本地数据库
-    //   }
-    // });
-
-
-    // RxNet.get<WaterInfoEntity>()
-    //     .setPath("api/weather")
-    //     .setParam("city", "101030100")
-    //     .setEnableRestfulUrl(true) ///Restful
-    //     .setCacheMode(CacheMode.onlyRequest)
-    //     .setJsonConvertAdapter(
-    //     JsonConvertAdapter<WaterInfoEntity>((data){
-    //       ///这里利用了idea jsonToDart 插件
-    //       var base =  BaseBean<WaterInfoEntity>.fromJson(data);
-    //       if(base.status == 200){
-    //         return base.data;
-    //       }
-    //       /// 返回空数据模板 等
-    //       return WaterInfoEntity();
-    //     }))
-    //     .execute(success: (data,mo){
-    //         var source = mo as SourcesType;
-    //         if(data is WaterInfoEntity){
-    //
-    //         }
-    //         content = data.toString();
-    //         ///数据来源是网络
-    //         /// 界面上可以分别处理或提示 来源等
-    //         if(source == SourcesType.net){
-    //         }else{
-    //           /// 本地数据库
-    //         }
-    //         setState(() {});
-    //   });
-
-
-
-    RxNet.get<NormalWaterInfoEntity>()  //这里可以省略 泛型声明
-        .setPath("api/weather")
-        .setParam("city", "101030100")
-        .setEnableRestfulUrl(true) ///Restful
-        .setCacheMode(CacheMode.requestFailedReadCache)
-        .setCheckNetwork((){
-            //todo 检查网络的实现
-          return true;
-        })
-        .setJsonConvertAdapter(
-        JsonConvertAdapter<NormalWaterInfoEntity>((data){
-          return NormalWaterInfoEntity.fromJson(data);
-        }))
-        .execute(success: (data,mo){
-      var source = mo as SourcesType;
-      if(data is NormalWaterInfoEntity){
-        content = data.toString();
-        print("------>${data.message}");
-      }
-      ///数据来源是网络
-      /// 界面上可以分别处理或提示 来源等
-      if(source == SourcesType.net){
-        print("------网络");
-      }else{
-        /// 本地数据库
-        print("------本地");
-      }
-      setState(() {});
-    });
-
+  Widget buildButton(String name, Widget page) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [Container(
+      height: 60,
+      width: 200,
+      margin: const EdgeInsets.only(top: 30),
+      child: GestureDetector(
+          child: Row(children: [
+            Expanded(
+                child: TextButton(
+                  onPressed: () {
+                    RouteUtils.push(context, page);
+                  },
+                  style: ButtonStyle(
+                    backgroundColor: MaterialStateProperty.all(Colors.cyan),
+                  ),
+                  child: Text(name,
+                      style: const TextStyle(color: Colors.black, fontSize: 16)),
+                ))
+          ])),
+    )],);
   }
-
-  String downloadPath = "";
-  void download() async{
-
-    requestPermission();
-    Directory? appDocDir =  await getExternalStorageDirectory();
-    String? appDocPath = "${appDocDir?.path}/test.jpg";
-
-
-    RxNet.get()
-        .setPath("https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg")
-        .download(
-          savePath:appDocPath,
-          onReceiveProgress: (len,total){
-            print("len:$len,total:$total");
-            if(len ==total){
-              downloadPath = appDocPath;
-              setState(() {
-
-              });
-            }
-          });
-
-  }
-
-  ///请求系统权限，让用户确认授权
-  void requestPermission()  {
-    List<Permission> permissions = <Permission>[
-      Permission.storage
-    ];
-
-    for (var element in permissions) {
-      element.request().then((value){
-        print("------permissions：${value.name}");
-      });
-    }
-  }
-
-
 }
