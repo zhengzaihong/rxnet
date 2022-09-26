@@ -10,7 +10,7 @@ import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 /// email:1096877329@qq.com
 /// create_date: 2022/8/9
 /// create_time: 18:03
-/// describe: 网络请求工具库，支持多种缓存模式（缓存策略目前只支持 android 和 IOS  HarmoneyOS平台）
+/// describe: 网络请求工具库，支持多种缓存模式（缓存策略目前只支持 android HarmonyOS 和 IOS MACOS平台）
 
 ///同一个CancelToken可以用于多个请求，当一个CancelToken取消时，所有使用该CancelToken的请求都会被取消。
 final Map<String, CancelToken> _cancelTokens = <String, CancelToken>{};

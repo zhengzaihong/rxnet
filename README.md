@@ -1,14 +1,14 @@
-# Rxnet 
+# RxNet 
 
-一款极简且强大Flutter网络请求工具，支持restful,泛型请求，数据缓存。该库是对Dio网络库的扩展。
+一款极简且强大Flutter网络请求工具，支持restful、泛型请求、数据缓存(无网请求)。该库是对Dio的扩展,同步的写法异步的实现，使用更加自然。
 
-注意：数据缓存只支持 Andorid 和IOS 平台，内部是基于sqlite实现。
+注意：数据缓存只支持 Andorid、HarmonyOS 和 IOS 、MACOS平台。
 
 ## 依赖：
 
     dependencies:
     
-       flutter_rxnet_forzzh:0.0.2
+       flutter_rxnet_forzzh:0.0.3
 
 
 ## 常用参数：
@@ -137,7 +137,7 @@ Rxnet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
         });
 
  
-    注意：如果有全局公共 BaseBean可以如说明 2中方式转换。如果没有则你的每个数据模型应当建全字段。
+    注意：如果有全局公共 BaseBean可以如说明 2 中方式转换。如果没有则你的每个数据模型应当建全字段。
          setJsonConvertAdapter()设置需要转换的模型
 
 
@@ -159,7 +159,7 @@ Rxnet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
   
     RxNet.post()
         .setPath(
-            "https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg")
+            "xxxxx.jpg")
         .upload(
             success: (data, sourcesType) {},
             failure: (e) {},

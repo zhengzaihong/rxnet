@@ -8,21 +8,16 @@ import 'package:rxnet_example/get_request_page.dart';
 import 'download_page.dart';
 
 void main() {
+
   RxNet().init(
       baseUrl: "http://t.weather.sojson.com/",
-      dbName: "test",
-
-      ///数据库名字
-      tableName: "project",
-
-      ///表明
-      isDebug: true,
-
-      ///是否调试 打印日志
-      interceptors: [
-        ///拦截器
+      dbName: "test",   ///数据库名字
+      tableName: "project", ///表明
+      isDebug: true,   ///是否调试 打印日志
+      interceptors: [  ///拦截器
         CustomLogInterceptor()
       ]);
+
   runApp(const MyApp());
 }
 
@@ -66,24 +61,27 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget buildButton(String name, Widget page) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: [Container(
-      height: 60,
-      width: 200,
-      margin: const EdgeInsets.only(top: 30),
-      child: GestureDetector(
-          child: Row(children: [
+      children: [
+        Container(
+          height: 60,
+          width: 200,
+          margin: const EdgeInsets.only(top: 30),
+          child: GestureDetector(
+              child: Row(children: [
             Expanded(
                 child: TextButton(
-                  onPressed: () {
-                    RouteUtils.push(context, page);
-                  },
-                  style: ButtonStyle(
-                    backgroundColor: MaterialStateProperty.all(Colors.cyan),
-                  ),
-                  child: Text(name,
-                      style: const TextStyle(color: Colors.black, fontSize: 16)),
-                ))
+              onPressed: () {
+                RouteUtils.push(context, page);
+              },
+              style: ButtonStyle(
+                backgroundColor: MaterialStateProperty.all(Colors.cyan),
+              ),
+              child: Text(name,
+                  style: const TextStyle(color: Colors.black, fontSize: 16)),
+            ))
           ])),
-    )],);
+        )
+      ],
+    );
   }
 }
