@@ -30,6 +30,10 @@ class RxNet {
 
   CheckNetWork? baseCheckNet;
 
+  RequestCaptureError? requestCaptureError;
+
+  CacheMode? baseCacheMode;
+
   /// 创建 dio 实例对象
   RxNet._internal() {
     var options = BaseOptions(
@@ -49,9 +53,17 @@ class RxNet {
     BaseOptions? options,
     bool isDebug = true,
     CheckNetWork? baseCheckNet,
+    RequestCaptureError? requestCaptureError,
+    CacheMode? baseCacheMode,
   }) {
 
     LogUtil.init(isDebug: isDebug);
+
+    this.baseCheckNet = baseCheckNet;
+    this.baseCacheMode = baseCacheMode;
+    this.requestCaptureError = requestCaptureError;
+
+
     if (options != null) {
       _client?.options = options;
     }
@@ -148,7 +160,7 @@ class BuildRequest<T> {
 
   String? _path;
 
-  CacheMode _cacheMode = CacheMode.onlyRequest;
+  CacheMode? _cacheMode;
 
   Map<String, dynamic> _params = {};
 
@@ -286,7 +298,6 @@ class BuildRequest<T> {
       if(_headers.isNotEmpty){
         _options?.headers = _headers;
       }
-      // Response<Map<String, dynamic>> response = await _rxNet.client!.request(
       Response<T> response = await _rxNet.client!.request(
           url,
           data: _bodyData,
@@ -327,6 +338,7 @@ class BuildRequest<T> {
 
     } on DioError catch (e, s) {
       LogUtil.v("请求出错：$e\n$s");
+      _collectError(e);
       var error = HttpError.dioError(e);
       if (failure != null && e.type != DioErrorType.cancel) {
         error.bodyData = e;
@@ -340,6 +352,7 @@ class BuildRequest<T> {
       }
     } catch (e, s) {
       LogUtil.v("未知异常出错：$e\n$s");
+      _collectError(e);
       if (readCache != null) {
         LogUtil.v("网络请求失败，开始读取缓存：");
         readCache.call();
@@ -398,25 +411,24 @@ class BuildRequest<T> {
   }
 
 
-  BuildRequest execute({HttpSuccessCallback? success, HttpFailureCallback? failure}) {
+  void execute({HttpSuccessCallback? success, HttpFailureCallback? failure}) async{
 
     ///如果设置了网络检查 请返回是否启用请求的状态。
     if(checkNetWork!=null){
-      bool status = checkNetWork?.call()??true;
       ///如果网络检查失败 或者 false 将不会执行请求。
-      if(!status){
-        return this;
+      if(! await checkNetWork!.call()){
+        return ;
       }
     }else{
       if(_rxNet.baseCheckNet!=null){
-        bool status = checkNetWork?.call()??true;
         ///如果网络检查失败 或者 false 将不会执行请求。
-        if(!status){
-          return this;
+        if(!await _rxNet.baseCheckNet!.call()){
+          return ;
         }
       }
     }
 
+    _cacheMode = _cacheMode??(_rxNet.baseCacheMode??CacheMode.onlyRequest);
     switch (_cacheMode) {
       case CacheMode.onlyRequest:
         {
@@ -456,7 +468,7 @@ class BuildRequest<T> {
           break;
         }
     }
-    return this;
+    return ;
   }
 
 
@@ -468,7 +480,7 @@ class BuildRequest<T> {
   }) async {
 
     if(checkNetWork!=null){
-      bool status = checkNetWork?.call()??true;
+      bool status = await checkNetWork?.call()??true;
       if(!status){
         return;
       }
@@ -484,7 +496,6 @@ class BuildRequest<T> {
         _options?.headers = _headers;
       }
       Response<T> response = await _rxNet.client!.request(
-      // Response<Map<String, dynamic>> response = await _rxNet.client!.request(
           url,
           onSendProgress: onSendProgress,
           data: _bodyData,
@@ -499,6 +510,7 @@ class BuildRequest<T> {
       }
 
     } on DioError catch (e, s) {
+      _collectError(e);
       LogUtil.v("请求出错：$e\n$s");
       if (failure != null && e.type != DioErrorType.cancel) {
         var error = HttpError.dioError(e);
@@ -506,6 +518,7 @@ class BuildRequest<T> {
         failure(error);
       }
     } catch (e, s) {
+      _collectError(e);
       LogUtil.v("未知异常出错：$e\n$s");
       if (failure != null) {
         failure(HttpError(HttpError.UNKNOWN, "网络异常，请稍后重试！",e));
@@ -524,7 +537,7 @@ class BuildRequest<T> {
   }) async {
 
     if(checkNetWork!=null){
-      bool status = checkNetWork?.call()??true;
+      bool status = await checkNetWork?.call()??true;
       if(!status){
         return;
       }
@@ -565,12 +578,19 @@ class BuildRequest<T> {
       if (failure != null && e.type != DioErrorType.cancel) {
         failure(HttpError.dioError(e));
       }
+      _collectError(e);
     } catch (e, s) {
       LogUtil.v("未知异常出错：$e\n$s");
+      _collectError(e);
       if (failure != null) {
         failure(HttpError(HttpError.UNKNOWN, "网络异常，请稍后重试！",e));
       }
     }
   }
 
+  void _collectError(dynamic e){
+    if(_rxNet.requestCaptureError!=null){
+      _rxNet.requestCaptureError!.call(e);
+    }
+  }
 }

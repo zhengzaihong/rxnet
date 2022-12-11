@@ -1,7 +1,9 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
-import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
+import 'package:flutter_rxnet_forzzh/utils/LogUtil.dart';
+
+
 
 
 ///
@@ -55,28 +57,31 @@ class CustomLogInterceptor extends Interceptor {
   ///
   void Function(Object object) logPrint;
 
+  final Map<String,int> _requestMaps = {};
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     super.onRequest(options, handler);
-      logPrint('*** Request ***');
-      printKV('uri', options.uri);
-      if (request) {
-        printKV('method', options.method);
-        printKV('responseType', options.responseType.toString());
-        printKV('followRedirects', options.followRedirects);
-        printKV('connectTimeout', options.connectTimeout);
-        printKV('receiveTimeout', options.receiveTimeout);
-        printKV('extra', options.extra);
-      }
-      if (requestHeader) {
-        logPrint('headers:');
-        options.headers.forEach((key, v) => printKV(" $key", v));
-      }
-      if (requestBody) {
-        logPrint("data:");
-        printAll(jsonEncode(options.data));
-      }
-      logPrint("");
+    logPrint('*** Request ***');
+    _requestMaps[options.uri.toString()] =DateTime.now().millisecondsSinceEpoch;
+    printKV('uri', options.uri);
+    if (request) {
+      printKV('method', options.method);
+      printKV('responseType', options.responseType.toString());
+      printKV('followRedirects', options.followRedirects);
+      printKV('connectTimeout', options.connectTimeout);
+      printKV('receiveTimeout', options.receiveTimeout);
+      printKV('extra', options.extra);
+    }
+    if (requestHeader) {
+      logPrint('headers:');
+      options.headers.forEach((key, v) => printKV(" $key", v));
+    }
+    if (requestBody) {
+      logPrint("data:");
+      printAll(jsonEncode(options.data));
+    }
+    logPrint("");
   }
 
 
@@ -117,7 +122,11 @@ class CustomLogInterceptor extends Interceptor {
       logPrint("Response Text:");
       printAll(response.toString());
     }
-    logPrint("");
+
+    int time =  DateTime.now().millisecondsSinceEpoch - (_requestMaps[response?.requestOptions?.uri?.toString()]??0);
+    logPrint('useTime:${millisecondsConvertToDHMS(time)}');
+    logPrint('url:${response?.requestOptions?.uri}');
+
   }
 
   printKV(String key, Object v) {
@@ -127,4 +136,45 @@ class CustomLogInterceptor extends Interceptor {
   printAll(msg) {
     msg.toString().split("\n").forEach(logPrint);
   }
+
+
+}
+
+
+String millisecondsConvertToDHMS(int milliseconds) {
+
+  String daysStr;
+  String hoursStr;
+  String minutesStr;
+  String secondsStr;
+  //天
+  double day = (milliseconds / 1000) / (24 * 3600);
+  if (day < 10) {
+    daysStr = "0${day.toInt()}";
+  } else {
+    daysStr = day.toString();
+  }
+  //时
+  double hour = ((milliseconds / 1000) % (24 * 3600)) / 3600;
+  if (hour < 10) {
+    hoursStr = "0${hour.toInt()}";
+  } else {
+    hoursStr = hour.toString();
+  }
+  //分
+  double minute = ((milliseconds / 1000) % 3600) / 60;
+  if (minute < 10) {
+    minutesStr = "0${minute.toInt()}";
+  } else {
+    minutesStr = minute.toString();
+  }
+  //秒
+  double second = (milliseconds / 1000) % 60;
+  if (second < 10) {
+    secondsStr = "0${second.toInt()}";
+  } else {
+    secondsStr = second.toString();
+  }
+
+  return "耗时：$daysStr天$hoursStr:$minutesStr:$secondsStr";
 }

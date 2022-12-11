@@ -6,19 +6,33 @@ import 'package:flutter_uikit_forzzh/uikitlib.dart';
 import 'package:rxnet_example/get_request_page.dart';
 
 import 'download_page.dart';
-
+import 'package:connectivity_plus/connectivity_plus.dart';
 void main() {
-
   RxNet().init(
       baseUrl: "http://t.weather.sojson.com/",
       dbName: "test",   ///数据库名字
       tableName: "project", ///表明
       isDebug: true,   ///是否调试 打印日志
+      baseCacheMode: CacheMode.onlyCache,
+      baseCheckNet:checkNet, ///全局检查网络
+      requestCaptureError: (e){  ///全局抓获 异常
+
+      },
       interceptors: [  ///拦截器
         CustomLogInterceptor()
-      ]);
+      ],);
 
   runApp(const MyApp());
+}
+
+
+Future<bool> checkNet() async{
+  var connectivityResult = await (Connectivity().checkConnectivity());
+  if (connectivityResult == ConnectivityResult.none) {
+    print( "当前无网络");
+    return false;
+  }
+  return Future.value(true);
 }
 
 class MyApp extends StatelessWidget {

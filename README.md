@@ -8,7 +8,7 @@
 
     dependencies:
     
-       flutter_rxnet_forzzh:0.0.3
+       flutter_rxnet_forzzh:0.0.4
 
 
 ## 常用参数：
@@ -39,7 +39,7 @@ CacheMode：支持如下几种模式：
 
 需要json 转对象，请设置 setJsonConvertAdapter 并在回调中根据后端返回统一格式进行转换。
 
-Rxnet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailureCallback获取错误信息。
+RxNet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailureCallback获取错误信息。
 
 
 
@@ -49,13 +49,19 @@ Rxnet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
  1.先初始化网络框架
 
     RxNet().init(
-        baseUrl: "http://t.weather.sojson.com/",
-        dbName: "test", ///数据库名字
-        tableName: "project" ,///表名
-        isDebug: true, ///是否调试 打印日志
-        interceptors: [  ///拦截器
+      baseUrl: "http://t.weather.sojson.com/",
+      dbName: "test",   ///数据库名字
+      tableName: "project", ///表明
+      isDebug: true,   ///是否调试 打印日志
+      baseCacheMode: CacheMode.onlyCache,
+      baseCheckNet:checkNet, ///全局检查网络
+      requestCaptureError: (e){  ///全局抓获 异常
+
+      },
+      interceptors: [  ///拦截器
         CustomLogInterceptor()
-    ]);
+      ],);
+
  
  2.发起网络请求：
 
