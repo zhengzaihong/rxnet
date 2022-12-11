@@ -28,6 +28,8 @@ class RxNet {
 
   Dio? get client => _client;
 
+  CheckNetWork? baseCheckNet;
+
   /// 创建 dio 实例对象
   RxNet._internal() {
     var options = BaseOptions(
@@ -46,6 +48,7 @@ class RxNet {
     List<Interceptor>? interceptors,
     BaseOptions? options,
     bool isDebug = true,
+    CheckNetWork? baseCheckNet,
   }) {
 
     LogUtil.init(isDebug: isDebug);
@@ -403,6 +406,14 @@ class BuildRequest<T> {
       ///如果网络检查失败 或者 false 将不会执行请求。
       if(!status){
         return this;
+      }
+    }else{
+      if(_rxNet.baseCheckNet!=null){
+        bool status = checkNetWork?.call()??true;
+        ///如果网络检查失败 或者 false 将不会执行请求。
+        if(!status){
+          return this;
+        }
       }
     }
 
