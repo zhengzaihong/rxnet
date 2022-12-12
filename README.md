@@ -53,7 +53,7 @@ RxNet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
       dbName: "test",   ///数据库名字
       tableName: "project", ///表明
       isDebug: true,   ///是否调试 打印日志
-      baseCacheMode: CacheMode.onlyCache,
+      baseCacheMode: CacheMode.onlyCache, // 缓存模式，请求单独配置优先级高于baseCacheMode
       baseCheckNet:checkNet, ///全局检查网络
       requestCaptureError: (e){  ///全局抓获 异常
 

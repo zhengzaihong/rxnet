@@ -20,7 +20,7 @@ void main() {
       },
       interceptors: [  ///拦截器
         CustomLogInterceptor()
-      ],);
+      ]);
 
   runApp(const MyApp());
 }
