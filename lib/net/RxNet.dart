@@ -73,10 +73,10 @@ class RxNet {
     }
     try {
       if (Platform.isAndroid || Platform.isIOS) {
-        DatabaseUtil.initDatabase(dbName,tabname: tableName);
+        DatabaseUtil.initDatabase(dbName,tabName: tableName);
       }
     } catch (e) {
-      LogUtil.v("不支持的环境：web, windows");
+      LogUtil.v("数据缓存不支持的环境：web, windows");
     }
     return this;
   }
@@ -101,6 +101,16 @@ class RxNet {
         client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
       };
     }
+  }
+
+
+  ///这里提供一个收集日字的方法，便于后期排查
+  ///文件需要有写的权限，eg:xxx/xxx/log.txt
+  void cacheLogToFile(String filePath) async{
+    var file = File(filePath);
+    var sink = file.openWrite();
+    _client?.interceptors.add(LogInterceptor(logPrint: sink.writeln));
+    await sink.close();
   }
 
   static BuildRequest get<T>() {
@@ -156,7 +166,7 @@ class BuildRequest<T> {
 
   final RxNet _rxNet;
 
-  String? _cancleTag;
+  String? _cancelTag;
 
   String? _path;
 
@@ -250,13 +260,13 @@ class BuildRequest<T> {
   }
 
   BuildRequest setTag(String tag) {
-    _cancleTag = tag;
+    _cancelTag = tag;
     _cancelTokens[tag] = CancelToken();
     return this;
   }
 
   String? getTag() {
-    return _cancleTag;
+    return _cancelTag;
   }
 
   BuildRequest covertParamToBody() {
@@ -306,8 +316,7 @@ class BuildRequest<T> {
           cancelToken: _cancelTokens[getTag()]);
 
       ///成功
-      if (response.statusCode == 200)
-      {
+      if (response.statusCode == 200) {
         if (_useJsonAdapter && getJsonConvertAdapter() != null) {
           LogUtil.v("useJsonAdapter：true");
           var data = getJsonConvertAdapter()?.jsonTransformation.call(response.data);
@@ -324,20 +333,20 @@ class BuildRequest<T> {
             NetUtils.saveCache(cacheKey, response.data==null?"":jsonEncode(response.data));
           }
         } catch (e) {
-          LogUtil.v("catch环境：web");
+          LogUtil.v("catch环境：web,windows");
         }
+        return;
       }
-      else {
-        if (readCache != null) {
-          readCache.call();
-        } else {
-          ///失败
-          failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败",response.data));
-        }
+
+      if (readCache != null) {
+        readCache.call();
+      } else {
+        ///失败
+        failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败",response.data));
       }
 
     } on DioError catch (e, s) {
-      LogUtil.v("请求出错：$e\n$s");
+      LogUtil.v("网络请求出错,请检查网络：$e\n$s");
       _collectError(e);
       var error = HttpError.dioError(e);
       if (failure != null && e.type != DioErrorType.cancel) {
@@ -364,29 +373,12 @@ class BuildRequest<T> {
   }
 
 
-  ///解析本地缓存数据
-  void _parseLocalData(
-      HttpSuccessCallback? success,
-      HttpFailureCallback? failure,
-      List<Map<String,dynamic>> list,
-      ){
-    var datas = list[0]["value"];
-    if (_useJsonAdapter && getJsonConvertAdapter() != null) {
-      LogUtil.v("useJsonAdapter：true");
-      var data = getJsonConvertAdapter()?.jsonTransformation.call(jsonDecode(datas));
-      success?.call(data, SourcesType.cache);
-    } else {
-      LogUtil.v("useJsonAdapter：false");
-      success?.call(datas, SourcesType.cache);
-    }
-  }
 
 
   void _readCache(
       HttpSuccessCallback? success,
       HttpFailureCallback? failure,
       ){
-
     if(DatabaseUtil.isDatabaseReady){
       _readCacheAction(success,failure);
     }else{
@@ -410,63 +402,71 @@ class BuildRequest<T> {
     });
   }
 
+  ///解析本地缓存数据
+  void _parseLocalData(
+      HttpSuccessCallback? success,
+      HttpFailureCallback? failure,
+      List<Map<String,dynamic>> list,
+      ){
+    var datas = list[0]["value"];
+    if (_useJsonAdapter && getJsonConvertAdapter() != null) {
+      LogUtil.v("useJsonAdapter：true");
+      var data = getJsonConvertAdapter()?.jsonTransformation.call(jsonDecode(datas));
+      success?.call(data, SourcesType.cache);
+    } else {
+      LogUtil.v("useJsonAdapter：false");
+      success?.call(datas, SourcesType.cache);
+    }
+  }
 
-  void execute({HttpSuccessCallback? success, HttpFailureCallback? failure}) async{
+
+  Future<bool> _checkNetWork() async{
 
     ///如果设置了网络检查 请返回是否启用请求的状态。
     if(checkNetWork!=null){
       ///如果网络检查失败 或者 false 将不会执行请求。
-      if(! await checkNetWork!.call()){
-        return ;
-      }
-    }else{
-      if(_rxNet.baseCheckNet!=null){
-        ///如果网络检查失败 或者 false 将不会执行请求。
-        if(!await _rxNet.baseCheckNet!.call()){
-          return ;
-        }
-      }
+      return await checkNetWork!.call();
+    }
+
+    ///局部网络检查优先级高于全局
+    if(checkNetWork==null && _rxNet.baseCheckNet!=null){
+    ///如果网络检查失败 或者 false 将不会执行请求。
+      return await _rxNet.baseCheckNet!.call();
+    }
+    return true;
+  }
+  void execute({HttpSuccessCallback? success, HttpFailureCallback? failure}) async{
+
+    if(!(await _checkNetWork())){
+      return ;
     }
 
     _cacheMode = _cacheMode??(_rxNet.baseCacheMode??CacheMode.onlyRequest);
-    switch (_cacheMode) {
-      case CacheMode.onlyRequest:
-        {
-          _doWorkRequest(success: success, failure: failure);
-          break;
-        }
-      case CacheMode.firstCacheThenRequest:
-        {
-          _readCache(success,failure);
-          _doWorkRequest(
-              success: success,
-              failure: failure,
-              cache: true);
-          break;
-        }
-      case CacheMode.requestFailedReadCache:
-        {
-          _doWorkRequest(
-              success: success,
-              failure: failure,
-              cache: true,
-              readCache: () {
-                _readCache(success,failure);
-              });
-          break;
-        }
+    if(_cacheMode == CacheMode.onlyRequest){
+      _doWorkRequest(success: success, failure: failure);
+      return;
+    }
 
-      case CacheMode.onlyCache:
-        {
-          _readCache(success,failure);
-          break;
-        }
+    if(_cacheMode == CacheMode.firstCacheThenRequest){
+      _readCache(success,failure);
+      _doWorkRequest(success: success, failure: failure, cache: true);
+      return;
+    }
 
-      case CacheMode.requestAndSaveCache:
-        {
-          _doWorkRequest(success: success, failure: failure, cache: true);
-          break;
-        }
+    if(_cacheMode == CacheMode.requestFailedReadCache){
+      _doWorkRequest(success: success, failure: failure, cache: true,
+          readCache: () {
+            _readCache(success,failure);
+          });
+      return;
+    }
+    if(_cacheMode == CacheMode.onlyCache){
+      _readCache(success,failure);
+      return;
+    }
+    if(_cacheMode == CacheMode.requestAndSaveCache){
+      _doWorkRequest(success: success, failure: failure, cache: true);
+      return;
     }
     return ;
   }
@@ -479,11 +479,8 @@ class BuildRequest<T> {
     HttpFailureCallback? failure,
   }) async {
 
-    if(checkNetWork!=null){
-      bool status = await checkNetWork?.call()??true;
-      if(!status){
-        return;
-      }
+    if(!(await _checkNetWork())){
+      return ;
     }
 
     String url = _path.toString();
@@ -536,12 +533,11 @@ class BuildRequest<T> {
     HttpFailureCallback? failure,
   }) async {
 
-    if(checkNetWork!=null){
-      bool status = await checkNetWork?.call()??true;
-      if(!status){
-        return;
-      }
+
+    if(!(await _checkNetWork())){
+      return ;
     }
+
     ///0代表不设置超时
     int receiveTimeout = 0;
     var options = _options??Options(

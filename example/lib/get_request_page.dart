@@ -58,23 +58,27 @@ class _GetRequestPageState extends State<GetRequestPage> {
         .setPath("api/weather")
         .setParam("city", "101030100")
         .setEnableRestfulUrl(true) ///Restful
-        .setCacheMode(CacheMode.onlyRequest)
+        .setCacheMode(CacheMode.requestFailedReadCache)
         .setJsonConvertAdapter(
           JsonConvertAdapter<NormalWaterInfoEntity>((data){
             return NormalWaterInfoEntity.fromJson(data);
           }))
-        .execute(success: (data,mo){
-          var source = mo as SourcesType;
-          if(data is NormalWaterInfoEntity){
-            content = data.toString();
-          }
-          if(source == SourcesType.net){
-            sourcesType = SourcesType.net;
-          }else{
-            sourcesType = SourcesType.cache;
-          }
-          setState(() {});
-    });
+        .execute(
+        success: (data,mo){
+
+            var source = mo as SourcesType;
+            if(data is NormalWaterInfoEntity){
+              content = data.toString();
+            }
+            if(source == SourcesType.net){
+              sourcesType = SourcesType.net;
+            }else{
+              sourcesType = SourcesType.cache;
+            }
+            setState(() {});
+
+       },failure: (error){
+      });
 
   }
 

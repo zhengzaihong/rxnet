@@ -3,9 +3,6 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_rxnet_forzzh/utils/LogUtil.dart';
 
-
-
-
 ///
 /// create_user: zhengzaihong
 /// email:1096877329@qq.com
@@ -19,7 +16,6 @@ void log2Console(Object object) {
 }
 
 class CustomLogInterceptor extends Interceptor {
-
   CustomLogInterceptor({
     this.request = true,
     this.requestHeader = true,
@@ -48,22 +44,15 @@ class CustomLogInterceptor extends Interceptor {
   /// 是否打印错误信息
   bool error;
 
-
-  ///  这里提供一个收集日字的方法，便于后期排查
-  ///  var file=File("./log.txt");
-  ///  var sink=file.openWrite();
-  ///  dio.interceptors.add(LogInterceptor(logPrint: sink.writeln));
-  ///  await sink.close();
-  ///
   void Function(Object object) logPrint;
 
-  final Map<String,int> _requestMaps = {};
+  final Map<String, DateTime> _requestMaps = {};
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     super.onRequest(options, handler);
     logPrint('*** Request ***');
-    _requestMaps[options.uri.toString()] =DateTime.now().millisecondsSinceEpoch;
+    _requestMaps[options.uri.toString()] = DateTime.now();
     printKV('uri', options.uri);
     if (request) {
       printKV('method', options.method);
@@ -84,7 +73,6 @@ class CustomLogInterceptor extends Interceptor {
     logPrint("");
   }
 
-
   @override
   void onError(DioError err, ErrorInterceptorHandler handler) {
     if (error) {
@@ -98,8 +86,10 @@ class CustomLogInterceptor extends Interceptor {
     }
     super.onError(err, handler);
   }
+
   @override
-  Future onResponse(Response response ,  ResponseInterceptorHandler handler) async {
+  Future onResponse(
+      Response response, ResponseInterceptorHandler handler) async {
     logPrint("*** Response ***");
     _printResponse(response);
 
@@ -107,9 +97,8 @@ class CustomLogInterceptor extends Interceptor {
   }
 
   void _printResponse(Response? response) {
-    printKV('uri', response?.requestOptions?.uri??"");
     if (responseHeader) {
-      printKV('statusCode', response?.statusCode??"");
+      printKV('statusCode', response?.statusCode ?? "");
       if (response?.isRedirect == true) {
         printKV('redirect', response!.realUri);
       }
@@ -123,10 +112,13 @@ class CustomLogInterceptor extends Interceptor {
       printAll(response.toString());
     }
 
-    int time =  DateTime.now().millisecondsSinceEpoch - (_requestMaps[response?.requestOptions?.uri?.toString()]??0);
-    logPrint('useTime:${millisecondsConvertToDHMS(time)}');
-    logPrint('url:${response?.requestOptions?.uri}');
-
+    DateTime oldTime =
+        _requestMaps[response?.requestOptions?.uri?.toString()] ??
+            DateTime.now();
+    DateTime responseTime = DateTime.now();
+    Duration duration = responseTime.difference(oldTime);
+    logPrint('useTime:${duration.inMinutes}:${duration.inSeconds}:${duration.inMilliseconds}');
+    logPrint('Response end url :${response?.requestOptions?.uri}');
   }
 
   printKV(String key, Object v) {
@@ -136,45 +128,4 @@ class CustomLogInterceptor extends Interceptor {
   printAll(msg) {
     msg.toString().split("\n").forEach(logPrint);
   }
-
-
-}
-
-
-String millisecondsConvertToDHMS(int milliseconds) {
-
-  String daysStr;
-  String hoursStr;
-  String minutesStr;
-  String secondsStr;
-  //天
-  double day = (milliseconds / 1000) / (24 * 3600);
-  if (day < 10) {
-    daysStr = "0${day.toInt()}";
-  } else {
-    daysStr = day.toString();
-  }
-  //时
-  double hour = ((milliseconds / 1000) % (24 * 3600)) / 3600;
-  if (hour < 10) {
-    hoursStr = "0${hour.toInt()}";
-  } else {
-    hoursStr = hour.toString();
-  }
-  //分
-  double minute = ((milliseconds / 1000) % 3600) / 60;
-  if (minute < 10) {
-    minutesStr = "0${minute.toInt()}";
-  } else {
-    minutesStr = minute.toString();
-  }
-  //秒
-  double second = (milliseconds / 1000) % 60;
-  if (second < 10) {
-    secondsStr = "0${second.toInt()}";
-  } else {
-    secondsStr = second.toString();
-  }
-
-  return "耗时：$daysStr天$hoursStr:$minutesStr:$secondsStr";
 }

@@ -2,13 +2,13 @@
 
 一款极简且强大Flutter网络请求工具，支持restful、泛型请求、数据缓存(无网请求)。该库是对Dio的扩展,同步的写法异步的实现，使用更加自然。
 
-注意：数据缓存只支持 Andorid、HarmonyOS 和 IOS 、MACOS平台。
+注意：数据缓存只支持 Android、HarmonyOS 和 IOS 、MACOS平台。
 
 ## 依赖：
 
     dependencies:
     
-       flutter_rxnet_forzzh:0.0.4
+       flutter_rxnet_forzzh:0.0.5
 
 
 ## 常用参数：
@@ -92,7 +92,7 @@ RxNet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
             }else{
               /// 本地数据库
             }
-         });
+         },failure: (error){});
 
 
  3.请求原始数据,某些特殊情况，如读取网盘资源文件数据
@@ -186,36 +186,38 @@ RxNet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
 
 
    输出格式：
-   
-        v  *** Request ***
-        v  uri: http://t.weather.sojson.com/api/weather/city/101030100
-        v  method: GET
-        v  responseType: ResponseType.json
-        v  followRedirects: true
-        v  connectTimeout: 0
-        v  receiveTimeout: 0
-        v  extra: {}
-        v  headers:
-        v  data:
-        v  null
-        v  
-        v  *** Response ***
-        v  uri: http://t.weather.sojson.com/api/weather/city/101030100
-        v  statusCode: 200
-        v  headers:
-        v   connection: keep-alive
-        v   cache-control: max-age=3000
-        v   transfer-encoding: chunked
-        v   date: Fri, 02 Sep 2022 01:59:04 GMT
-        v   x-real-ip: 2409:8907:bb36:6ba7:6963:2da8:d6b:935f
-        v   content-encoding: gzip
-        v   vary: Accept-Encoding
-        v   age: 2824
-        v   content-type: application/json;charset=UTF-8
-        v   x-source: C/200
-        v   server: marco/2.17
-        v   x-request-id: 161b3502a9a5df5aa79809152b368dd9; 06a1d20e55263e6a61797ab3e8a7d2ee
-        v   via: S.mix-js-czx2-045, T.45.H, V.mix-js-czx2-047, T.2.H, M.ctn-sc-yan-004
-        v   expires: Fri, 02 Sep 2022 02:02:00 GMT
-        v  Response Text:
-        v   {"status": 200,"date": "20220902","time": "2022-09-02 09:12:00","cityInfo": {"city": "天津市","citykey": "101030100","parent": "天津","updateTime": "08:31"},}
+
+
+    v  *** Request ***
+    v  uri: http://t.weather.sojson.com/api/weather/city/101030100
+    v  method: GET
+    v  responseType: ResponseType.json
+    v  followRedirects: true
+    v  connectTimeout: 0
+    v  receiveTimeout: 0
+    v  extra: {}
+    v  headers:
+    v  data:
+    v  null
+    v  
+    v  *** Response ***
+    v  statusCode: 200
+    v  headers:
+    v   connection: keep-alive
+    v   cache-control: max-age=3000
+    v   transfer-encoding: chunked
+    v   date: Thu, 02 Feb 2023 09:35:14 GMT
+    v   vary: Accept-Encoding
+    v   content-encoding: gzip
+    v   age: 2536
+    v   content-type: application/json;charset=UTF-8
+    v   x-source: C/200
+    v   server: marco/2.19
+    v   x-request-id: 479e0f0466b8935c06021c2f0523b652; aa40fbf05d7742d83bda29c476b8d71c
+    v   via: S.mix-js-czx2-049, T.49.M, V.mix-js-czx2-049, T.4.H, M.ctn-sc-yan-004
+    v   expires: Thu, 02 Feb 2023 09:42:58 GMT
+    v  Response Text:
+    v  {"message":"success感谢又拍云(upyun.com)提供CDN赞助","status":200,"date":"20230202","time":"2023-02-02 16:52:58","cityInfo":{"city":"天津市","citykey":"101030100","parent":"天津","updateTime":"13:16"},"data":{"shidu":"16%","pm25":11.0,"pm10":22.0,"quality":"优","wendu":"-1","ganmao":"各类人群可自由活动","forecast":[{"date":"02","high":"高温 4℃","low":"低温 -4℃","ymd":"2023-02-02","week":"星期四","sunrise":"07:16","sunset":"17:32","aqi":37,"fx":"东北风","fl":"1级","type":"阴","notice":"不要被阴云遮挡住好心情"},{"date":"03","high":"高温 6℃","low":"低温 -3℃","ymd":"2023-02-03","week":"星期五","sunrise":"07:15","sunset":"17:33","aqi":76,"fx":"西风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"04","high":"高温 8℃","low":"低温 -2℃","ymd":"2023-02-04","week":"星期六","sunrise":"07:14","sunset":"17:35","aqi":82,"fx":"西风","fl":"2级","type":"晴","notice":"愿你拥有比�
+    v  useTime:0:0:177
+    v  Response end url :http://t.weather.sojson.com/api/weather/city/101030100
+    v  useJsonAdapter：true

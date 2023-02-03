@@ -1,6 +1,13 @@
 import 'package:path/path.dart' as path ;
 import 'package:sqflite/sqflite.dart';
 
+///
+/// create_user: zhengzaihong
+/// email:1096877329@qq.com
+/// create_date: 2022/8/11
+/// create_time: 9:52
+/// describe: 利用原生平台的sqllite
+///
 class DatabaseUtil {
   static  Database? database;
   static bool isDatabaseReady = false;
@@ -8,10 +15,10 @@ class DatabaseUtil {
   static String tableName= "cacheTable";
 
   static final List<Function> _checkDataBaseListener = [];
-  static Future initDatabase(String db,{String? tabname}) {
+  static Future initDatabase(String db,{String? tabName}) {
     dbName = db;
-    if(null!=tabname){
-      tableName = tabname;
+    if(null!=tabName){
+      tableName = tabName;
     }
     Future future = Future(() async {
       String databasePath = await createDatabase();
@@ -72,8 +79,7 @@ class DatabaseUtil {
     if(database==null){
       return Future.value([]);
     }
-    return await database.rawQuery(
-        'SELECT value FROM  $tableName WHERE cacheKey = \'' + cacheKey + "\'");
+    return await database.rawQuery('SELECT value FROM  $tableName WHERE cacheKey = \'' + cacheKey + "\'");
   }
 
   ///插入

@@ -1,4 +1,3 @@
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
@@ -13,8 +12,8 @@ void main() {
       dbName: "test",   ///数据库名字
       tableName: "project", ///表明
       isDebug: true,   ///是否调试 打印日志
-      baseCacheMode: CacheMode.onlyCache,
-      baseCheckNet:checkNet, ///全局检查网络
+      baseCacheMode: CacheMode.requestFailedReadCache,
+      // baseCheckNet:checkNet, ///全局检查网络
       requestCaptureError: (e){  ///全局抓获 异常
 
       },
@@ -41,7 +40,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Rxnet',
+      title: 'Flutter RxNet',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
