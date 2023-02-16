@@ -259,12 +259,12 @@ class BuildRequest<T> {
     return this;
   }
 
-  BuildRequest setHeaders(Map<String, dynamic> headers) {
+  BuildRequest addHeaders(Map<String, dynamic> headers) {
     _headers = headers;
     return this;
   }
 
-  BuildRequest addHeader(String key, dynamic value) {
+  BuildRequest setHeader(String key, dynamic value) {
     _headers[key] = value;
     return this;
   }
