@@ -7,6 +7,7 @@ import 'package:rxnet_example/get_request_page.dart';
 import 'download_page.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 void main() {
+
   RxNet().init(
       baseUrl: "http://t.weather.sojson.com/",
       dbName: "test",   ///数据库名字

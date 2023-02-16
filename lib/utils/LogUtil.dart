@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 ///
 /// create_user: zhengzaihong
 /// email:1096877329@qq.com
@@ -33,6 +35,6 @@ class LogUtil {
     sb.write((tag.isEmpty) ? tagDefault : tag);
     sb.write(stag);
     sb.write(object);
-    print(sb.toString());
+    log(sb.toString());
   }
 }

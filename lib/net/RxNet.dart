@@ -34,6 +34,8 @@ class RxNet {
 
   CacheMode? baseCacheMode;
 
+  Map<String, dynamic> globalHeader ={};
+
   /// 创建 dio 实例对象
   RxNet._internal() {
     var options = BaseOptions(
@@ -147,6 +149,11 @@ class RxNet {
     );
   }
 
+  ///设置全局请求头
+  void setGlobalHeader(Map<String, dynamic> header) {
+    globalHeader = header;
+  }
+
   ///取消网络请求
   void cancel(String tag,{dynamic reason}) {
     if (_cancelTokens.containsKey(tag)) {
@@ -156,6 +163,7 @@ class RxNet {
       _cancelTokens.remove(tag);
     }
   }
+
 }
 
 
@@ -175,6 +183,8 @@ class BuildRequest<T> {
   Map<String, dynamic> _params = {};
 
   Map<String, dynamic> _headers = {};
+
+  bool _enableGlobalHeader = true;
 
   dynamic _bodyData;
 
@@ -254,7 +264,7 @@ class BuildRequest<T> {
     return this;
   }
 
-  BuildRequest setHeader(String key, dynamic value) {
+  BuildRequest addHeader(String key, dynamic value) {
     _headers[key] = value;
     return this;
   }
@@ -267,6 +277,11 @@ class BuildRequest<T> {
 
   String? getTag() {
     return _cancelTag;
+  }
+
+  BuildRequest enableGlobalHeader(bool enable) {
+    _enableGlobalHeader = enable;
+    return this;
   }
 
   BuildRequest covertParamToBody() {
@@ -305,9 +320,16 @@ class BuildRequest<T> {
     }
     try {
       _options?.method = _httpType.name;
+
+      ///局部头优先与全局
       if(_headers.isNotEmpty){
         _options?.headers = _headers;
+      }else{
+        if(_enableGlobalHeader){
+          _options?.headers = _rxNet.globalHeader;
+        }
       }
+
       Response<T> response = await _rxNet.client!.request(
           url,
           data: _bodyData,
@@ -392,14 +414,15 @@ class BuildRequest<T> {
       HttpSuccessCallback? success,
       HttpFailureCallback? failure,
       ){
-    NetUtils.getCache("$_path", _params).then((list) {
-      if (list.isNotEmpty) {
-        LogUtil.v("缓存数据:$list");
-        _parseLocalData(success,failure,list);
-      } else {
-        failure?.call({});
-      }
-    });
+
+      NetUtils.getCache("$_path", _params).then((list) {
+        if (list.isNotEmpty) {
+          LogUtil.v("缓存数据:$list");
+          _parseLocalData(success,failure,list);
+        } else {
+          failure?.call({});
+        }
+      });
   }
 
   ///解析本地缓存数据
@@ -492,6 +515,7 @@ class BuildRequest<T> {
       if(_headers.isNotEmpty){
         _options?.headers = _headers;
       }
+
       Response<T> response = await _rxNet.client!.request(
           url,
           onSendProgress: onSendProgress,

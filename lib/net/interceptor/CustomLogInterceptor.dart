@@ -117,7 +117,7 @@ class CustomLogInterceptor extends Interceptor {
             DateTime.now();
     DateTime responseTime = DateTime.now();
     Duration duration = responseTime.difference(oldTime);
-    logPrint('useTime:${duration.inMinutes}:${duration.inSeconds}:${duration.inMilliseconds}');
+    logPrint('useTime:${duration.inMinutes}分:${duration.inSeconds}秒:${duration.inMilliseconds}毫秒');
     logPrint('Response end url :${response?.requestOptions?.uri}');
   }
 
