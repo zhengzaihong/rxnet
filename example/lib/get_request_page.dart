@@ -54,31 +54,38 @@ class _GetRequestPageState extends State<GetRequestPage> {
 
   void request() {
 
-    RxNet.get<NormalWaterInfoEntity>()  ///这里可以省略 泛型声明
+    var success = ((data,mo){
+      var source = mo as SourcesType;
+      if(data is NormalWaterInfoEntity){
+        content = data.toString();
+      }
+      if(source == SourcesType.net){
+        sourcesType = SourcesType.net;
+      }else{
+        sourcesType = SourcesType.cache;
+      }
+      setState(() {});
+    });
+
+    var failure = ((error){
+
+    });
+
+    RxNet.post<NormalWaterInfoEntity>()  ///这里可以省略 泛型声明
         .setPath("api/weather")
         .setParam("city", "101030100")
         .setEnableRestfulUrl(true) ///Restful
         .setCacheMode(CacheMode.requestFailedReadCache)
-        .setJsonConvertAdapter(
-          JsonConvertAdapter<NormalWaterInfoEntity>((data){
-            return NormalWaterInfoEntity.fromJson(data);
-          }))
-        .execute(
-        success: (data,mo){
+        .setJsonConvert((data)=>NormalWaterInfoEntity.fromJson(data))
+        //
+        // .setJsonConvertAdapter(
+        //   JsonConvertAdapter<NormalWaterInfoEntity>((data){
+        //     return NormalWaterInfoEntity.fromJson(data);
+        //   }))
+        .execute(success: success,failure:failure);
 
-            var source = mo as SourcesType;
-            if(data is NormalWaterInfoEntity){
-              content = data.toString();
-            }
-            if(source == SourcesType.net){
-              sourcesType = SourcesType.net;
-            }else{
-              sourcesType = SourcesType.cache;
-            }
-            setState(() {});
 
-       },failure: (error){
-      });
+
 
   }
 

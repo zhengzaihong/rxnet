@@ -16,7 +16,7 @@ void main() {
       baseCacheMode: CacheMode.requestFailedReadCache,
       // baseCheckNet:checkNet, ///全局检查网络
       requestCaptureError: (e){  ///全局抓获 异常
-
+        print("---------------------------->$e");
       },
       interceptors: [  ///拦截器
         CustomLogInterceptor()

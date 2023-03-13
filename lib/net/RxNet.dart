@@ -198,10 +198,33 @@ class BuildRequest<T> {
 
   CheckNetWork? checkNetWork;
 
-  BuildRequest(this._httpType, this._rxNet);
+  BuildRequest(this._httpType, this._rxNet){
+    BaseOptions? op = _rxNet._client?.options;
+    _options = Options(
+      method: op?.method,
+      sendTimeout: op?.sendTimeout,
+      receiveTimeout: op?.receiveTimeout,
+      extra: op?.extra,
+      headers: op?.headers,
+      responseType: op?.responseType,
+      contentType: op?.contentType,
+      validateStatus: op?.validateStatus,
+      receiveDataWhenStatusError: op?.receiveDataWhenStatusError,
+      followRedirects: op?.followRedirects,
+      maxRedirects: op?.maxRedirects,
+      requestEncoder: op?.requestEncoder,
+      responseDecoder: op?.responseDecoder,
+      listFormat: op?.listFormat,
+    );
+  }
 
   BuildRequest setUseJsonAdapter(bool use) {
     _useJsonAdapter = use;
+    return this;
+  }
+
+  BuildRequest setJsonConvert(Function(dynamic data) function) {
+    setJsonConvertAdapter(JsonConvertAdapter((data) => function.call(data)));
     return this;
   }
 
@@ -234,7 +257,12 @@ class BuildRequest<T> {
     return this;
   }
 
-  BuildRequest setBodyData(dynamic param) {
+  BuildRequest setFormParam(String key, dynamic value) {
+    _bodyData[key] = value;
+    return this;
+  }
+
+  BuildRequest addFormParams(dynamic param) {
     _bodyData = param;
     return this;
   }
@@ -284,11 +312,6 @@ class BuildRequest<T> {
     return this;
   }
 
-  BuildRequest covertParamToBody() {
-    _bodyData = _params;
-    _params.clear();
-    return this;
-  }
 
   BuildRequest setCacheMode(CacheMode cacheMode) {
     _cacheMode = cacheMode;
@@ -512,8 +535,13 @@ class BuildRequest<T> {
     }
     try {
       _options?.method = _httpType.name;
+      ///局部头优先与全局
       if(_headers.isNotEmpty){
         _options?.headers = _headers;
+      }else{
+        if(_enableGlobalHeader){
+          _options?.headers = _rxNet.globalHeader;
+        }
       }
 
       Response<T> response = await _rxNet.client!.request(
@@ -562,28 +590,30 @@ class BuildRequest<T> {
       return ;
     }
 
-    ///0代表不设置超时
-    int receiveTimeout = 0;
-    var options = _options??Options(
-      receiveTimeout: receiveTimeout
-    );
-
     String url = _path.toString();
     if (getEnableRestfulUrl()) {
       url = NetUtils.restfulUrl(_path.toString(), _params);
     }
     try {
+
       _options?.method = _httpType.name;
+
+      ///局部头优先与全局
       if(_headers.isNotEmpty){
-        options.headers = _headers;
+        _options?.headers = _headers;
+      }else{
+        if(_enableGlobalHeader){
+          _options?.headers = _rxNet.globalHeader;
+        }
       }
+
       Response<dynamic> response = await _rxNet.client!.download(
           url,
           savePath,
           onReceiveProgress: onReceiveProgress,
           queryParameters: getEnableRestfulUrl()?{}:_params,
           data: _bodyData,
-          options: options,
+          options: _options,
           cancelToken: _cancelTokens[getTag() ]);
       ///成功
       if(response.statusCode==200){
