@@ -8,7 +8,7 @@
 
     dependencies:
     
-       flutter_rxnet_forzzh:0.0.5
+       flutter_rxnet_forzzh:0.0.6
 
 
 ## 常用参数：
@@ -80,7 +80,7 @@ RxNet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
             }
             /// 返回空数据模板 等
             return WaterInfoEntity();
-          }))
+          })) // 或者像这样：setJsonConvert((data)=>WaterInfoEntity.fromJson(data))
           .execute(success: (data,sourcesType){
             var source = sourcesType as SourcesType;
             if(data is WaterInfoEntity){
