@@ -71,7 +71,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
 
     });
 
-    RxNet.post<NormalWaterInfoEntity>()  ///这里可以省略 泛型声明
+    RxNet.get<NormalWaterInfoEntity>()  ///这里可以省略 泛型声明
         .setPath("api/weather")
         .setParam("city", "101030100")
         .setEnableRestfulUrl(true) ///Restful
