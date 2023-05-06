@@ -1,6 +1,6 @@
 name: flutter_rxnet_forzzh
 description: flutter_rxnet_forzzh.
-version: 0.0.6
+version: 0.0.7
 homepage: https://github.com/zhengzaihong/rxnet
 
 platforms:
@@ -25,7 +25,7 @@ dependencies:
   crypto:  ^3.0.2
 
   #dio网络请求
-  dio: ^4.0.6
+  dio: ^5.1.1
 
   #sqflite数据库
   sqflite: ^2.0.3+1

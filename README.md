@@ -8,7 +8,7 @@
 
     dependencies:
     
-       flutter_rxnet_forzzh:0.0.6
+       flutter_rxnet_forzzh:0.0.7
 
 
 ## 常用参数：

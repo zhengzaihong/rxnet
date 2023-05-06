@@ -58,8 +58,8 @@ class CustomLogInterceptor extends Interceptor {
       printKV('method', options.method);
       printKV('responseType', options.responseType.toString());
       printKV('followRedirects', options.followRedirects);
-      printKV('connectTimeout', options.connectTimeout);
-      printKV('receiveTimeout', options.receiveTimeout);
+      printKV('connectTimeout', options.connectTimeout?.inMicroseconds??"");
+      printKV('receiveTimeout', options.receiveTimeout?.inMicroseconds??"");
       printKV('extra', options.extra);
     }
     if (requestHeader) {

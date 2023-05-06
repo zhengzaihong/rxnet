@@ -70,10 +70,13 @@ class _GetRequestPageState extends State<GetRequestPage> {
     var failure = ((error){
 
     });
-
+    RxNet().setGlobalHeader({
+      "Authorization": "bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjo2LCJ1c2VyX3R5cGUiOmZhbHNlLCJleHAiOjE2ODM0NDM3ODh9.K1GPsVGsvKc_6LN2iMdow6HRT_J-mlisDUtg6o1_vyY",
+    });
     RxNet.get<NormalWaterInfoEntity>()  ///这里可以省略 泛型声明
-        .setPath("api/weather")
-        .setParam("city", "101030100")
+        // .setPath("api/weather")
+        // .setParam("city", "101030100")
+        .setPath("http:///10.88.33.197:8001/api/v1/admin/user/info")
         .setEnableRestfulUrl(true) ///Restful
         .setCacheMode(CacheMode.requestFailedReadCache)
         .setJsonConvert((data)=>NormalWaterInfoEntity.fromJson(data))

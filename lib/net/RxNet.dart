@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:core';
 import 'dart:io';
-import 'package:dio/adapter.dart';
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 
 ///
@@ -95,12 +95,13 @@ class RxNet {
   /// 前置方法 setEnableProxy
   void setProxy(String address){
     if(isEnableProxy()){
-      (_instance.client?.httpClientAdapter as DefaultHttpClientAdapter).onHttpClientCreate = (client) {
+      (_instance.client?.httpClientAdapter as IOHttpClientAdapter).onHttpClientCreate = (client) {
         client.findProxy = (uri) {
           ///ip:prort
           return address;
         };
         client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+        return null;
       };
     }
   }
@@ -152,6 +153,10 @@ class RxNet {
   ///设置全局请求头
   void setGlobalHeader(Map<String, dynamic> header) {
     globalHeader = header;
+  }
+
+  Map<String, dynamic> getGlobalHeader() {
+    return globalHeader;
   }
 
   ///取消网络请求
