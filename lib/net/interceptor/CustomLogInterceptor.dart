@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_rxnet_forzzh/utils/LogUtil.dart';
 
+import '../fun/fun_apply.dart';
+
 ///
 /// create_user: zhengzaihong
 /// email:1096877329@qq.com
@@ -15,6 +17,8 @@ void log2Console(Object object) {
   LogUtil.v(object);
 }
 
+
+
 class CustomLogInterceptor extends Interceptor {
   CustomLogInterceptor({
     this.request = true,
@@ -24,6 +28,9 @@ class CustomLogInterceptor extends Interceptor {
     this.responseBody = true,
     this.error = true,
     this.logPrint = log2Console,
+    this.handlerError,
+    this.handlerRequest,
+    this.handlerResponse,
   });
 
   /// 是否打印请求参数
@@ -45,6 +52,11 @@ class CustomLogInterceptor extends Interceptor {
   bool error;
 
   void Function(Object object) logPrint;
+
+  HandlerResponse? handlerResponse;
+  HandlerError? handlerError;
+  HandlerRequest? handlerRequest;
+
 
   final Map<String, DateTime> _requestMaps = {};
 
@@ -71,6 +83,7 @@ class CustomLogInterceptor extends Interceptor {
       printAll(jsonEncode(options.data));
     }
     logPrint("");
+    handlerRequest?.call(options, handler);
   }
 
   @override
@@ -85,6 +98,7 @@ class CustomLogInterceptor extends Interceptor {
       logPrint("");
     }
     super.onError(err, handler);
+    handlerError?.call(err, handler);
   }
 
   @override
@@ -92,6 +106,7 @@ class CustomLogInterceptor extends Interceptor {
       Response response, ResponseInterceptorHandler handler) async {
     logPrint("*** Response ***");
     _printResponse(response);
+    handlerResponse?.call(response, handler);
 
     return super.onResponse(response, handler);
   }

@@ -1,5 +1,7 @@
 
 
+import 'package:dio/dio.dart';
+
 typedef JsonTransformation<T> = dynamic Function(dynamic data);
 
 ///http请求成功回调
@@ -18,4 +20,10 @@ typedef CheckNetWork = Future<bool> Function();
 ///全局捕获异常
 typedef RequestCaptureError = void Function(dynamic error);
 
+typedef OptionConfig = void Function(Options options);
 
+typedef HandlerResponse = void Function(Response response, ResponseInterceptorHandler handler);
+
+typedef HandlerRequest = void Function(RequestOptions options, RequestInterceptorHandler handler);
+
+typedef HandlerError = void Function(DioError err, ErrorInterceptorHandler handler);

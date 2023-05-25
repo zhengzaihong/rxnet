@@ -323,8 +323,8 @@ class BuildRequest<T> {
     return this;
   }
 
-  BuildRequest setOptions(Options options) {
-    _options = options;
+  BuildRequest setOptionConfig(OptionConfig callBack) {
+    callBack.call(_options!);
     return this;
   }
 
