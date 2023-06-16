@@ -11,7 +11,6 @@ import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 /// create_date: 2022/8/9
 /// create_time: 18:03
 /// describe: 网络请求工具库，支持多种缓存模式（缓存策略目前只支持 android HarmonyOS 和 IOS MACOS平台）
-
 ///同一个CancelToken可以用于多个请求，当一个CancelToken取消时，所有使用该CancelToken的请求都会被取消。
 final Map<String, CancelToken> _cancelTokens = <String, CancelToken>{};
 
@@ -168,7 +167,6 @@ class RxNet {
       _cancelTokens.remove(tag);
     }
   }
-
 }
 
 
@@ -430,8 +428,6 @@ class BuildRequest<T> {
   }
 
 
-
-
   void _readCache(
       SuccessCallback? success,
       FailureCallback? failure,
@@ -590,17 +586,14 @@ class BuildRequest<T> {
     FailureCallback? failure,
   }) async {
 
-
     if(!(await _checkNetWork())){
       return ;
     }
-
     String url = _path.toString();
     if (getEnableRestfulUrl()) {
       url = NetUtils.restfulUrl(_path.toString(), _params);
     }
     try {
-
       _options?.method = _httpType.name;
 
       ///局部头优先与全局
@@ -619,7 +612,7 @@ class BuildRequest<T> {
           queryParameters: getEnableRestfulUrl()?{}:_params,
           data: _bodyData,
           options: _options,
-          cancelToken: _cancelTokens[getTag() ]);
+          cancelToken: _cancelTokens[getTag()]);
       ///成功
       if(response.statusCode==200){
         success?.call(response.data, SourcesType.net);

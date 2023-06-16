@@ -1,9 +1,7 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 import 'package:flutter_uikit_forzzh/uikitlib.dart';
 import 'package:rxnet_example/get_request_page.dart';
-
 import 'download_page.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 void main() {
@@ -22,8 +20,10 @@ void main() {
         CustomLogInterceptor()
       ]);
 
+
   runApp(const MyApp());
 }
+
 
 
 Future<bool> checkNet() async{
