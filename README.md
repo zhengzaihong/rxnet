@@ -8,7 +8,7 @@
 
     dependencies:
     
-       flutter_rxnet_forzzh:0.0.7
+       flutter_rxnet_forzzh:0.0.8
 
 
 ## 常用参数：
@@ -20,16 +20,13 @@ CacheMode：支持如下几种模式：
     1.不做缓存，只网络数据
     onlyRequest,
     
-    2.请求成功后存储缓存
-    requestAndSaveCache,
-
-    3.先请求网络，如果请求网络失败，则读取缓存，如果读取缓存失败，本次请求失败
+    2.先请求网络，如果请求网络失败，则读取缓存，如果读取缓存失败，本次请求失败
     requestFailedReadCache,
 
-    4.先使用缓存，不管是否存在，仍然请求网络
+    3.先使用缓存，不管是否存在，仍然请求网络
     firstCacheThenRequest,
 
-    5.只使用缓存
+    4.只使用缓存
     onlyCache;
 
 
@@ -69,30 +66,9 @@ RxNet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
         .setPath("api/weather")
         .setParam("city", "101030100")
         .setEnableRestfulUrl(true) ///Restful
-        .setCacheMode(CacheMode.onlyCache)
-        .setJsonConvertAdapter(
-          JsonConvertAdapter<WaterInfoEntity>((data){
-            ///这里利用了idea jsonToDart 插件
-            ///其他工具实现也可以
-            var base =  BaseBean<WaterInfoEntity>.fromJson(data);
-            if(base.status == 200){
-              return base.data;
-            }
-            /// 返回空数据模板 等
-            return WaterInfoEntity();
-          })) // 或者像这样：setJsonConvert((data)=>WaterInfoEntity.fromJson(data))
-          .execute(success: (data,sourcesType){
-            var source = sourcesType as SourcesType;
-            if(data is WaterInfoEntity){
-              print("---------->${data.toString()}");
-            }
-            ///数据来源是网络
-            /// 界面上可以分别处理或提示 来源等
-            if(source == SourcesType.net){
-            }else{
-              /// 本地数据库
-            }
-         },failure: (error){});
+        .setCacheMode(CacheMode.requestFailedReadCache)
+        .setJsonConvert((data)=>NormalWaterInfoEntity.fromJson(data))
+        .execute(success: success,failure:failure);
 
 
  3.请求原始数据,某些特殊情况，如读取网盘资源文件数据
@@ -124,10 +100,7 @@ RxNet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
           //todo 检查网络的实现（非必要）
            return true;
         })
-        .setJsonConvertAdapter(
-            JsonConvertAdapter<NormalWaterInfoEntity>((data){
-              return NormalWaterInfoEntity.fromJson(data);
-            }))
+       .setJsonConvert((data)=>NormalWaterInfoEntity.fromJson(data))
         .execute(success: (data,sourcesType){
           var source = sourcesType as SourcesType;
           if(data is NormalWaterInfoEntity){
