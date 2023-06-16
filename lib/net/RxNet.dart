@@ -262,23 +262,30 @@ class BuildRequest<T> {
     return this;
   }
 
+  @Deprecated("优化到 setParam方式")
   BuildRequest setFormParam(String key, dynamic value) {
     _bodyData[key] = value;
     return this;
   }
 
-  BuildRequest addFormParams(dynamic param) {
+  ///用于有些特殊的请求，无具体key等
+  BuildRequest setFormParams(dynamic param) {
     _bodyData = param;
     return this;
   }
 
   BuildRequest setParam(String key, dynamic value) {
-    _params[key] = value;
+    if (_httpType == HttpType.post) {
+      _bodyData[key] = value;
+    }else{
+      _params[key] = value;
+    }
     return this;
   }
 
-  BuildRequest setNewParams(Map<String, dynamic> param) {
-    _params = param;
+
+  BuildRequest setParams(Map<String, dynamic> params) {
+    _params = params;
     return this;
   }
 
@@ -336,8 +343,8 @@ class BuildRequest<T> {
 
 
   void _doWorkRequest({
-    HttpSuccessCallback? success,
-    HttpFailureCallback? failure,
+    SuccessCallback? success,
+    FailureCallback? failure,
     bool cache = false,
     Function? readCache,
   }) async {
@@ -426,8 +433,8 @@ class BuildRequest<T> {
 
 
   void _readCache(
-      HttpSuccessCallback? success,
-      HttpFailureCallback? failure,
+      SuccessCallback? success,
+      FailureCallback? failure,
       ){
     if(DatabaseUtil.isDatabaseReady){
       _readCacheAction(success,failure);
@@ -439,8 +446,8 @@ class BuildRequest<T> {
   }
 
   void _readCacheAction(
-      HttpSuccessCallback? success,
-      HttpFailureCallback? failure,
+      SuccessCallback? success,
+      FailureCallback? failure,
       ){
 
       NetUtils.getCache("$_path", _params).then((list) {
@@ -455,8 +462,8 @@ class BuildRequest<T> {
 
   ///解析本地缓存数据
   void _parseLocalData(
-      HttpSuccessCallback? success,
-      HttpFailureCallback? failure,
+      SuccessCallback? success,
+      FailureCallback? failure,
       List<Map<String,dynamic>> list,
       ){
     var datas = list[0]["value"];
@@ -486,7 +493,7 @@ class BuildRequest<T> {
     }
     return true;
   }
-  void execute({HttpSuccessCallback? success, HttpFailureCallback? failure}) async{
+  void execute({SuccessCallback? success, FailureCallback? failure}) async{
 
     if(!(await _checkNetWork())){
       return ;
@@ -515,19 +522,14 @@ class BuildRequest<T> {
       _readCache(success,failure);
       return;
     }
-    if(_cacheMode == CacheMode.requestAndSaveCache){
-      _doWorkRequest(success: success, failure: failure, cache: true);
-      return;
-    }
-    return ;
   }
 
 
   ///上传文件
   void upload({
     ProgressCallback? onSendProgress,
-    HttpSuccessCallback? success,
-    HttpFailureCallback? failure,
+    SuccessCallback? success,
+    FailureCallback? failure,
   }) async {
 
     if(!(await _checkNetWork())){
@@ -559,24 +561,22 @@ class BuildRequest<T> {
 
       if(response.statusCode == 200){
         success?.call(response.data, SourcesType.net);
-      }else{
-        failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败",response.data));
+        return;
       }
 
+      failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败",response.data));
     } on DioError catch (e, s) {
       _collectError(e);
       LogUtil.v("请求出错：$e\n$s");
-      if (failure != null && e.type != DioErrorType.cancel) {
+      if (e.type != DioErrorType.cancel) {
         var error = HttpError.dioError(e);
         error.bodyData = e;
-        failure(error);
+        failure?.call(error);
       }
     } catch (e, s) {
       _collectError(e);
       LogUtil.v("未知异常出错：$e\n$s");
-      if (failure != null) {
-        failure(HttpError(HttpError.UNKNOWN, "网络异常，请稍后重试！",e));
-      }
+      failure?.call( HttpError(HttpError.UNKNOWN, "网络异常，请稍后重试！",e));
     }
   }
 
@@ -586,8 +586,8 @@ class BuildRequest<T> {
   void download({
     required String savePath,
     ProgressCallback? onReceiveProgress,
-    HttpSuccessCallback? success,
-    HttpFailureCallback? failure,
+    SuccessCallback? success,
+    FailureCallback? failure,
   }) async {
 
 
@@ -622,24 +622,20 @@ class BuildRequest<T> {
           cancelToken: _cancelTokens[getTag() ]);
       ///成功
       if(response.statusCode==200){
-        if (success != null) {
-          success(response.data,SourcesType.net);
-        }
-      }else{
-        failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败",response.data));
+        success?.call(response.data, SourcesType.net);
+        return;
       }
+      failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败",response.data));
     } on DioError catch (e, s) {
       LogUtil.v("请求出错：$e\n$s");
-      if (failure != null && e.type != DioErrorType.cancel) {
-        failure(HttpError.dioError(e));
+      if (e.type != DioErrorType.cancel) {
+        failure?.call(HttpError.dioError(e));
       }
       _collectError(e);
     } catch (e, s) {
       LogUtil.v("未知异常出错：$e\n$s");
       _collectError(e);
-      if (failure != null) {
-        failure(HttpError(HttpError.UNKNOWN, "网络异常，请稍后重试！",e));
-      }
+      failure?.call( HttpError(HttpError.UNKNOWN, "网络异常，请稍后重试！",e));
     }
   }
 

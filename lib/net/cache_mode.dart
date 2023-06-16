@@ -11,9 +11,6 @@ enum CacheMode {
   ///没有缓存
   onlyRequest,
 
-  /// 请求成功后存储缓存
-  requestAndSaveCache,
-
   ///先请求网络，如果请求网络失败，则读取缓存，如果读取缓存失败，本次请求失败
   requestFailedReadCache,
 

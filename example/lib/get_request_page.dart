@@ -79,6 +79,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
         .setPath("http:///10.88.33.197:8001/api/v1/admin/user/info")
         .setEnableRestfulUrl(true) ///Restful
         .setCacheMode(CacheMode.requestFailedReadCache)
+         .setFormParam("key", 1)
         .setJsonConvert((data)=>NormalWaterInfoEntity.fromJson(data))
         //
         // .setJsonConvertAdapter(
