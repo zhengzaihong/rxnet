@@ -19,7 +19,6 @@ void main() {
         if(e is DioError){
           print("------------------------->>>${e.response}");
         }
-
       },
       interceptors: [  ///拦截器
         CustomLogInterceptor()
