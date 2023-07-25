@@ -4,6 +4,8 @@ import 'package:flutter_uikit_forzzh/uikitlib.dart';
 import 'package:rxnet_example/get_request_page.dart';
 import 'download_page.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
+
 void main() {
 
   RxNet().init(
@@ -14,7 +16,10 @@ void main() {
       baseCacheMode: CacheMode.requestFailedReadCache,
       // baseCheckNet:checkNet, ///全局检查网络
       requestCaptureError: (e){  ///全局抓获 异常
-        print("---------------------------->$e");
+        if(e is DioError){
+          print("------------------------->>>${e.response}");
+        }
+
       },
       interceptors: [  ///拦截器
         CustomLogInterceptor()

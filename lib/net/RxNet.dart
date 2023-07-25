@@ -191,8 +191,6 @@ class BuildRequest<T> {
 
   dynamic _bodyData;
 
-  bool _useJsonAdapter = true;
-
   JsonConvertAdapter<T>? _jsonConvertAdapter;
 
   Options? _options;
@@ -219,11 +217,6 @@ class BuildRequest<T> {
       responseDecoder: op?.responseDecoder,
       listFormat: op?.listFormat,
     );
-  }
-
-  BuildRequest setUseJsonAdapter(bool use) {
-    _useJsonAdapter = use;
-    return this;
   }
 
   BuildRequest setJsonConvert(Function(dynamic data) function) {
@@ -260,12 +253,6 @@ class BuildRequest<T> {
     return this;
   }
 
-  @Deprecated("优化到 setParam方式")
-  BuildRequest setFormParam(String key, dynamic value) {
-    _bodyData[key] = value;
-    return this;
-  }
-
   ///用于有些特殊的请求，无具体key等
   BuildRequest setFormParams(dynamic param) {
     _bodyData = param;
@@ -273,22 +260,33 @@ class BuildRequest<T> {
   }
 
   BuildRequest setParam(String key, dynamic value) {
-    if (_httpType == HttpType.post) {
-      _bodyData[key] = value;
-    }else{
+    if (_httpType == HttpType.get) {
       _params[key] = value;
+    }else{
+      _bodyData[key] = value;
     }
     return this;
   }
 
 
   BuildRequest setParams(Map<String, dynamic> params) {
-    _params = params;
+    if (_httpType == HttpType.get) {
+      _params = params;
+    }else{
+      _bodyData = params;
+    }
     return this;
   }
 
-  BuildRequest addParams(Map<String, dynamic> param) {
-    _params.addAll(param);
+  BuildRequest addParams(Map<String, dynamic> params) {
+    if (_httpType == HttpType.get) {
+      _params.addAll(params);
+    }else{
+      _bodyData ??= {};
+      if(_bodyData is Map){
+        _bodyData.addAll(params);
+      }
+    }
     return this;
   }
 
@@ -357,10 +355,10 @@ class BuildRequest<T> {
       ///局部头优先与全局
       if(_headers.isNotEmpty){
         _options?.headers = _headers;
-      }else{
-        if(_enableGlobalHeader){
-          _options?.headers = _rxNet.globalHeader;
-        }
+      }
+      if(_enableGlobalHeader){
+        _options?.headers ??= {};
+        _options?.headers?.addAll(_rxNet.globalHeader);
       }
 
       Response<T> response = await _rxNet.client!.request(
@@ -372,7 +370,7 @@ class BuildRequest<T> {
 
       ///成功
       if (response.statusCode == 200) {
-        if (_useJsonAdapter && getJsonConvertAdapter() != null) {
+        if (getJsonConvertAdapter() != null) {
           LogUtil.v("useJsonAdapter：true");
           var data = getJsonConvertAdapter()?.jsonTransformation.call(response.data);
           success?.call(data!, SourcesType.net);
@@ -463,7 +461,7 @@ class BuildRequest<T> {
       List<Map<String,dynamic>> list,
       ){
     var datas = list[0]["value"];
-    if (_useJsonAdapter && getJsonConvertAdapter() != null) {
+    if (getJsonConvertAdapter() != null) {
       LogUtil.v("useJsonAdapter：true");
       var data = getJsonConvertAdapter()?.jsonTransformation.call(jsonDecode(datas));
       success?.call(data, SourcesType.cache);
@@ -494,7 +492,6 @@ class BuildRequest<T> {
     if(!(await _checkNetWork())){
       return ;
     }
-
     _cacheMode = _cacheMode??(_rxNet.baseCacheMode??CacheMode.onlyRequest);
     if(_cacheMode == CacheMode.onlyRequest){
       _doWorkRequest(success: success, failure: failure);
@@ -541,11 +538,12 @@ class BuildRequest<T> {
       ///局部头优先与全局
       if(_headers.isNotEmpty){
         _options?.headers = _headers;
-      }else{
-        if(_enableGlobalHeader){
-          _options?.headers = _rxNet.globalHeader;
-        }
       }
+      if(_enableGlobalHeader){
+        _options?.headers ??= {};
+        _options?.headers?.addAll(_rxNet.globalHeader);
+      }
+
 
       Response<T> response = await _rxNet.client!.request(
           url,
@@ -599,10 +597,10 @@ class BuildRequest<T> {
       ///局部头优先与全局
       if(_headers.isNotEmpty){
         _options?.headers = _headers;
-      }else{
-        if(_enableGlobalHeader){
-          _options?.headers = _rxNet.globalHeader;
-        }
+      }
+      if(_enableGlobalHeader){
+        _options?.headers ??= {};
+        _options?.headers?.addAll(_rxNet.globalHeader);
       }
 
       Response<dynamic> response = await _rxNet.client!.download(
