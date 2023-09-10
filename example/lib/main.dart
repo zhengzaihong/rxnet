@@ -10,13 +10,13 @@ void main() {
 
   RxNet().init(
       baseUrl: "http://t.weather.sojson.com/",
-      dbName: "test",   ///数据库名字
-      tableName: "project", ///表明
+      // cacheDir: "xxx",   ///缓存路径 path
+      // cacheName: "local_cache_app", ///缓存文件
       isDebug: true,   ///是否调试 打印日志
       baseCacheMode: CacheMode.requestFailedReadCache,
       // baseCheckNet:checkNet, ///全局检查网络
       requestCaptureError: (e){  ///全局抓获 异常
-        if(e is DioError){
+        if(e is DioException){
           print("------------------------->>>${e.response}");
         }
       },

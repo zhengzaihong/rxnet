@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
+import 'package:flutter_rxnet_forzzh/utils/HiveDataBase.dart';
+import 'package:hive/hive.dart';
+
 
 ///
 /// create_user: zhengzaihong
@@ -15,7 +18,6 @@ import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 final Map<String, CancelToken> _cancelTokens = <String, CancelToken>{};
 
 class RxNet {
-
   Dio? _client;
 
   static final RxNet _instance = RxNet._internal();
@@ -33,13 +35,14 @@ class RxNet {
 
   CacheMode? baseCacheMode;
 
-  Map<String, dynamic> globalHeader ={};
+  Map<String, dynamic> globalHeader = {};
+
+  HiveDataBase? _dataBase;
 
   /// 创建 dio 实例对象
   RxNet._internal() {
     var options = BaseOptions(
-        contentType: Headers.jsonContentType,
-        responseType: ResponseType.json);
+        contentType: Headers.jsonContentType, responseType: ResponseType.json);
     _client ??= Dio(options);
   }
 
@@ -48,22 +51,23 @@ class RxNet {
   /// [interceptors] 基础拦截器
   RxNet init({
     required String baseUrl,
-    String dbName = "dataMapper",
-    String? tableName,
+    String? cacheDir,
+    String cacheName = 'app_local_data',
     List<Interceptor>? interceptors,
     BaseOptions? options,
     bool isDebug = true,
     CheckNetWork? baseCheckNet,
     RequestCaptureError? requestCaptureError,
     CacheMode? baseCacheMode,
+    HiveCipher? encryptionCipher,
   }) {
-
     LogUtil.init(isDebug: isDebug);
 
     this.baseCheckNet = baseCheckNet;
     this.baseCacheMode = baseCacheMode;
     this.requestCaptureError = requestCaptureError;
 
+    initDb(cacheDir: cacheDir, cacheName: cacheName, encryptionCipher: encryptionCipher);
 
     if (options != null) {
       _client?.options = options;
@@ -72,29 +76,44 @@ class RxNet {
     if (interceptors != null) {
       _client?.interceptors.addAll(interceptors);
     }
-    try {
-      if (Platform.isAndroid || Platform.isIOS) {
-        DatabaseUtil.initDatabase(dbName,tabName: tableName);
-      }
-    } catch (e) {
-      LogUtil.v("数据缓存不支持的环境：web, windows");
-    }
     return this;
   }
 
-  RxNet setEnableProxy(bool enable){
+  HiveDataBase initDb({String? cacheDir,String? cacheName,HiveCipher? encryptionCipher}) {
+    _dataBase = HiveDataBase(
+        directory: cacheDir,
+        hiveBoxName: cacheName,
+        encryptionCipher: encryptionCipher);
+    return _dataBase!;
+  }
+
+  Future saveCache(String key, dynamic value) async {
+    return getDb()?.put(value, key = key);
+  }
+
+  Future readCache(String key) async {
+    return getDb()?.get(key);
+  }
+
+  HiveDataBase? getDb(){
+    return _dataBase;
+  }
+
+  RxNet setEnableProxy(bool enable) {
     _isProxyEnable = enable;
     return this;
   }
-  bool isEnableProxy(){
+
+  bool isEnableProxy() {
     return _isProxyEnable;
   }
 
   /// isProxyEnable 为true 才会生效
   /// 前置方法 setEnableProxy
-  void setProxy(String address){
-    if(isEnableProxy()){
-      (_instance.client?.httpClientAdapter as IOHttpClientAdapter).onHttpClientCreate = (client) {
+  void setProxy(String address) {
+    if (isEnableProxy()) {
+      (_instance.client?.httpClientAdapter as IOHttpClientAdapter)
+          .onHttpClientCreate = (client) {
         client.findProxy = (uri) {
           ///ip:prort
           return address;
@@ -105,10 +124,9 @@ class RxNet {
     }
   }
 
-
   ///这里提供一个收集日字的方法，便于后期排查
   ///文件需要有写的权限，eg:xxx/xxx/log.txt
-  void cacheLogToFile(String filePath) async{
+  void cacheLogToFile(String filePath) async {
     var file = File(filePath);
     var sink = file.openWrite();
     _client?.interceptors.add(LogInterceptor(logPrint: sink.writeln));
@@ -121,6 +139,7 @@ class RxNet {
       RxNet(),
     );
   }
+
   static BuildRequest post<T>() {
     return BuildRequest(
       HttpType.post,
@@ -159,7 +178,7 @@ class RxNet {
   }
 
   ///取消网络请求
-  void cancel(String tag,{dynamic reason}) {
+  void cancel(String tag, {dynamic reason}) {
     if (_cancelTokens.containsKey(tag)) {
       if (!_cancelTokens[tag]!.isCancelled) {
         _cancelTokens[tag]?.cancel(reason);
@@ -169,10 +188,7 @@ class RxNet {
   }
 }
 
-
-
 class BuildRequest<T> {
-
   final HttpType _httpType;
 
   final RxNet _rxNet;
@@ -199,7 +215,7 @@ class BuildRequest<T> {
 
   CheckNetWork? checkNetWork;
 
-  BuildRequest(this._httpType, this._rxNet){
+  BuildRequest(this._httpType, this._rxNet) {
     BaseOptions? op = _rxNet._client?.options;
     _options = Options(
       method: op?.method,
@@ -262,17 +278,16 @@ class BuildRequest<T> {
   BuildRequest setParam(String key, dynamic value) {
     if (_httpType == HttpType.get) {
       _params[key] = value;
-    }else{
+    } else {
       _bodyData[key] = value;
     }
     return this;
   }
 
-
   BuildRequest setParams(Map<String, dynamic> params) {
     if (_httpType == HttpType.get) {
       _params = params;
-    }else{
+    } else {
       _bodyData = params;
     }
     return this;
@@ -281,9 +296,9 @@ class BuildRequest<T> {
   BuildRequest addParams(Map<String, dynamic> params) {
     if (_httpType == HttpType.get) {
       _params.addAll(params);
-    }else{
+    } else {
       _bodyData ??= {};
-      if(_bodyData is Map){
+      if (_bodyData is Map) {
         _bodyData.addAll(params);
       }
     }
@@ -320,7 +335,6 @@ class BuildRequest<T> {
     return this;
   }
 
-
   BuildRequest setCacheMode(CacheMode cacheMode) {
     _cacheMode = cacheMode;
     return this;
@@ -332,11 +346,10 @@ class BuildRequest<T> {
   }
 
   ///提供一个检查网络的方法，外部需要自行实现
-  BuildRequest setCheckNetwork(CheckNetWork checkNetWork){
+  BuildRequest setCheckNetwork(CheckNetWork checkNetWork) {
     this.checkNetWork = checkNetWork;
     return this;
   }
-
 
   void _doWorkRequest({
     SuccessCallback? success,
@@ -344,7 +357,6 @@ class BuildRequest<T> {
     bool cache = false,
     Function? readCache,
   }) async {
-
     String url = _path.toString();
     if (getEnableRestfulUrl()) {
       url = NetUtils.restfulUrl(_path.toString(), _params);
@@ -353,18 +365,17 @@ class BuildRequest<T> {
       _options?.method = _httpType.name;
 
       ///局部头优先与全局
-      if(_headers.isNotEmpty){
+      if (_headers.isNotEmpty) {
         _options?.headers = _headers;
       }
-      if(_enableGlobalHeader){
+      if (_enableGlobalHeader) {
         _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet.globalHeader);
       }
 
-      Response<T> response = await _rxNet.client!.request(
-          url,
+      Response<T> response = await _rxNet.client!.request(url,
           data: _bodyData,
-          queryParameters: getEnableRestfulUrl()?{}:_params,
+          queryParameters: getEnableRestfulUrl() ? {} : _params,
           options: _options,
           cancelToken: _cancelTokens[getTag()]);
 
@@ -372,151 +383,102 @@ class BuildRequest<T> {
       if (response.statusCode == 200) {
         if (getJsonConvertAdapter() != null) {
           LogUtil.v("useJsonAdapter：true");
-          var data = getJsonConvertAdapter()?.jsonTransformation.call(response.data);
+          var data =
+              getJsonConvertAdapter()?.jsonTransformation.call(response.data);
           success?.call(data!, SourcesType.net);
         } else {
           LogUtil.v("useJsonAdapter：false");
           success?.call(response.data, SourcesType.net);
         }
 
-        try {
-          if (cache && (Platform.isIOS || Platform.isAndroid)) {
-            String cacheKey = NetUtils.getCacheKeyFromPath("$_path", _params);
-            /// 存储数据
-            NetUtils.saveCache(cacheKey, response.data==null?"":jsonEncode(response.data));
-          }
-        } catch (e) {
-          LogUtil.v("catch环境：web,windows");
-        }
+        /// 存储数据
+        String cacheKey = NetUtils.getCacheKeyFromPath("$_path", _params);
+        _rxNet.saveCache(cacheKey, jsonEncode(response.data));
         return;
       }
 
-      if (readCache != null) {
-        readCache.call();
-      } else {
-        ///失败
-        failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败",response.data));
-      }
-
-    } on DioError catch (e, s) {
-      LogUtil.v("网络请求出错,请检查网络：$e\n$s");
-      _collectError(e);
-      var error = HttpError.dioError(e);
-      if (failure != null && e.type != DioErrorType.cancel) {
-        error.bodyData = e;
-      }
-      if (readCache != null) {
-        LogUtil.v("网络请求失败，开始读取缓存：");
-        readCache.call();
-      } else {
-        ///失败
-        failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败",error));
-      }
+      ///失败
+      failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败", response.data));
     } catch (e, s) {
-      LogUtil.v("未知异常出错：$e\n$s");
-      _collectError(e);
-      if (readCache != null) {
-        LogUtil.v("网络请求失败，开始读取缓存：");
-        readCache.call();
-      } else {
-        ///失败
-        failure?.call(HttpError(HttpError.UNKNOWN, "未知异常出错",e));
-      }
+      _catchError(success, failure, readCache, e, s);
     }
   }
 
 
   void _readCache(
-      SuccessCallback? success,
-      FailureCallback? failure,
-      ){
-    if(DatabaseUtil.isDatabaseReady){
-      _readCacheAction(success,failure);
-    }else{
-      DatabaseUtil.setDataBaseReadListener((isOk){
-        _readCacheAction(success,failure);
-      });
+    SuccessCallback? success,
+    FailureCallback? failure,
+  ) async {
+    var value =
+        await _rxNet.readCache(NetUtils.getCacheKeyFromPath('$_path', _params));
+    if (value != null) {
+      _parseLocalData(success, failure, value);
+    } else {
+      failure?.call({});
     }
-  }
-
-  void _readCacheAction(
-      SuccessCallback? success,
-      FailureCallback? failure,
-      ){
-
-      NetUtils.getCache("$_path", _params).then((list) {
-        if (list.isNotEmpty) {
-          LogUtil.v("缓存数据:$list");
-          _parseLocalData(success,failure,list);
-        } else {
-          failure?.call({});
-        }
-      });
+    LogUtil.v("缓存数据:$value");
   }
 
   ///解析本地缓存数据
   void _parseLocalData(
-      SuccessCallback? success,
-      FailureCallback? failure,
-      List<Map<String,dynamic>> list,
-      ){
-    var datas = list[0]["value"];
+    SuccessCallback? success,
+    FailureCallback? failure,
+    dynamic cacheValue,
+  ) {
     if (getJsonConvertAdapter() != null) {
       LogUtil.v("useJsonAdapter：true");
-      var data = getJsonConvertAdapter()?.jsonTransformation.call(jsonDecode(datas));
+      var data = getJsonConvertAdapter()
+          ?.jsonTransformation
+          .call(jsonDecode(cacheValue));
       success?.call(data, SourcesType.cache);
     } else {
       LogUtil.v("useJsonAdapter：false");
-      success?.call(datas, SourcesType.cache);
+      success?.call(cacheValue, SourcesType.cache);
     }
   }
 
-
-  Future<bool> _checkNetWork() async{
-
+  Future<bool> _checkNetWork() async {
     ///如果设置了网络检查 请返回是否启用请求的状态。
-    if(checkNetWork!=null){
+    if (checkNetWork != null) {
       ///如果网络检查失败 或者 false 将不会执行请求。
       return await checkNetWork!.call();
     }
 
     ///局部网络检查优先级高于全局
-    if(checkNetWork==null && _rxNet.baseCheckNet!=null){
-    ///如果网络检查失败 或者 false 将不会执行请求。
+    if (checkNetWork == null && _rxNet.baseCheckNet != null) {
+      ///如果网络检查失败 或者 false 将不会执行请求。
       return await _rxNet.baseCheckNet!.call();
     }
     return true;
   }
-  void execute({SuccessCallback? success, FailureCallback? failure}) async{
 
-    if(!(await _checkNetWork())){
-      return ;
-    }
-    _cacheMode = _cacheMode??(_rxNet.baseCacheMode??CacheMode.onlyRequest);
-    if(_cacheMode == CacheMode.onlyRequest){
-      _doWorkRequest(success: success, failure: failure);
+  void execute({SuccessCallback? success, FailureCallback? failure}) async {
+    if (!(await _checkNetWork())) {
       return;
     }
-
-    if(_cacheMode == CacheMode.firstCacheThenRequest){
-      _readCache(success,failure);
-      _doWorkRequest(success: success, failure: failure, cache: true);
-      return;
+    _cacheMode = _cacheMode ?? (_rxNet.baseCacheMode ?? CacheMode.onlyRequest);
+    if (_cacheMode == CacheMode.onlyRequest) {
+      return  _doWorkRequest(success: success, failure: failure);
     }
 
-    if(_cacheMode == CacheMode.requestFailedReadCache){
-      _doWorkRequest(success: success, failure: failure, cache: true,
+    if (_cacheMode == CacheMode.firstCacheThenRequest) {
+      _readCache(success, failure);
+      return _doWorkRequest(success: success, failure: failure, cache: true);
+    }
+
+    if (_cacheMode == CacheMode.requestFailedReadCache) {
+      return  _doWorkRequest(
+          success: success,
+          failure: failure,
+          cache: true,
           readCache: () {
-            _readCache(success,failure);
+            _readCache(success, failure);
           });
-      return;
     }
-    if(_cacheMode == CacheMode.onlyCache){
-      _readCache(success,failure);
-      return;
+    if (_cacheMode == CacheMode.onlyCache) {
+      return _readCache(success, failure);
     }
   }
-
 
   ///上传文件
   void upload({
@@ -524,9 +486,8 @@ class BuildRequest<T> {
     SuccessCallback? success,
     FailureCallback? failure,
   }) async {
-
-    if(!(await _checkNetWork())){
-      return ;
+    if (!(await _checkNetWork())) {
+      return;
     }
 
     String url = _path.toString();
@@ -535,45 +496,33 @@ class BuildRequest<T> {
     }
     try {
       _options?.method = _httpType.name;
+
       ///局部头优先与全局
-      if(_headers.isNotEmpty){
+      if (_headers.isNotEmpty) {
         _options?.headers = _headers;
       }
-      if(_enableGlobalHeader){
+      if (_enableGlobalHeader) {
         _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet.globalHeader);
       }
 
-
-      Response<T> response = await _rxNet.client!.request(
-          url,
+      Response<T> response = await _rxNet.client!.request(url,
           onSendProgress: onSendProgress,
           data: _bodyData,
-          queryParameters: getEnableRestfulUrl()?{}:_params,
+          queryParameters: getEnableRestfulUrl() ? {} : _params,
           options: _options,
           cancelToken: _cancelTokens[getTag()]);
 
-      if(response.statusCode == 200){
+      if (response.statusCode == 200) {
         success?.call(response.data, SourcesType.net);
         return;
       }
 
-      failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败",response.data));
-    } on DioError catch (e, s) {
-      _collectError(e);
-      LogUtil.v("请求出错：$e\n$s");
-      if (e.type != DioErrorType.cancel) {
-        var error = HttpError.dioError(e);
-        error.bodyData = e;
-        failure?.call(error);
-      }
+      failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败", response.data));
     } catch (e, s) {
-      _collectError(e);
-      LogUtil.v("未知异常出错：$e\n$s");
-      failure?.call( HttpError(HttpError.UNKNOWN, "网络异常，请稍后重试！",e));
+      _catchError(success, failure, null, e, s);
     }
   }
-
 
   ///下载文件
   ///[savePath]  文件保存路径
@@ -583,9 +532,8 @@ class BuildRequest<T> {
     SuccessCallback? success,
     FailureCallback? failure,
   }) async {
-
-    if(!(await _checkNetWork())){
-      return ;
+    if (!(await _checkNetWork())) {
+      return;
     }
     String url = _path.toString();
     if (getEnableRestfulUrl()) {
@@ -595,44 +543,61 @@ class BuildRequest<T> {
       _options?.method = _httpType.name;
 
       ///局部头优先与全局
-      if(_headers.isNotEmpty){
+      if (_headers.isNotEmpty) {
         _options?.headers = _headers;
       }
-      if(_enableGlobalHeader){
+      if (_enableGlobalHeader) {
         _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet.globalHeader);
       }
 
-      Response<dynamic> response = await _rxNet.client!.download(
-          url,
-          savePath,
+      Response<dynamic> response = await _rxNet.client!.download(url, savePath,
           onReceiveProgress: onReceiveProgress,
-          queryParameters: getEnableRestfulUrl()?{}:_params,
+          queryParameters: getEnableRestfulUrl() ? {} : _params,
           data: _bodyData,
           options: _options,
           cancelToken: _cancelTokens[getTag()]);
+
       ///成功
-      if(response.statusCode==200){
+      if (response.statusCode == 200) {
         success?.call(response.data, SourcesType.net);
         return;
       }
-      failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败",response.data));
-    } on DioError catch (e, s) {
-      LogUtil.v("请求出错：$e\n$s");
-      if (e.type != DioErrorType.cancel) {
-        failure?.call(HttpError.dioError(e));
-      }
-      _collectError(e);
+      failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败", response.data));
     } catch (e, s) {
-      LogUtil.v("未知异常出错：$e\n$s");
-      _collectError(e);
-      failure?.call( HttpError(HttpError.UNKNOWN, "网络异常，请稍后重试！",e));
+      _catchError(success, failure, null, e, s);
     }
   }
 
-  void _collectError(dynamic e){
-    if(_rxNet.requestCaptureError!=null){
-      _rxNet.requestCaptureError!.call(e);
+  void _catchError(SuccessCallback? success, FailureCallback? failure,
+      Function? readCache, e, s) {
+    _collectError(e);
+    LogUtil.v("请求出错：$e\n$s");
+    if (e is DioException) {
+      var error = HttpError.dioError(e);
+      if (e.type != DioExceptionType.cancel) {
+        error.bodyData = e;
+      }
+      if (readCache != null) {
+        LogUtil.v("网络请求失败，开始读取缓存：");
+        readCache.call();
+      } else {
+        ///失败
+        failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败", error));
+      }
+      return;
     }
+
+    if (readCache != null) {
+      LogUtil.v("网络请求失败，开始读取缓存：");
+      readCache.call();
+    } else {
+      ///失败
+      failure?.call(HttpError(HttpError.UNKNOWN, "未知异常出错", e));
+    }
+  }
+
+  void _collectError(dynamic e) {
+    _rxNet.requestCaptureError?.call(e);
   }
 }

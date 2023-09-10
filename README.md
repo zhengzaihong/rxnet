@@ -2,13 +2,14 @@
 
 一款极简且强大Flutter网络请求工具，支持restful、泛型请求、数据缓存(无网请求)。该库是对Dio的扩展,同步的写法异步的实现，使用更加自然。
 
-注意：数据缓存只支持 Android、HarmonyOS 和 IOS 、MACOS平台。
+0.1.0版本之后缓存升级：支持全平台缓存，无网请求。
+注意：0.0.9以前版本 数据缓存只支持 Android、HarmonyOS 和 IOS 、MACOS平台。
 
 ## 依赖：
 
     dependencies:
     
-       flutter_rxnet_forzzh:0.0.9
+       flutter_rxnet_forzzh:0.1.0
 
 
 ## 常用参数：
@@ -46,19 +47,20 @@ RxNet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
  1.先初始化网络框架
 
     RxNet().init(
-      baseUrl: "http://t.weather.sojson.com/",
-      dbName: "test",   ///数据库名字
-      tableName: "project", ///表明
-      isDebug: true,   ///是否调试 打印日志
-      baseCacheMode: CacheMode.onlyCache, // 缓存模式，请求单独配置优先级高于baseCacheMode
-      baseCheckNet:checkNet, ///全局检查网络
-      requestCaptureError: (e){  ///全局抓获 异常
-
-      },
-      interceptors: [  ///拦截器
-        CustomLogInterceptor()
-      ],);
-
+        baseUrl: "xxxx",
+        // cacheDir: "xxx",   ///缓存路径 path
+        // cacheName: "local_cache_app", ///缓存文件
+        isDebug: true,   ///是否调试 打印日志
+        baseCacheMode: CacheMode.requestFailedReadCache,
+        // baseCheckNet:checkNet, ///全局检查网络
+        requestCaptureError: (e){  ///全局抓获 异常
+            if(e is DioException){
+              print("------------------------->>>${e.response}");
+            }
+        },
+        interceptors: [  ///拦截器
+            CustomLogInterceptor()
+        ]);
  
  2.发起网络请求：
 

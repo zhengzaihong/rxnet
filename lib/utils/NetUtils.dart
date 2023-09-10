@@ -1,18 +1,11 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 
 import 'DatabaseUtil.dart';
 import 'MD5Util.dart';
 import 'TextUtil.dart';
 
 class NetUtils {
-
-
-  ///获取get缓存请求
-  static Future<List<Map<String,dynamic>>> getCache(String path, Map<String, dynamic> params) async {
-    return DatabaseUtil.queryHttp(
-        DatabaseUtil.database, getCacheKeyFromPath(path, params));
-  }
-
 
   ///restful处理
   static String restfulUrl(String url, Map<String, dynamic> params) {
@@ -26,7 +19,6 @@ class NetUtils {
 
     return buffer.toString().replaceAll("//", "/");
   }
-
 
   static String getCacheKeyFromPath(String path, Map<String, dynamic> params) {
     String cacheKey = "";
@@ -44,17 +36,4 @@ class NetUtils {
     }
     return cacheKey;
   }
-
-  static void saveCache(String cacheKey, String value) {
-    DatabaseUtil.queryHttp(DatabaseUtil.database, cacheKey).then((list) {
-      if (list.isNotEmpty) {
-        //更新数据库数据
-        DatabaseUtil.updateHttp(DatabaseUtil.database, cacheKey, value);
-      } else {
-        //插入数据库数据
-        DatabaseUtil.insertHttp(DatabaseUtil.database, cacheKey, value);
-      }
-    });
-  }
 }
-
