@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:core';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
+import 'package:flutter_rxnet_forzzh/net/result_entity.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 import 'package:flutter_rxnet_forzzh/utils/HiveDataBase.dart';
 import 'package:hive/hive.dart';
@@ -452,6 +454,7 @@ class BuildRequest<T> {
     return true;
   }
 
+  ///基于异步回调方式
   void execute({SuccessCallback? success, FailureCallback? failure}) async {
     if (!(await _checkNetWork())) {
       return;
@@ -478,6 +481,57 @@ class BuildRequest<T> {
     if (_cacheMode == CacheMode.onlyCache) {
       return _readCache(success, failure);
     }
+  }
+
+  /// 外部使用 await 方式调用使用此方法。
+  /// 结果从 ResultEntity 中获取
+  /// 此方式不支持 同时请求和读取缓存策略。
+  Future<ResultEntity> executeAsync() async {
+    Completer<ResultEntity> completer = Completer();
+    if (!(await _checkNetWork())) {
+      return completer.future;
+    }
+    _cacheMode = _cacheMode ?? (_rxNet.baseCacheMode ?? CacheMode.onlyRequest);
+    if(_cacheMode == CacheMode.requestFailedReadCache){
+      _cacheMode = CacheMode.onlyRequest;
+    }
+    if(_cacheMode == CacheMode.firstCacheThenRequest){
+      _cacheMode = CacheMode.onlyCache;
+    }
+    if (_cacheMode == CacheMode.onlyRequest) {
+       _doWorkRequest(success: (data,model){
+         _successHandler(completer, data: data, model: model);
+       }, failure: (e){
+         _errorHandler(completer, error: e);
+       });
+    }
+
+    if (_cacheMode == CacheMode.onlyCache) {
+      _readCache((data, model){
+        _successHandler(completer, data: data, model: model);
+      }, (e){
+        _errorHandler(completer, error: e,isError: true);
+      });
+    }
+    return completer.future;
+  }
+
+  void _errorHandler(Completer<ResultEntity> completer,
+      {dynamic data,
+      SourcesType model = SourcesType.net,
+      dynamic error,
+      bool isError = true}) {
+    completer.complete(
+        ResultEntity(value: data, model: model, error: error, isError: isError));
+  }
+
+  void _successHandler(Completer<ResultEntity> completer,
+      {dynamic data,
+      SourcesType model = SourcesType.net,
+      dynamic error,
+      bool isError = false}) {
+    completer.complete(
+        ResultEntity(value: data, model: model, error: error, isError: isError));
   }
 
   ///上传文件

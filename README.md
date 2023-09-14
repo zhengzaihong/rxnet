@@ -64,6 +64,8 @@ RxNet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
  
  2.发起网络请求：
 
+    1.回调模式：
+
     RxNet.get()
         .setPath("api/weather")
         .setParam("city", "101030100")
@@ -71,6 +73,15 @@ RxNet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
         .setCacheMode(CacheMode.requestFailedReadCache)
         .setJsonConvert((data)=>NormalWaterInfoEntity.fromJson(data))
         .execute(success: success,failure:failure);
+
+    2. await方式：
+
+    var data =  await RxNet.get()  ///ResultEntity.value 取值
+        .setPath("api/weather")
+        .setParam("city", "101030100")
+        .setCacheMode(CacheMode.onlyRequest)
+        .setJsonConvert((data)=>NormalWaterInfoEntity.fromJson(data))
+        .executeAsync();
 
 
  3.请求原始数据,某些特殊情况，如读取网盘资源文件数据

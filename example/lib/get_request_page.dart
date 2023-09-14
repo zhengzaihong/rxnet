@@ -1,6 +1,7 @@
 
 
 import 'package:flutter/material.dart';
+import 'package:flutter_rxnet_forzzh/net/result_entity.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 import 'package:rxnet_example/bean/normal_water_info_entity.dart';
 
@@ -52,7 +53,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
     );
   }
 
-  void request() {
+  void request() async{
 
     var success = ((data,mo){
       var source = mo as SourcesType;
@@ -70,19 +71,26 @@ class _GetRequestPageState extends State<GetRequestPage> {
     var failure = ((error){
 
     });
-    RxNet().setGlobalHeader({
-      "Authorization": "bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjo2LCJ1c2VyX3R5cGUiOmZhbHNlLCJleHAiOjE2ODM0NDM3ODh9.K1GPsVGsvKc_6LN2iMdow6HRT_J-mlisDUtg6o1_vyY",
-    });
-    RxNet.get()  ///这里可以省略 泛型声明
+    // RxNet().setGlobalHeader({
+    //   "Authorization": "bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjo2LCJ1c2VyX3R5cGUiOmZhbHNlLCJleHAiOjE2ODM0NDM3ODh9.K1GPsVGsvKc_6LN2iMdow6HRT_J-mlisDUtg6o1_vyY",
+    // });
+   var data =  await RxNet.get()  ///这里可以省略 泛型声明
         .setPath("api/weather")
         .setParam("city", "101030100")
         // .setPath("http:///10.88.33.197:8001/api/v1/admin/user/info")
         .setEnableRestfulUrl(true) ///Restful  http://t.weather.sojson.com/api/weather/city/101030100
-        .setCacheMode(CacheMode.requestFailedReadCache)
-        .setJsonConvert((data)=>NormalWaterInfoEntity.fromJson(data))
-        .execute(success: success,failure:failure);
-
-
+        .setCacheMode(CacheMode.onlyRequest)
+        // .setJsonConvert((data)=>NormalWaterInfoEntity.fromJson(data))
+        .executeAsync();
+        // .execute(success: success,failure:failure);
+    var result  = data.value;
+    content = result.toString();
+    if(data.model == SourcesType.net){
+      sourcesType = SourcesType.net;
+    }else{
+      sourcesType = SourcesType.cache;
+    }
+    setState(() {});
   }
 
 }

@@ -26,4 +26,4 @@ typedef HandlerResponse = void Function(Response response, ResponseInterceptorHa
 
 typedef HandlerRequest = void Function(RequestOptions options, RequestInterceptorHandler handler);
 
-typedef HandlerError = void Function(DioError err, ErrorInterceptorHandler handler);
+typedef HandlerError = void Function(DioException err, ErrorInterceptorHandler handler);

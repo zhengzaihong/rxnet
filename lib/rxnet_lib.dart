@@ -10,3 +10,4 @@ export 'package:flutter_rxnet_forzzh/utils/LogUtil.dart';
 export 'package:flutter_rxnet_forzzh/utils/NetUtils.dart';
 export 'package:flutter_rxnet_forzzh/utils/TextUtil.dart';
 export 'package:flutter_rxnet_forzzh/net/interceptor/CustomLogInterceptor.dart';
+export 'package:flutter_rxnet_forzzh/net/result_entity.dart';
