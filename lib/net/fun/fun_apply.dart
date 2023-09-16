@@ -2,13 +2,15 @@
 
 import 'package:dio/dio.dart';
 
-typedef JsonTransformation<T> = dynamic Function(dynamic data);
+import '../type/sources_type.dart';
+
+typedef JsonTransformation = dynamic Function(dynamic data);
 
 ///http请求成功回调
-typedef SuccessCallback<Dynamic,SourcesType> = void Function(dynamic data,SourcesType model);
+typedef SuccessCallback<T> = void Function(T data,SourcesType model);
 
 ///失败回调
-typedef FailureCallback = void Function(dynamic data);
+typedef FailureCallback<T> = void Function(dynamic data);
 
 
 typedef ParamCallBack = void Function(Map<String, dynamic> params);
@@ -26,4 +28,4 @@ typedef HandlerResponse = void Function(Response response, ResponseInterceptorHa
 
 typedef HandlerRequest = void Function(RequestOptions options, RequestInterceptorHandler handler);
 
-typedef HandlerError = void Function(DioException err, ErrorInterceptorHandler handler);
+typedef HandlerError = void Function(Exception err, ErrorInterceptorHandler handler);

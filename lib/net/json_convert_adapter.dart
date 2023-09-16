@@ -7,7 +7,7 @@ import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 /// create_time: 11:01
 /// describe: json 转数据模型的 适配器
 ///
-class JsonConvertAdapter<T>{
+class JsonConvertAdapter{
 
   JsonTransformation jsonTransformation;
 

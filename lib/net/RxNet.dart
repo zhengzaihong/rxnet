@@ -4,7 +4,7 @@ import 'dart:core';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
-import 'package:flutter_rxnet_forzzh/net/result_entity.dart';
+import 'package:flutter_rxnet_forzzh/net/rxnet_exception.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 import 'package:flutter_rxnet_forzzh/utils/HiveDataBase.dart';
 import 'package:hive/hive.dart';
@@ -209,7 +209,7 @@ class BuildRequest<T> {
 
   dynamic _bodyData;
 
-  JsonConvertAdapter<T>? _jsonConvertAdapter;
+  JsonConvertAdapter? _jsonConvertAdapter;
 
   Options? _options;
 
@@ -242,12 +242,12 @@ class BuildRequest<T> {
     return this;
   }
 
-  BuildRequest setJsonConvertAdapter(JsonConvertAdapter<T> adapter) {
+  BuildRequest setJsonConvertAdapter(JsonConvertAdapter adapter) {
     _jsonConvertAdapter = adapter;
     return this;
   }
 
-  JsonConvertAdapter<T>? getJsonConvertAdapter() {
+  JsonConvertAdapter? getJsonConvertAdapter() {
     return _jsonConvertAdapter;
   }
 
@@ -353,9 +353,9 @@ class BuildRequest<T> {
     return this;
   }
 
-  void _doWorkRequest({
-    SuccessCallback? success,
-    FailureCallback? failure,
+  void _doWorkRequest<T>({
+    SuccessCallback<T>? success,
+    FailureCallback<T>? failure,
     bool cache = false,
     Function? readCache,
   }) async {
@@ -375,7 +375,7 @@ class BuildRequest<T> {
         _options?.headers?.addAll(_rxNet.globalHeader);
       }
 
-      Response<T> response = await _rxNet.client!.request(url,
+      Response response = await _rxNet.client!.request(url,
           data: _bodyData,
           queryParameters: getEnableRestfulUrl() ? {} : _params,
           options: _options,
@@ -387,10 +387,10 @@ class BuildRequest<T> {
           LogUtil.v("useJsonAdapter：true");
           var data =
               getJsonConvertAdapter()?.jsonTransformation.call(response.data);
-          success?.call(data!, SourcesType.net);
+          success?.call(data as T, SourcesType.net);
         } else {
           LogUtil.v("useJsonAdapter：false");
-          success?.call(response.data, SourcesType.net);
+          success?.call(response.data as T, SourcesType.net);
         }
 
         /// 存储数据
@@ -400,15 +400,15 @@ class BuildRequest<T> {
       }
 
       ///失败
-      failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败", response.data));
+      failure?.call(response.data);
     } catch (e, s) {
       _catchError(success, failure, readCache, e, s);
     }
   }
 
 
-  void _readCache(
-    SuccessCallback? success,
+  void _readCache<T>(
+    SuccessCallback<T>? success,
     FailureCallback? failure,
   ) async {
     var value =
@@ -422,9 +422,9 @@ class BuildRequest<T> {
   }
 
   ///解析本地缓存数据
-  void _parseLocalData(
-    SuccessCallback? success,
-    FailureCallback? failure,
+  void _parseLocalData<T>(
+    SuccessCallback<T>? success,
+    FailureCallback<T>? failure,
     dynamic cacheValue,
   ) {
     if (getJsonConvertAdapter() != null) {
@@ -454,8 +454,9 @@ class BuildRequest<T> {
     return true;
   }
 
-  ///基于异步回调方式
-  void execute({SuccessCallback? success, FailureCallback? failure}) async {
+  ///基于异步回调方式 支持同时请求和缓存策略
+  ///对于外部需要可接收多种状态的数据 建议使用此方式。
+  void execute<T>({SuccessCallback<T>? success, FailureCallback? failure}) async {
     if (!(await _checkNetWork())) {
       return;
     }
@@ -483,11 +484,11 @@ class BuildRequest<T> {
     }
   }
 
-  /// 外部使用 await 方式调用使用此方法。
+  /// 外部使用 await 方式调用此方法。
   /// 结果从 ResultEntity 中获取
   /// 此方式不支持 同时请求和读取缓存策略。
-  Future<ResultEntity> executeAsync() async {
-    Completer<ResultEntity> completer = Completer();
+  Future<ResultEntity<T>> executeAsync<T>() async  {
+    Completer<ResultEntity<T>> completer = Completer();
     if (!(await _checkNetWork())) {
       return completer.future;
     }
@@ -499,39 +500,37 @@ class BuildRequest<T> {
       _cacheMode = CacheMode.onlyCache;
     }
     if (_cacheMode == CacheMode.onlyRequest) {
-       _doWorkRequest(success: (data,model){
-         _successHandler(completer, data: data, model: model);
+       _doWorkRequest<T>(success: (data,model){
+         _successHandler<T>(completer, data: data, model: model);
        }, failure: (e){
-         _errorHandler(completer, error: e);
+         _errorHandler<T>(completer,model:SourcesType.net, error: e);
        });
     }
 
     if (_cacheMode == CacheMode.onlyCache) {
-      _readCache((data, model){
-        _successHandler(completer, data: data, model: model);
+      _readCache<T>((data, model){
+        _successHandler<T>(completer, data: data, model: model);
       }, (e){
-        _errorHandler(completer, error: e,isError: true);
+        _errorHandler<T>(completer,model:SourcesType.cache, error: e);
       });
     }
     return completer.future;
   }
 
-  void _errorHandler(Completer<ResultEntity> completer,
-      {dynamic data,
-      SourcesType model = SourcesType.net,
+  void _errorHandler<T>(Completer<ResultEntity<T>> completer,
+      {SourcesType model = SourcesType.net,
       dynamic error,
       bool isError = true}) {
-    completer.complete(
-        ResultEntity(value: data, model: model, error: error, isError: isError));
+    completer.complete(ResultEntity(error: error, isError: isError));
   }
 
-  void _successHandler(Completer<ResultEntity> completer,
-      {dynamic data,
+  void _successHandler<T>(Completer<ResultEntity<T>> completer,
+      {T? data,
       SourcesType model = SourcesType.net,
       dynamic error,
       bool isError = false}) {
-    completer.complete(
-        ResultEntity(value: data, model: model, error: error, isError: isError));
+    completer.complete(ResultEntity<T>(
+        value: data, model: model, error: error, isError: isError));
   }
 
   ///上传文件
@@ -572,7 +571,7 @@ class BuildRequest<T> {
         return;
       }
 
-      failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败", response.data));
+      failure?.call(response.data);
     } catch (e, s) {
       _catchError(success, failure, null, e, s);
     }
@@ -617,37 +616,22 @@ class BuildRequest<T> {
         success?.call(response.data, SourcesType.net);
         return;
       }
-      failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败", response.data));
+      failure?.call(response.data);
     } catch (e, s) {
-      _catchError(success, failure, null, e, s);
+      _catchError<T>(success, failure, null, e, s);
     }
   }
 
-  void _catchError(SuccessCallback? success, FailureCallback? failure,
+  void _catchError<T>(SuccessCallback<T>? success, FailureCallback<T>? failure,
       Function? readCache, e, s) {
     _collectError(e);
     LogUtil.v("请求出错：$e\n$s");
-    if (e is DioException) {
-      var error = HttpError.dioError(e);
-      if (e.type != DioExceptionType.cancel) {
-        error.bodyData = e;
-      }
-      if (readCache != null) {
-        LogUtil.v("网络请求失败，开始读取缓存：");
-        readCache.call();
-      } else {
-        ///失败
-        failure?.call(HttpError(HttpError.REQUEST_FAILE, "请求失败", error));
-      }
-      return;
-    }
-
     if (readCache != null) {
       LogUtil.v("网络请求失败，开始读取缓存：");
       readCache.call();
     } else {
       ///失败
-      failure?.call(HttpError(HttpError.UNKNOWN, "未知异常出错", e));
+      failure?.call(e);
     }
   }
 

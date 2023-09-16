@@ -3,6 +3,7 @@
 一款极简且强大Flutter网络请求工具，支持restful、泛型请求、数据缓存(无网请求)。该库是对Dio的扩展,同步的写法异步的实现，使用更加自然。
 
 0.1.0版本之后缓存升级：支持全平台缓存，无网请求。
+
 注意：0.0.9以前版本 数据缓存只支持 Android、HarmonyOS 和 IOS 、MACOS平台。
 
 ## 依赖：
@@ -31,16 +32,26 @@ CacheMode：支持如下几种模式：
     onlyCache;
 
 
-如需要 restful 风格请求：setEnableRestfulUrl(true)。
+注意：
 
-不设置 setJsonConvertAdapter返回的都是Map 类型数据。
+1.如需要 restful 风格请求：setEnableRestfulUrl(true)，内部自动转化参数链接
+
+2.不设置 setJsonConvertAdapter返回的都是Map类型数据，否则返回定义的实体类型。
 
 需要json 转对象，请设置 setJsonConvertAdapter 并在回调中根据后端返回统一格式进行转换。
 
-RxNet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailureCallback获取错误信息。
+执行请求的两种方式：
+
+    1.方式一 ：RxNet.execute(success,fail) 
+      支持缓存策略，先读缓存后请求，先请求失败后读缓存等
+      HttpSuccessCallback 回调中获取最终数据。
+      HttpFailureCallback 回调中获取错误信息。
 
 
-
+    2.方式二  await RxNet.executeAsync<xxxx>()
+      返回结果或错误信息都在 ResultEntity 实体中，无需try catch操作。
+      ResultEntity.value 获取最终结果。
+      ResultEntity.error 获取错误信息
 
 ## 说明：
  
@@ -51,7 +62,7 @@ RxNet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
         // cacheDir: "xxx",   ///缓存路径 path
         // cacheName: "local_cache_app", ///缓存文件
         isDebug: true,   ///是否调试 打印日志
-        baseCacheMode: CacheMode.requestFailedReadCache,
+        baseCacheMode: CacheMode.requestFailedReadCache, //请求策略
         // baseCheckNet:checkNet, ///全局检查网络
         requestCaptureError: (e){  ///全局抓获 异常
             if(e is DioException){
@@ -69,19 +80,35 @@ RxNet.execute() 的 HttpSuccessCallback 回调中获取最终数据。HttpFailur
     RxNet.get()
         .setPath("api/weather")
         .setParam("city", "101030100")
-        .setEnableRestfulUrl(true) ///Restful
+        .setEnableRestfulUrl(true) //Restful 
         .setCacheMode(CacheMode.requestFailedReadCache)
-        .setJsonConvert((data)=>NormalWaterInfoEntity.fromJson(data))
-        .execute(success: success,failure:failure);
+        .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
+        .execute<NormalWaterInfoEntity>(
+            success: (data, source) {
+              content = data.toString();
+              sourcesType = source;
+              setState(() {});
+            },
+            failure: (e) {});
+
 
     2. await方式：
 
-    var data =  await RxNet.get()  ///ResultEntity.value 取值
+     var data = await RxNet.get()
         .setPath("api/weather")
         .setParam("city", "101030100")
+        .setEnableRestfulUrl(true)
         .setCacheMode(CacheMode.onlyRequest)
-        .setJsonConvert((data)=>NormalWaterInfoEntity.fromJson(data))
-        .executeAsync();
+        .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
+        // .executeAsync();
+        .executeAsync<NormalWaterInfoEntity?>();
+
+      print("--------->#${data.isError}");
+      print("--------->#${data.error}");
+      var result = data.value;
+      content = result.toString();
+      sourcesType = data.model;
+
 
 
  3.请求原始数据,某些特殊情况，如读取网盘资源文件数据

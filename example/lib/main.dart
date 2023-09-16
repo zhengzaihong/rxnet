@@ -17,7 +17,7 @@ void main() {
       // baseCheckNet:checkNet, ///全局检查网络
       requestCaptureError: (e){  ///全局抓获 异常
         if(e is DioException){
-          print("------------------------->>>${e.response}");
+          print("------------------------->>>${HandleError.dioError(e).message}");
         }
       },
       interceptors: [  ///拦截器

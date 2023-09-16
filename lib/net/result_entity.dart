@@ -7,8 +7,8 @@ import 'package:flutter_rxnet_forzzh/net/type/sources_type.dart';
 /// create_time: 16:21
 /// describe: await 响应结果包装类
 ///
-class ResultEntity{
-  dynamic value;
+class ResultEntity<T>{
+  T? value;
   SourcesType model;
   dynamic error;
   bool isError;
