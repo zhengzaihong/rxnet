@@ -30,35 +30,50 @@ extension HiveExt on HiveInterface {
   }
 }
 
-
-class HiveDataBase {
-
+class RxNetDataBase {
   static Future<Box<dynamic>>? _box;
+  static bool isDatabaseReady = false;
+  static final List<Function> _checkDataBaseListener = [];
 
-  HiveDataBase({
-    String? directory,
+  RxNetDataBase();
+
+  static Future initDatabase({
+    Directory? directory,
     String? hiveBoxName = 'local_cache',
     HiveCipher? encryptionCipher,
   }) {
-    if (directory != null) {
-       Hive.init(directory);
-    }else{
-      Directory appDir;
-      Future(() async {
+    Future future = Future(() async {
+      Directory? appDir = directory;
+      try{
         if (Platform.isWindows) {
-          appDir = await getApplicationSupportDirectory();
-        }else if (Platform.isLinux) {
+          appDir = appDir??await getApplicationSupportDirectory();
+        } else if (Platform.isLinux) {
           final home = Platform.environment['HOME'];
-          appDir = Directory(join(home!, '.rxnet_local_cache'));
-        } else{
-          appDir = await getApplicationDocumentsDirectory();
+          appDir = appDir??Directory(join(home!, '.rxnet_local_cache'));
+        } else {
+          appDir = appDir??await getApplicationDocumentsDirectory();
         }
-        Hive.init(p.join(appDir.path, 'rxnet_local_cache'));
-        _box = Hive.openBoxSafe(hiveBoxName!, encryptionCipher: encryptionCipher);
-      });
-      return;
+      }catch (e){
+        appDir = appDir??await getTemporaryDirectory();
+      }
+      Hive.init(p.join(appDir.path, 'rxnet_local_cache'));
+      _box = Hive.openBoxSafe(hiveBoxName!, encryptionCipher: encryptionCipher);
+
+      isDatabaseReady = true;
+      for (var callBack in _checkDataBaseListener) {
+        callBack.call(isDatabaseReady);
+      }
+      _checkDataBaseListener.clear();
+    });
+    return future;
+  }
+
+  ///数据库还没初始完成，可能已经存在网络请求，先将其缓存
+  ///等待数据库完成后并返回数据后，将其全部回调全部清除。
+  static void setDataBaseReadListener(Function(bool isOk) function) {
+    if (!isDatabaseReady) {
+      _checkDataBaseListener.add(function);
     }
-    _box = Hive.openBoxSafe(hiveBoxName!, encryptionCipher: encryptionCipher);
   }
 
   FutureOr operator [](dynamic key) async {
@@ -66,7 +81,7 @@ class HiveDataBase {
   }
 
   void operator []=(dynamic key, dynamic value) {
-    put(value, key);
+    put(key, value);
   }
 
   Future<T?> get<T>(dynamic key) async {
@@ -78,7 +93,10 @@ class HiveDataBase {
     }
   }
 
-  Future put(dynamic value, [dynamic key]) async {
+  Future put(
+    dynamic key,
+    dynamic value,
+  ) async {
     final box = await _box;
     try {
       await box?.put(key, value);

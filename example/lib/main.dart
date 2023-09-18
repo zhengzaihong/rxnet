@@ -6,15 +6,15 @@ import 'download_page.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 
-void main() {
+void main() async{
 
-  RxNet().init(
+   await RxNet().init(
       baseUrl: "http://t.weather.sojson.com/",
-      // cacheDir: "xxx",   ///缓存路径 path
+      // cacheDir: "xxx",   ///缓存目录
       // cacheName: "local_cache_app", ///缓存文件
       isDebug: true,   ///是否调试 打印日志
       baseCacheMode: CacheMode.requestFailedReadCache,
-      // baseCheckNet:checkNet, ///全局检查网络
+      baseCheckNet:checkNet, ///全局检查网络
       requestCaptureError: (e){  ///全局抓获 异常
         if(e is DioException){
           print("------------------------->>>${HandleError.dioError(e).message}");
@@ -23,6 +23,13 @@ void main() {
       interceptors: [  ///拦截器
         CustomLogInterceptor()
       ]);
+
+  RxNet().getDb()?.put("key","内容").then((value){
+    RxNet().getDb()?.get("key").then((value){
+      print("----------------------getDb()>>>${value}");
+    });
+
+  });
 
 
   runApp(const MyApp());

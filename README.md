@@ -10,7 +10,7 @@
 
     dependencies:
     
-       flutter_rxnet_forzzh:0.1.1
+       flutter_rxnet_forzzh:0.1.2
 
 
 ## 常用参数：
@@ -40,6 +40,11 @@ CacheMode：支持如下几种模式：
 
 需要json 转对象，请设置 setJsonConvertAdapter 并在回调中根据后端返回统一格式进行转换。
 
+额外功能：小量数据支持 RxNet 数据存储来替换 ShardPreference使用：
+ 
+        RxNet().getDb()?.put("key","内容"); //存数据
+        RxNet().getDb()?.get("key");       //取数据
+
 执行请求的两种方式：
 
     1.方式一 ：RxNet.execute(success,fail) 
@@ -57,9 +62,9 @@ CacheMode：支持如下几种模式：
  
  1.先初始化网络框架
 
-    RxNet().init(
+    await RxNet().init(
         baseUrl: "xxxx",
-        // cacheDir: "xxx",   ///缓存路径 path
+        // cacheDir: "xxx",   ///缓存目录
         // cacheName: "local_cache_app", ///缓存文件
         isDebug: true,   ///是否调试 打印日志
         baseCacheMode: CacheMode.requestFailedReadCache, //请求策略

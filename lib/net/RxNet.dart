@@ -4,9 +4,11 @@ import 'dart:core';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
-import 'package:flutter_rxnet_forzzh/utils/HiveDataBase.dart';
 import 'package:hive/hive.dart';
+
+import '../utils/RxNetDataBase.dart';
 
 
 ///
@@ -38,7 +40,7 @@ class RxNet {
 
   Map<String, dynamic> globalHeader = {};
 
-  HiveDataBase? _dataBase;
+  RxNetDataBase? _dataBase;
 
   /// 创建 dio 实例对象
   RxNet._internal() {
@@ -50,25 +52,32 @@ class RxNet {
   ///初始化公共属性
   /// [baseUrl] 地址前缀
   /// [interceptors] 基础拦截器
-  RxNet init({
+  Future<void> init({
     required String baseUrl,
-    String? cacheDir,
+    Directory? cacheDir,
     String cacheName = 'app_local_data',
     List<Interceptor>? interceptors,
     BaseOptions? options,
-    bool isDebug = true,
+    bool isDebug = false,
     CheckNetWork? baseCheckNet,
     RequestCaptureError? requestCaptureError,
     CacheMode? baseCacheMode,
     HiveCipher? encryptionCipher,
-  }) {
+  }) async{
+
+    WidgetsFlutterBinding.ensureInitialized();
     LogUtil.init(isDebug: isDebug);
 
     this.baseCheckNet = baseCheckNet;
     this.baseCacheMode = baseCacheMode;
     this.requestCaptureError = requestCaptureError;
 
-    initDb(cacheDir: cacheDir, cacheName: cacheName, encryptionCipher: encryptionCipher);
+    _dataBase = RxNetDataBase();
+    await RxNetDataBase.initDatabase(
+        directory: cacheDir,
+        hiveBoxName: cacheName,
+        encryptionCipher: encryptionCipher);
+
 
     if (options != null) {
       _client?.options = options;
@@ -77,28 +86,20 @@ class RxNet {
     if (interceptors != null) {
       _client?.interceptors.addAll(interceptors);
     }
-    return this;
   }
 
-  HiveDataBase initDb({String? cacheDir,String? cacheName,HiveCipher? encryptionCipher}) {
-    _dataBase = HiveDataBase(
-        directory: cacheDir,
-        hiveBoxName: cacheName,
-        encryptionCipher: encryptionCipher);
-    return _dataBase!;
-  }
 
   Dio? getClient()=>_client;
 
   Future saveCache(String key, dynamic value) async {
-    return getDb()?.put(value, key = key);
+    return getDb()?.put(key,value);
   }
 
   Future readCache(String key) async {
     return getDb()?.get(key);
   }
 
-  HiveDataBase? getDb(){
+  RxNetDataBase? getDb(){
     return _dataBase;
   }
 
@@ -414,14 +415,22 @@ class BuildRequest<T> {
     SuccessCallback<T>? success,
     FailureCallback<T>? failure,
   ) async {
-    var value =
-        await _rxNet.readCache(NetUtils.getCacheKeyFromPath('$_path', _params));
-    if (value != null) {
-      _parseLocalData<T>(success, failure, value);
-    } else {
-      failure?.call({});
+
+    if(RxNetDataBase.isDatabaseReady){
+      var value =
+      await _rxNet.readCache(NetUtils.getCacheKeyFromPath('$_path', _params));
+      if (value != null) {
+        _parseLocalData<T>(success, failure, value);
+      } else {
+        failure?.call({});
+      }
+      LogUtil.v("缓存数据:$value");
+      return;
     }
-    LogUtil.v("缓存数据:$value");
+
+    RxNetDataBase.setDataBaseReadListener((isOk){
+      _readCache(success,failure);
+    });
   }
 
   ///解析本地缓存数据
