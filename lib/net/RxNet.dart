@@ -4,7 +4,6 @@ import 'dart:core';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
-import 'package:flutter_rxnet_forzzh/net/rxnet_exception.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 import 'package:flutter_rxnet_forzzh/utils/HiveDataBase.dart';
 import 'package:hive/hive.dart';
@@ -15,7 +14,7 @@ import 'package:hive/hive.dart';
 /// email:1096877329@qq.com
 /// create_date: 2022/8/9
 /// create_time: 18:03
-/// describe: 网络请求工具库，支持多种缓存模式（缓存策略目前只支持 android HarmonyOS 和 IOS MACOS平台）
+/// describe: 网络请求工具库，支持多种缓存模式
 ///同一个CancelToken可以用于多个请求，当一个CancelToken取消时，所有使用该CancelToken的请求都会被取消。
 final Map<String, CancelToken> _cancelTokens = <String, CancelToken>{};
 
@@ -89,6 +88,8 @@ class RxNet {
     return _dataBase!;
   }
 
+  Dio? getClient()=>_client;
+
   Future saveCache(String key, dynamic value) async {
     return getDb()?.put(value, key = key);
   }
@@ -114,7 +115,7 @@ class RxNet {
   /// 前置方法 setEnableProxy
   void setProxy(String address) {
     if (isEnableProxy()) {
-      (_instance.client?.httpClientAdapter as IOHttpClientAdapter)
+        (_instance.client?.httpClientAdapter as DefaultHttpClientAdapter)
           .onHttpClientCreate = (client) {
         client.findProxy = (uri) {
           ///ip:prort
@@ -394,8 +395,10 @@ class BuildRequest<T> {
         }
 
         /// 存储数据
-        String cacheKey = NetUtils.getCacheKeyFromPath("$_path", _params);
-        _rxNet.saveCache(cacheKey, jsonEncode(response.data));
+        if(cache){
+          String cacheKey = NetUtils.getCacheKeyFromPath("$_path", _params);
+          _rxNet.saveCache(cacheKey, jsonEncode(response.data));
+        }
         return;
       }
 
@@ -409,12 +412,12 @@ class BuildRequest<T> {
 
   void _readCache<T>(
     SuccessCallback<T>? success,
-    FailureCallback? failure,
+    FailureCallback<T>? failure,
   ) async {
     var value =
         await _rxNet.readCache(NetUtils.getCacheKeyFromPath('$_path', _params));
     if (value != null) {
-      _parseLocalData(success, failure, value);
+      _parseLocalData<T>(success, failure, value);
     } else {
       failure?.call({});
     }

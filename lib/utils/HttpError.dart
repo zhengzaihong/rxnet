@@ -46,7 +46,7 @@ class HandleError {
 
   dynamic bodyData;
 
-  HandleError(this.code, this.message,this.bodyData);
+  HandleError._(this.code, this.message,this.bodyData);
 
   HandleError.dioError(DioException error) {
     message = error.message;

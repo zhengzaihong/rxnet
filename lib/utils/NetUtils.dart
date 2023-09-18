@@ -30,7 +30,7 @@ class NetUtils {
     if (params.isNotEmpty) {
       String paramsStr = "";
       params.forEach((key, value) {
-        paramsStr = paramsStr + key + value;
+        paramsStr = "$paramsStr$key$value";
       });
       cacheKey = cacheKey + MD5Util.generateMd5(paramsStr);
     }
