@@ -2,7 +2,7 @@
 
 一款极简且强大Flutter网络请求工具，支持restful、泛型请求、数据缓存(无网请求)。该库是对Dio的扩展,同步的写法异步的实现，使用更加自然。
 
-0.1.0版本之后缓存升级：支持全平台缓存，无网请求。
+0.1.0版本之后缓存升级：支持全平台缓存(非web)，无网请求。
 
 注意：0.0.9以前版本 数据缓存只支持 Android、HarmonyOS 和 IOS 、MACOS平台。
 
@@ -17,7 +17,7 @@
 
 支持的请求方式：  get, post, delete, put, patch,
 
-CacheMode：支持如下几种模式：
+缓存策略：CacheMode 支持如下几种模式：
 
     1.不做缓存，只网络数据
     onlyRequest,
@@ -200,7 +200,7 @@ CacheMode：支持如下几种模式：
        ...xxx
           isDebug: true, ///是否调试 打印日志
           interceptors: [  ///拦截器
-          CustomLogInterceptor()
+          CustomLogInterceptor() // 可自行添加自定义
       ]);
 
 
