@@ -1,5 +1,4 @@
 
-
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -51,10 +50,14 @@ class _DownLoadPageState extends State<DownLoadPage> {
   String downloadPath = "";
   void download() async{
 
+    if(PlatformTools.isWeb){
+      Downloader.downloadFile(url: "https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg");
+      return;
+    }
+
     requestPermission();
     Directory? appDocDir =  await getExternalStorageDirectory();
     String? appDocPath = "${appDocDir?.path}/test.jpg";
-
 
     RxNet.get()
         .setPath("https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg")

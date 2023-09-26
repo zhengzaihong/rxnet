@@ -10,7 +10,7 @@
 
     dependencies:
     
-       flutter_rxnet_forzzh:0.1.2
+       flutter_rxnet_forzzh:0.1.3
 
 
 ## 常用参数：
@@ -41,7 +41,8 @@ CacheMode：支持如下几种模式：
 需要json 转对象，请设置 setJsonConvertAdapter 并在回调中根据后端返回统一格式进行转换。
 
 额外功能：小量数据支持 RxNet 数据存储来替换 ShardPreference使用：
- 
+
+        // web 端不支持
         RxNet().getDb()?.put("key","内容"); //存数据
         RxNet().getDb()?.get("key");       //取数据
 
@@ -238,3 +239,17 @@ CacheMode：支持如下几种模式：
     v  useTime:0分:0秒:184毫秒
     v  Response end url :http://t.weather.sojson.com/api/weather/city/101030100
     v  useJsonAdapter：true
+
+   特殊说明：
+
+    如果web端遇到跨域问题：The connection errored: The XMLHttpRequest onError callback was called.  
+
+    解决办法如下：
+
+    1.找到当前项目使用的flutter sdk目录
+    
+    2.然后找到flutter\packages\flutter_tools\lib\src\web\chrome.dart文件并打开
+
+    3.找到'--disable-extensions'位置，然后添加'--disable-web-security'
+
+    4.另外还需要到flutter\bin\cache目录下，删除flutter_tools.stamp和flutter_tools.snapshot的文件，否则改动不生效

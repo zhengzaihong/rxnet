@@ -7,7 +7,6 @@ import 'package:dio/io.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 import 'package:hive/hive.dart';
-
 import '../utils/RxNetDataBase.dart';
 
 
@@ -72,12 +71,6 @@ class RxNet {
     this.baseCacheMode = baseCacheMode;
     this.requestCaptureError = requestCaptureError;
 
-    _dataBase = RxNetDataBase();
-    await RxNetDataBase.initDatabase(
-        directory: cacheDir,
-        hiveBoxName: cacheName,
-        encryptionCipher: encryptionCipher);
-
 
     if (options != null) {
       _client?.options = options;
@@ -85,6 +78,17 @@ class RxNet {
     _client?.options.baseUrl = baseUrl;
     if (interceptors != null) {
       _client?.interceptors.addAll(interceptors);
+    }
+
+
+    if(PlatformTools.isWeb){
+      print("不支持缓存的环境：web");
+    }else{
+      _dataBase = RxNetDataBase();
+      await RxNetDataBase.initDatabase(
+          directory: cacheDir,
+          hiveBoxName: cacheName,
+          encryptionCipher: encryptionCipher);
     }
   }
 
@@ -396,7 +400,7 @@ class BuildRequest<T> {
         }
 
         /// 存储数据
-        if(cache){
+        if(cache && !PlatformTools.isWeb){
           String cacheKey = NetUtils.getCacheKeyFromPath("$_path", _params);
           _rxNet.saveCache(cacheKey, jsonEncode(response.data));
         }
@@ -415,6 +419,9 @@ class BuildRequest<T> {
     SuccessCallback<T>? success,
     FailureCallback<T>? failure,
   ) async {
+    if(PlatformTools.isWeb){
+      return;
+    }
 
     if(RxNetDataBase.isDatabaseReady){
       var value =
@@ -588,6 +595,8 @@ class BuildRequest<T> {
       _catchError(success, failure, null, e, s);
     }
   }
+
+
 
   ///下载文件
   ///[savePath]  文件保存路径

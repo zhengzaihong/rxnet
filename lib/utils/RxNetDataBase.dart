@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'dart:io';
-
 import 'package:flutter_rxnet_forzzh/utils/LogUtil.dart';
 import 'package:hive/hive.dart';
 import 'package:path/path.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+
+import 'PlatformTools.dart';
 
 ///
 /// create_user: zhengzaihong
@@ -44,13 +45,16 @@ class RxNetDataBase {
   }) {
     Future future = Future(() async {
       Directory? appDir = directory;
+
       try{
-        if (Platform.isWindows) {
+        if (PlatformTools.isWindows) {
           appDir = appDir??await getApplicationSupportDirectory();
-        } else if (Platform.isLinux) {
+        } else if (PlatformTools.isLinux) {
           final home = Platform.environment['HOME'];
           appDir = appDir??Directory(join(home!, '.rxnet_local_cache'));
-        } else {
+        } else if(PlatformTools.isAndroidOrIOS){
+          appDir = appDir??await getTemporaryDirectory();
+        } else{
           appDir = appDir??await getApplicationDocumentsDirectory();
         }
       }catch (e){
@@ -58,7 +62,6 @@ class RxNetDataBase {
       }
       Hive.init(p.join(appDir.path, 'rxnet_local_cache'));
       _box = Hive.openBoxSafe(hiveBoxName!, encryptionCipher: encryptionCipher);
-
       isDatabaseReady = true;
       for (var callBack in _checkDataBaseListener) {
         callBack.call(isDatabaseReady);

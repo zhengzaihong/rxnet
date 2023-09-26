@@ -41,7 +41,7 @@ Future<bool> checkNet() async{
   var connectivityResult = await (Connectivity().checkConnectivity());
   if (connectivityResult == ConnectivityResult.none) {
     print( "当前无网络");
-    return false;
+    return true;
   }
   return Future.value(true);
 }
