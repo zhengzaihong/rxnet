@@ -53,7 +53,9 @@ class CustomLogInterceptor extends Interceptor {
 
   void Function(Object object) logPrint;
 
+  /// 外部实现了这几个方法 ，请务必调用 super.xxx方法
   HandlerResponse? handlerResponse;
+
   HandlerError? handlerError;
   HandlerRequest? handlerRequest;
 
@@ -62,7 +64,7 @@ class CustomLogInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    super.onRequest(options, handler);
+
     logPrint('*** Request ***');
     _requestMaps[options.uri.toString()] = DateTime.now();
     printKV('uri', options.uri);
@@ -84,12 +86,13 @@ class CustomLogInterceptor extends Interceptor {
     }
     logPrint("");
     handlerRequest?.call(options, handler);
+    super.onRequest(options, handler);
   }
 
   @override
-  void onError(DioError err, ErrorInterceptorHandler handler) {
+  void onError(DioException err, ErrorInterceptorHandler handler) {
     if (error) {
-      logPrint('*** DioError ***:');
+      logPrint('*** DioException ***:');
       logPrint("uri: ${err.requestOptions.uri}");
       logPrint("$err");
       if (err.response != null) {
@@ -97,8 +100,8 @@ class CustomLogInterceptor extends Interceptor {
       }
       logPrint("");
     }
-    super.onError(err, handler);
     handlerError?.call(err, handler);
+    super.onError(err, handler);
   }
 
   @override
@@ -107,7 +110,6 @@ class CustomLogInterceptor extends Interceptor {
     logPrint("*** Response ***");
     _printResponse(response);
     handlerResponse?.call(response, handler);
-
     return super.onResponse(response, handler);
   }
 

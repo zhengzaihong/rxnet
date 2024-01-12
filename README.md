@@ -10,7 +10,7 @@
 
     dependencies:
     
-       flutter_rxnet_forzzh:0.1.3
+       flutter_rxnet_forzzh:0.1.4
 
 
 ## 常用参数：
@@ -43,8 +43,8 @@
 额外功能：小量数据支持 RxNet 数据存储来替换 ShardPreference使用：
 
         // web 端不支持
-        RxNet().getDb()?.put("key","内容"); //存数据
-        RxNet().getDb()?.get("key");       //取数据
+        rxPut("key","内容"); //存数据
+        rxGet("key");       //取数据
 
 执行请求的两种方式：
 

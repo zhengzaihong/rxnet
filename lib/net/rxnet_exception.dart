@@ -1,5 +1,6 @@
 import 'dart:core';
-import 'result_entity.dart';
+import 'package:flutter_rxnet_forzzh/net/rx_result.dart';
+
 ///
 /// create_user: zhengzaihong
 /// email:1096877329@qq.com
@@ -9,7 +10,7 @@ import 'result_entity.dart';
 ///
 class RxNetException implements Exception{
   String? code;
-  ResultEntity? resultEntity;
+  RxResult? resultEntity;
 
   RxNetException({this.code,this.resultEntity});
 

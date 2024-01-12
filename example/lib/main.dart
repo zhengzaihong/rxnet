@@ -21,14 +21,16 @@ void main() async{
         }
       },
       interceptors: [  ///拦截器
-        CustomLogInterceptor()
+        CustomLogInterceptor(
+          handlerRequest: (e,f) {
+          }
+        )
       ]);
 
-  RxNet().getDb()?.put("key","内容").then((value){
-    RxNet().getDb()?.get("key").then((value){
-      print("----------------------getDb()>>>${value}");
-    });
-
+    rxPut("key","内容").then((value){
+        rxGet("key").then((value){
+          print("----------------------getDb()>>>${value}");
+        });
   });
 
 

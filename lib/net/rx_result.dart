@@ -1,5 +1,5 @@
-
 import 'package:flutter_rxnet_forzzh/net/type/sources_type.dart';
+
 ///
 /// create_user: zhengzaihong
 /// email:1096877329@qq.com
@@ -7,10 +7,15 @@ import 'package:flutter_rxnet_forzzh/net/type/sources_type.dart';
 /// create_time: 16:21
 /// describe: await 响应结果包装类
 ///
-class ResultEntity<T>{
+class RxResult<T> {
   T? value;
   SourcesType model;
   dynamic error;
   bool isError;
-  ResultEntity({this.value,this.model = SourcesType.net,this.error,this.isError = false});
+
+  RxResult(
+      {this.value,
+      this.model = SourcesType.net,
+      this.error,
+      this.isError = false});
 }

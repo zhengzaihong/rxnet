@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_rxnet_forzzh/net/result_entity.dart';
-import 'package:flutter_rxnet_forzzh/net/rxnet_exception.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 import 'package:rxnet_example/bean/normal_water_info_entity.dart';
 
@@ -61,8 +59,9 @@ class _GetRequestPageState extends State<GetRequestPage> {
         .setParam("city", "101030100")
         .setEnableRestfulUrl(true)
         ///Restful  http://t.weather.sojson.com/api/weather/city/101030100
-        .setCacheMode(CacheMode.requestFailedReadCache)
-        .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
+        .setCacheMode(CacheMode.onlyCache)
+        // .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
+        .setJsonConvert((data)=> NormalWaterInfoEntity.fromJson(data))
         .execute<NormalWaterInfoEntity>(
             success: (data, source) {
               content = data.toString();

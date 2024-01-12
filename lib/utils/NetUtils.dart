@@ -6,6 +6,7 @@ import 'MD5Util.dart';
 import 'TextUtil.dart';
 
 class NetUtils {
+  NetUtils._();
 
   ///restful处理
   static String restfulUrl(String url, Map<String, dynamic> params) {

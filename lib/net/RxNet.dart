@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_rxnet_forzzh/net/rx_result.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 import 'package:hive/hive.dart';
 import '../utils/RxNetDataBase.dart';
@@ -120,7 +121,7 @@ class RxNet {
   /// 前置方法 setEnableProxy
   void setProxy(String address) {
     if (isEnableProxy()) {
-        (_instance.client?.httpClientAdapter as DefaultHttpClientAdapter)
+      (_instance.client?.httpClientAdapter as DefaultHttpClientAdapter)
           .onHttpClientCreate = (client) {
         client.findProxy = (uri) {
           ///ip:prort
@@ -243,8 +244,8 @@ class BuildRequest<T> {
     );
   }
 
-  BuildRequest setJsonConvert(Function(dynamic data) function) {
-    setJsonConvertAdapter(JsonConvertAdapter((data) => function.call(data)));
+  BuildRequest setJsonConvert(JsonTransformation jsonTransformation) {
+    setJsonConvertAdapter(JsonConvertAdapter(jsonTransformation));
     return this;
   }
 
@@ -287,6 +288,7 @@ class BuildRequest<T> {
     if (_httpType == HttpType.get) {
       _params[key] = value;
     } else {
+      _bodyData ??= {};
       _bodyData[key] = value;
     }
     return this;
@@ -392,7 +394,7 @@ class BuildRequest<T> {
         if (getJsonConvertAdapter() != null) {
           LogUtil.v("useJsonAdapter：true");
           var data =
-              getJsonConvertAdapter()?.jsonTransformation.call(response.data);
+          getJsonConvertAdapter()?.jsonTransformation.call(response.data);
           success?.call(data as T, SourcesType.net);
         } else {
           LogUtil.v("useJsonAdapter：false");
@@ -416,9 +418,9 @@ class BuildRequest<T> {
 
 
   void _readCache<T>(
-    SuccessCallback<T>? success,
-    FailureCallback<T>? failure,
-  ) async {
+      SuccessCallback<T>? success,
+      FailureCallback<T>? failure,
+      ) async {
     if(PlatformTools.isWeb){
       return;
     }
@@ -442,10 +444,10 @@ class BuildRequest<T> {
 
   ///解析本地缓存数据
   void _parseLocalData<T>(
-    SuccessCallback<T>? success,
-    FailureCallback<T>? failure,
-    dynamic cacheValue,
-  ) {
+      SuccessCallback<T>? success,
+      FailureCallback<T>? failure,
+      dynamic cacheValue,
+      ) {
     if (getJsonConvertAdapter() != null) {
       LogUtil.v("useJsonAdapter：true");
       var data = getJsonConvertAdapter()
@@ -504,10 +506,10 @@ class BuildRequest<T> {
   }
 
   /// 外部使用 await 方式调用此方法。
-  /// 结果从 ResultEntity 中获取
+  /// 结果从 RxResult 中获取
   /// 此方式不支持 同时请求和读取缓存策略。
-  Future<ResultEntity<T>> executeAsync<T>() async  {
-    Completer<ResultEntity<T>> completer = Completer();
+  Future<RxResult<T>> executeAsync<T>() async  {
+    Completer<RxResult<T>> completer = Completer();
     if (!(await _checkNetWork())) {
       return completer.future;
     }
@@ -519,11 +521,11 @@ class BuildRequest<T> {
       _cacheMode = CacheMode.onlyCache;
     }
     if (_cacheMode == CacheMode.onlyRequest) {
-       _doWorkRequest<T>(success: (data,model){
-         _successHandler<T>(completer, data: data, model: model);
-       }, failure: (e){
-         _errorHandler<T>(completer,model:SourcesType.net, error: e);
-       });
+      _doWorkRequest<T>(success: (data,model){
+        _successHandler<T>(completer, data: data, model: model);
+      }, failure: (e){
+        _errorHandler<T>(completer,model:SourcesType.net, error: e);
+      });
     }
 
     if (_cacheMode == CacheMode.onlyCache) {
@@ -536,19 +538,19 @@ class BuildRequest<T> {
     return completer.future;
   }
 
-  void _errorHandler<T>(Completer<ResultEntity<T>> completer,
+  void _errorHandler<T>(Completer<RxResult<T>> completer,
       {SourcesType model = SourcesType.net,
-      dynamic error,
-      bool isError = true}) {
-    completer.complete(ResultEntity(error: error, isError: isError));
+        dynamic error,
+        bool isError = true}) {
+    completer.complete(RxResult(error: error, isError: isError));
   }
 
-  void _successHandler<T>(Completer<ResultEntity<T>> completer,
+  void _successHandler<T>(Completer<RxResult<T>> completer,
       {T? data,
-      SourcesType model = SourcesType.net,
-      dynamic error,
-      bool isError = false}) {
-    completer.complete(ResultEntity<T>(
+        SourcesType model = SourcesType.net,
+        dynamic error,
+        bool isError = false}) {
+    completer.complete(RxResult<T>(
         value: data, model: model, error: error, isError: isError));
   }
 
