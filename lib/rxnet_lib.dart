@@ -15,3 +15,4 @@ export 'package:flutter_rxnet_forzzh/utils/ext.dart';
 export 'package:flutter_rxnet_forzzh/net/interceptor/CustomLogInterceptor.dart';
 export 'package:flutter_rxnet_forzzh/net/rx_result.dart';
 export 'package:flutter_rxnet_forzzh/net/rxnet_exception.dart';
+export 'package:dio/dio.dart';

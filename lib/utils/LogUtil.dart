@@ -1,5 +1,4 @@
 import 'dart:developer';
-
 ///
 /// create_user: zhengzaihong
 /// email:1096877329@qq.com
@@ -15,9 +14,16 @@ class LogUtil {
 
   static String tagDefault = _TAG_DEFAULT;
 
-  static void init({bool isDebug = false, String tag = _TAG_DEFAULT}) {
+  static bool isSystemPrint = false;
+
+  static void init({
+    bool isDebug = false,
+    String? tag,
+    bool useSystemPrint = false
+   }) {
     debug = isDebug;
-    tag = tag;
+    tagDefault = tag??_TAG_DEFAULT;
+    isSystemPrint = useSystemPrint;
   }
 
   static void e(Object object, {String? tag}) {
@@ -26,6 +32,10 @@ class LogUtil {
 
   static void v(Object object, {String? tag}) {
     if (debug) {
+      if (isSystemPrint){
+        print("$tag ${object.toString()}");
+        return;
+      }
       _printLog(tag??"", '  v  ', object);
     }
   }

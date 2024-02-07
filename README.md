@@ -36,9 +36,9 @@
 
 1.如需要 restful 风格请求：setEnableRestfulUrl(true)，内部自动转化参数链接
 
-2.不设置 setJsonConvertAdapter返回的都是Map类型数据，否则返回定义的实体类型。
+2.不设置 setJsonConvert 返回的都是Map类型数据，否则返回定义的实体类型。
 
-需要json 转对象，请设置 setJsonConvertAdapter 并在回调中根据后端返回统一格式进行转换。
+需要json 转对象，请设置 setJsonConvert 并在回调中根据后端返回统一格式进行转换。
 
 额外功能：小量数据支持 RxNet 数据存储来替换 ShardPreference使用：
 

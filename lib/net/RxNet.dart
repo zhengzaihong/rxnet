@@ -57,8 +57,10 @@ class RxNet {
     Directory? cacheDir,
     String cacheName = 'app_local_data',
     List<Interceptor>? interceptors,
-    BaseOptions? options,
+    BaseOptions? baseOptions,
     bool isDebug = false,
+    bool useSystemPrint = false,
+    String? printTag,
     CheckNetWork? baseCheckNet,
     RequestCaptureError? requestCaptureError,
     CacheMode? baseCacheMode,
@@ -66,16 +68,17 @@ class RxNet {
   }) async{
 
     WidgetsFlutterBinding.ensureInitialized();
-    LogUtil.init(isDebug: isDebug);
+    LogUtil.init(isDebug: isDebug, tag: printTag, useSystemPrint: useSystemPrint);
 
     this.baseCheckNet = baseCheckNet;
     this.baseCacheMode = baseCacheMode;
     this.requestCaptureError = requestCaptureError;
 
 
-    if (options != null) {
-      _client?.options = options;
+    if (baseOptions != null) {
+      _client?.options = baseOptions;
     }
+    /// 已最初baseUrl 为准
     _client?.options.baseUrl = baseUrl;
     if (interceptors != null) {
       _client?.interceptors.addAll(interceptors);
@@ -83,7 +86,7 @@ class RxNet {
 
 
     if(PlatformTools.isWeb){
-      print("不支持缓存的环境：web");
+      LogUtil.v("RxNet 不支持缓存的环境：web");
     }else{
       _dataBase = RxNetDataBase();
       await RxNetDataBase.initDatabase(
@@ -340,7 +343,7 @@ class BuildRequest<T> {
     return _cancelTag;
   }
 
-  BuildRequest enableGlobalHeader(bool enable) {
+  BuildRequest setEnableGlobalHeader(bool enable) {
     _enableGlobalHeader = enable;
     return this;
   }
@@ -350,6 +353,7 @@ class BuildRequest<T> {
     return this;
   }
 
+  ///提供一个设置配置的方法，遇到需要额外处理的时候配置
   BuildRequest setOptionConfig(OptionConfig callBack) {
     callBack.call(_options!);
     return this;

@@ -4,7 +4,6 @@ import 'package:flutter_uikit_forzzh/uikitlib.dart';
 import 'package:rxnet_example/get_request_page.dart';
 import 'download_page.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:dio/dio.dart';
 
 void main() async{
 
@@ -14,6 +13,7 @@ void main() async{
       // cacheName: "local_cache_app", ///缓存文件
       isDebug: true,   ///是否调试 打印日志
       baseCacheMode: CacheMode.requestFailedReadCache,
+      useSystemPrint: true,
       baseCheckNet:checkNet, ///全局检查网络
       requestCaptureError: (e){  ///全局抓获 异常
         if(e is DioException){
@@ -23,13 +23,18 @@ void main() async{
       interceptors: [  ///拦截器
         CustomLogInterceptor(
           handlerRequest: (e,f) {
+          },
+          handlerResponse: (e,f) {
+
           }
         )
       ]);
 
+
+
     rxPut("key","内容").then((value){
         rxGet("key").then((value){
-          print("----------------------getDb()>>>${value}");
+          print("---------------------->>>${value}");
         });
   });
 

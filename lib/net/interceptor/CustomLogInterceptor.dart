@@ -17,8 +17,6 @@ void log2Console(Object object) {
   LogUtil.v(object);
 }
 
-
-
 class CustomLogInterceptor extends Interceptor {
   CustomLogInterceptor({
     this.request = true,
@@ -53,7 +51,7 @@ class CustomLogInterceptor extends Interceptor {
 
   void Function(Object object) logPrint;
 
-  /// 外部实现了这几个方法 ，请务必调用 super.xxx方法
+  /// 外部实现了这几个方法 ，请勿调用 super.xxx方法
   HandlerResponse? handlerResponse;
 
   HandlerError? handlerError;
@@ -78,7 +76,8 @@ class CustomLogInterceptor extends Interceptor {
     }
     if (requestHeader) {
       logPrint('headers:');
-      options.headers.forEach((key, v) => printKV(" $key", v));
+      // options.headers.forEach((key, v) => printKV(" $key", v));
+      printAll(jsonEncode(options.headers));
     }
     if (requestBody) {
       logPrint("data:");
