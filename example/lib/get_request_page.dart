@@ -59,7 +59,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
         .setParam("city", "101030100")
         .setEnableRestfulUrl(true)
         ///Restful  http://t.weather.sojson.com/api/weather/city/101030100
-        .setCacheMode(CacheMode.onlyCache)
+        // .setCacheMode(CacheMode.onlyCache)
         // .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
         .setJsonConvert((data)=> NormalWaterInfoEntity.fromJson(data))
         .execute<NormalWaterInfoEntity>(

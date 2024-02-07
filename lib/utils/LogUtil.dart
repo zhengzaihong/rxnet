@@ -33,7 +33,7 @@ class LogUtil {
   static void v(Object object, {String? tag}) {
     if (debug) {
       if (isSystemPrint){
-        print("$tag ${object.toString()}");
+        print("${tag??tagDefault} ${object.toString()}");
         return;
       }
       _printLog(tag??"", '  v  ', object);

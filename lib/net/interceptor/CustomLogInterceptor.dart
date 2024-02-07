@@ -63,7 +63,7 @@ class CustomLogInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
 
-    logPrint('*** Request ***');
+    logPrint('***************** Request Start *****************');
     _requestMaps[options.uri.toString()] = DateTime.now();
     printKV('uri', options.uri);
     if (request) {
@@ -75,7 +75,7 @@ class CustomLogInterceptor extends Interceptor {
       printKV('extra', options.extra);
     }
     if (requestHeader) {
-      logPrint('headers:');
+      logPrint('Request Headers:');
       // options.headers.forEach((key, v) => printKV(" $key", v));
       printAll(jsonEncode(options.headers));
     }
@@ -83,7 +83,7 @@ class CustomLogInterceptor extends Interceptor {
       logPrint("data:");
       printAll(jsonEncode(options.data));
     }
-    logPrint("");
+    logPrint('***************** Request End *****************');
     handlerRequest?.call(options, handler);
     super.onRequest(options, handler);
   }
@@ -91,13 +91,13 @@ class CustomLogInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     if (error) {
-      logPrint('*** DioException ***:');
+      logPrint('***************** DioException Info Start *****************:');
       logPrint("uri: ${err.requestOptions.uri}");
       logPrint("$err");
       if (err.response != null) {
         _printResponse(err.response);
       }
-      logPrint("");
+      logPrint('***************** DioException Info End *****************:');
     }
     handlerError?.call(err, handler);
     super.onError(err, handler);
@@ -106,7 +106,7 @@ class CustomLogInterceptor extends Interceptor {
   @override
   Future onResponse(
       Response response, ResponseInterceptorHandler handler) async {
-    logPrint("*** Response ***");
+    logPrint("***************** Response Start *****************");
     _printResponse(response);
     handlerResponse?.call(response, handler);
     return super.onResponse(response, handler);
@@ -119,7 +119,7 @@ class CustomLogInterceptor extends Interceptor {
         printKV('redirect', response!.realUri);
       }
       if (response?.headers != null) {
-        logPrint("headers:");
+        logPrint("Response Headers:");
         response?.headers.forEach((key, v) => printKV(" $key", v.join(",")));
       }
     }
@@ -134,7 +134,9 @@ class CustomLogInterceptor extends Interceptor {
     DateTime responseTime = DateTime.now();
     Duration duration = responseTime.difference(oldTime);
     logPrint('useTime:${duration.inMinutes}分:${duration.inSeconds}秒:${duration.inMilliseconds}毫秒');
-    logPrint('Response end url :${response?.requestOptions?.uri}');
+    logPrint('Response url :${response?.requestOptions?.uri}');
+
+    logPrint("***************** Response End *****************");
   }
 
   printKV(String key, Object v) {

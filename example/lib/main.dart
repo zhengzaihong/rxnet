@@ -13,30 +13,22 @@ void main() async{
       // cacheName: "local_cache_app", ///缓存文件
       isDebug: true,   ///是否调试 打印日志
       baseCacheMode: CacheMode.requestFailedReadCache,
-      useSystemPrint: true,
+      // useSystemPrint: true,
       baseCheckNet:checkNet, ///全局检查网络
       requestCaptureError: (e){  ///全局抓获 异常
-        if(e is DioException){
-          print("------------------------->>>${HandleError.dioError(e).message}");
-        }
+        print("------------------------->>>${HandleError.dioError(e).message}");
       },
       interceptors: [  ///拦截器
         CustomLogInterceptor(
           handlerRequest: (e,f) {
           },
           handlerResponse: (e,f) {
-
+           ///拦截响应预处理些类似错误码跳转等业务。
+           final status = e.data['status'];
+           print('---------->>>status:${status}');
           }
         )
       ]);
-
-
-
-    rxPut("key","内容").then((value){
-        rxGet("key").then((value){
-          print("---------------------->>>${value}");
-        });
-  });
 
 
   runApp(const MyApp());
