@@ -87,13 +87,13 @@ class RxNet {
 
     if(PlatformTools.isWeb){
       LogUtil.v("RxNet 不支持缓存的环境：web");
-    }else{
-      _dataBase = RxNetDataBase();
-      await RxNetDataBase.initDatabase(
-          directory: cacheDir,
-          hiveBoxName: cacheName,
-          encryptionCipher: encryptionCipher);
+      return;
     }
+    _dataBase = RxNetDataBase();
+    await RxNetDataBase.initDatabase(
+        directory: cacheDir,
+        hiveBoxName: cacheName,
+        encryptionCipher: encryptionCipher);
   }
 
 
@@ -264,12 +264,12 @@ class BuildRequest<T> {
   /// 处理 RestfulUrl格式请求
   /// 如：xxxx/xxx/weather?city=101030100
   /// 结果：xxxx/xxx/weather/city/101030100
-  BuildRequest setEnableRestfulUrl(bool restful) {
+  BuildRequest setRestfulUrl(bool restful) {
     _enableRestfulUrl = restful;
     return this;
   }
 
-  bool getEnableRestfulUrl() {
+  bool isRestfulUrl() {
     return _enableRestfulUrl;
   }
 
@@ -288,32 +288,32 @@ class BuildRequest<T> {
   }
 
   BuildRequest setParam(String key, dynamic value) {
-    if (_httpType == HttpType.get) {
-      _params[key] = value;
-    } else {
+    if (_httpType == HttpType.post) {
       _bodyData ??= {};
       _bodyData[key] = value;
+    } else {
+      _params[key] = value;
     }
     return this;
   }
 
   BuildRequest setParams(Map<String, dynamic> params) {
-    if (_httpType == HttpType.get) {
-      _params = params;
-    } else {
+    if (_httpType == HttpType.post) {
       _bodyData = params;
+    } else {
+      _params = params;
     }
     return this;
   }
 
   BuildRequest addParams(Map<String, dynamic> params) {
-    if (_httpType == HttpType.get) {
-      _params.addAll(params);
-    } else {
+    if(_httpType == HttpType.post) {
       _bodyData ??= {};
       if (_bodyData is Map) {
         _bodyData.addAll(params);
       }
+    }else{
+      _params.addAll(params);
     }
     return this;
   }
@@ -372,7 +372,7 @@ class BuildRequest<T> {
     Function? readCache,
   }) async {
     String url = _path.toString();
-    if (getEnableRestfulUrl()) {
+    if (isRestfulUrl()) {
       url = NetUtils.restfulUrl(_path.toString(), _params);
     }
     try {
@@ -389,7 +389,7 @@ class BuildRequest<T> {
 
       Response response = await _rxNet.client!.request(url,
           data: _bodyData,
-          queryParameters: getEnableRestfulUrl() ? {} : _params,
+          queryParameters: isRestfulUrl() ? {} : _params,
           options: _options,
           cancelToken: _cancelTokens[getTag()]);
 
@@ -569,7 +569,7 @@ class BuildRequest<T> {
     }
 
     String url = _path.toString();
-    if (getEnableRestfulUrl()) {
+    if (isRestfulUrl()) {
       url = NetUtils.restfulUrl(_path.toString(), _params);
     }
     try {
@@ -587,7 +587,7 @@ class BuildRequest<T> {
       Response<T> response = await _rxNet.client!.request(url,
           onSendProgress: onSendProgress,
           data: _bodyData,
-          queryParameters: getEnableRestfulUrl() ? {} : _params,
+          queryParameters: isRestfulUrl() ? {} : _params,
           options: _options,
           cancelToken: _cancelTokens[getTag()]);
 
@@ -616,7 +616,7 @@ class BuildRequest<T> {
       return;
     }
     String url = _path.toString();
-    if (getEnableRestfulUrl()) {
+    if (isRestfulUrl()) {
       url = NetUtils.restfulUrl(_path.toString(), _params);
     }
     try {
@@ -633,7 +633,7 @@ class BuildRequest<T> {
 
       Response<dynamic> response = await _rxNet.client!.download(url, savePath,
           onReceiveProgress: onReceiveProgress,
-          queryParameters: getEnableRestfulUrl() ? {} : _params,
+          queryParameters: isRestfulUrl() ? {} : _params,
           data: _bodyData,
           options: _options,
           cancelToken: _cancelTokens[getTag()]);

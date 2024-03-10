@@ -10,7 +10,7 @@
 
     dependencies:
     
-       flutter_rxnet_forzzh:0.1.5
+       flutter_rxnet_forzzh:0.1.6
 
 
 ## 常用参数：
@@ -34,7 +34,7 @@
 
 注意：
 
-1.如需要 restful 风格请求：setEnableRestfulUrl(true)，内部自动转化参数链接
+1.如需要 restful 风格请求：setRestfulUrl(true)，内部自动转化参数链接
 
 2.不设置 setJsonConvert 返回的都是Map类型数据，否则返回定义的实体类型。
 
@@ -55,9 +55,9 @@
 
 
     2.方式二  await RxNet.executeAsync<xxxx>()
-      返回结果或错误信息都在 ResultEntity 实体中，无需try catch操作。
-      ResultEntity.value 获取最终结果。
-      ResultEntity.error 获取错误信息
+      返回结果或错误信息都在 RxResult 实体中，无需try catch操作。
+      RxResult.value 获取最终结果。
+      RxResult.error 获取错误信息
 
 ## 说明：
  

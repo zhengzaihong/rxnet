@@ -24,8 +24,8 @@ void main() async{
           },
           handlerResponse: (e,f) {
            ///拦截响应预处理些类似错误码跳转等业务。
-           final status = e.data['status'];
-           print('---------->>>status:${status}');
+           // final status = e.data['status'];
+           // print('---------->>>status:${status}');
           }
         )
       ]);

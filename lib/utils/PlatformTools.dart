@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 class PlatformTools {
+  PlatformTools._();
   static bool _isWeb() {
     return kIsWeb == true;
   }

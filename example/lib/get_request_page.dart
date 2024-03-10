@@ -57,7 +57,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
     RxNet.get()
         .setPath("api/weather")
         .setParam("city", "101030100")
-        .setEnableRestfulUrl(true)
+        .setRestfulUrl(true)
         ///Restful  http://t.weather.sojson.com/api/weather/city/101030100
         // .setCacheMode(CacheMode.onlyCache)
         // .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
@@ -80,7 +80,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
     var data = await RxNet.get()
         .setPath("api/weather")
         .setParam("city", "101030100")
-        .setEnableRestfulUrl(true)
+        .setRestfulUrl(true)
         .setCacheMode(CacheMode.onlyRequest)
         .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
         // .executeAsync();
