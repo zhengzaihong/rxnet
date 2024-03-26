@@ -22,6 +22,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
           const SizedBox(height: 40),
           TextButton(
             onPressed: () {
+              RxNet().setEnv('release');
               request();
             },
             style: ButtonStyle(
@@ -30,6 +31,31 @@ class _GetRequestPageState extends State<GetRequestPage> {
             child: const Text("发起get请求",
                 style: TextStyle(color: Colors.black, fontSize: 16)),
           ),
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              RxNet().setEnv('test');
+              request();
+            },
+            style: ButtonStyle(
+              backgroundColor: MaterialStateProperty.all(Colors.cyan),
+            ),
+            child: const Text("测试环境",
+                style: TextStyle(color: Colors.black, fontSize: 16)),
+          ),
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              RxNet().setEnv('debug');
+              request();
+            },
+            style: ButtonStyle(
+              backgroundColor: MaterialStateProperty.all(Colors.cyan),
+            ),
+            child: const Text("debug环境测试",
+                style: TextStyle(color: Colors.black, fontSize: 16)),
+          ),
+
           const SizedBox(height: 20),
           Expanded(
               child: Column(
@@ -51,13 +77,16 @@ class _GetRequestPageState extends State<GetRequestPage> {
   }
 
   void request() async {
-    // RxNet().setGlobalHeader({
+    // RxNet().setHeaders({
     //   "Authorization": "bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjo2LCJ1c2VyX3R5cGUiOmZhbHNlLCJleHAiOjE2ODM0NDM3ODh9.K1GPsVGsvKc_6LN2iMdow6HRT_J-mlisDUtg6o1_vyY",
     // });
+    // RxNet().getCancelToken("tag");
+
     RxNet.get()
         .setPath("api/weather")
         .setParam("city", "101030100")
         .setRestfulUrl(true)
+         // .setCancelToken(tag)
         ///Restful  http://t.weather.sojson.com/api/weather/city/101030100
         // .setCacheMode(CacheMode.onlyCache)
         // .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))

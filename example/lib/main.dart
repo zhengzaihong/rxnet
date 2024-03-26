@@ -7,28 +7,33 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 
 void main() async{
 
-   await RxNet().init(
-      baseUrl: "http://t.weather.sojson.com/",
-      // cacheDir: "xxx",   ///缓存目录
-      // cacheName: "local_cache_app", ///缓存文件
-      isDebug: true,   ///是否调试 打印日志
-      baseCacheMode: CacheMode.requestFailedReadCache,
-      // useSystemPrint: true,
-      baseCheckNet:checkNet, ///全局检查网络
-      requestCaptureError: (e){  ///全局抓获 异常
-        print("------------------------->>>${HandleError.dioError(e).message}");
-      },
-      interceptors: [  ///拦截器
-        CustomLogInterceptor(
-          handlerRequest: (e,f) {
-          },
-          handlerResponse: (e,f) {
-           ///拦截响应预处理些类似错误码跳转等业务。
-           // final status = e.data['status'];
-           // print('---------->>>status:${status}');
-          }
-        )
-      ]);
+     await RxNet().init(
+        baseUrl: "http://t.weather.sojson.com/",
+        // cacheDir: "xxx",   ///缓存目录
+        // cacheName: "local_cache_app", ///缓存文件
+        isDebug: true,   ///是否调试 打印日志
+        baseCacheMode: CacheMode.requestFailedReadCache,
+        // useSystemPrint: true,
+        baseCheckNet:checkNet, ///全局检查网络
+        requestCaptureError: (e){  ///全局抓获 异常
+          print(">>>${HandleError.dioError(e).message}");
+        },
+         envUrls: {  ///支持多环境 baseUrl调试
+          "test": "http://t.weather.sojson1.com/",
+          "debug": "http://t.weather.sojson2.com/",
+          "release": "http://t.weather.sojson.com/",
+           //xxxxx
+        },
+        interceptors: [  ///拦截器
+          CustomLogInterceptor(
+            handlerRequest: (e,f) {
+            },
+            handlerResponse: (e,f) {
+             ///拦截响应预处理些类似错误码跳转等业务。
+             // final status = e.data['status'];
+            }
+          )
+        ]);
 
 
   runApp(const MyApp());

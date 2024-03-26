@@ -10,7 +10,7 @@
 
     dependencies:
     
-       flutter_rxnet_forzzh:0.1.6
+       flutter_rxnet_forzzh:0.1.7
 
 
 ## 常用参数：
@@ -48,7 +48,7 @@
 
 执行请求的两种方式：
 
-    1.方式一 ：RxNet.execute(success,fail) 
+    1.方式一 ：RxNet.execute(success,failure) 
       支持缓存策略，先读缓存后请求，先请求失败后读缓存等
       HttpSuccessCallback 回调中获取最终数据。
       HttpFailureCallback 回调中获取错误信息。
@@ -63,20 +63,32 @@
  
  1.先初始化网络框架
 
-    await RxNet().init(
-        baseUrl: "xxxx",
+     await RxNet().init(
+        baseUrl: "http://t.weather.sojson.com/",
         // cacheDir: "xxx",   ///缓存目录
         // cacheName: "local_cache_app", ///缓存文件
         isDebug: true,   ///是否调试 打印日志
-        baseCacheMode: CacheMode.requestFailedReadCache, //请求策略
-        // baseCheckNet:checkNet, ///全局检查网络
+        baseCacheMode: CacheMode.requestFailedReadCache,
+        // useSystemPrint: true,
+        baseCheckNet:checkNet, ///全局检查网络
         requestCaptureError: (e){  ///全局抓获 异常
-            if(e is DioException){
-              print("------------------------->>>${e.response}");
-            }
+          print(">>>${HandleError.dioError(e).message}");
+        },
+         envUrls: {  ///支持多环境 baseUrl调试
+          "test": "http://t.weather.sojson1.com/",
+          "debug": "http://t.weather.sojson2.com/",
+          "release": "http://t.weather.sojson.com/",
+           //xxxxx
         },
         interceptors: [  ///拦截器
-            CustomLogInterceptor()
+          CustomLogInterceptor(
+            handlerRequest: (e,f) {
+            },
+            handlerResponse: (e,f) {
+             ///拦截响应预处理些类似错误码跳转等业务。
+             // final status = e.data['status'];
+            }
+          )
         ]);
  
  2.发起网络请求：

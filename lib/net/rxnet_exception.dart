@@ -1,5 +1,5 @@
 import 'dart:core';
-import 'package:flutter_rxnet_forzzh/net/rx_result.dart';
+import 'RxResult.dart';
 
 ///
 /// create_user: zhengzaihong

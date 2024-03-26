@@ -1,4 +1,4 @@
-import '../net/rx_result.dart';
+import '../net/RxResult.dart';
 import '../net/rxnet_exception.dart';
 
 void download({required String? url}){

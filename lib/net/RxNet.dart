@@ -2,10 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:core';
 import 'dart:io';
-import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_rxnet_forzzh/net/rx_result.dart';
+import 'package:flutter_rxnet_forzzh/net/RxResult.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 import 'package:hive/hive.dart';
 import '../utils/RxNetDataBase.dart';
@@ -42,6 +41,14 @@ class RxNet {
 
   RxNetDataBase? _dataBase;
 
+  /// 支持多环境 baseUrl调试 ,
+  /// 例如：
+  /// test: http://192.168.1.100:8080/
+  /// debug: http://192.168.1.100:8080/
+  /// release: http://192.168.1.100:8080/
+  /// 则 baseUrlEnv = {"test":"http://192.168.1.100:8080/","debug":"http://192.168.1.100:8080/","release":"http://192.168.1.100:8080/"}
+  Map<String, dynamic> baseUrlEnv = {};
+
   /// 创建 dio 实例对象
   RxNet._internal() {
     var options = BaseOptions(
@@ -65,6 +72,7 @@ class RxNet {
     RequestCaptureError? requestCaptureError,
     CacheMode? baseCacheMode,
     HiveCipher? encryptionCipher,
+    Map<String, dynamic>? envUrls,
   }) async{
 
     WidgetsFlutterBinding.ensureInitialized();
@@ -83,8 +91,9 @@ class RxNet {
     if (interceptors != null) {
       _client?.interceptors.addAll(interceptors);
     }
-
-
+    if(envUrls!= null && envUrls.isNotEmpty){
+      baseUrlEnv.addAll(envUrls);
+    }
     if(PlatformTools.isWeb){
       LogUtil.v("RxNet 不支持缓存的环境：web");
       return;
@@ -99,10 +108,24 @@ class RxNet {
 
   Dio? getClient()=>_client;
 
+
+  /// 切换环境
+  /// [env] 环境名称 key
+  /// 例如：debug,test,release
+  void setEnv(String env){
+    _client?.options.baseUrl = baseUrlEnv[env];
+  }
+
+
+  /// 缓存
+  /// [key] 缓存key
+  /// [value] 缓存值
   Future saveCache(String key, dynamic value) async {
     return getDb()?.put(key,value);
   }
 
+  /// 读取缓存
+  /// [key] 缓存key
   Future readCache(String key) async {
     return getDb()?.get(key);
   }
@@ -111,11 +134,13 @@ class RxNet {
     return _dataBase;
   }
 
+  /// 是否开启代理
   RxNet setEnableProxy(bool enable) {
     _isProxyEnable = enable;
     return this;
   }
 
+  /// 是否开启代理
   bool isEnableProxy() {
     return _isProxyEnable;
   }
@@ -181,12 +206,18 @@ class RxNet {
   }
 
   ///设置全局请求头
-  void setGlobalHeader(Map<String, dynamic> header) {
+  void setHeaders(Map<String, dynamic> header) {
     globalHeader = header;
   }
 
-  Map<String, dynamic> getGlobalHeader() {
+  Map<String, dynamic> getHeaders() {
     return globalHeader;
+  }
+
+  ///获取取消token
+  ///tag 请求的标识
+  CancelToken? getCancelToken(String tag) {
+    return _cancelTokens[tag];
   }
 
   ///取消网络请求
@@ -201,6 +232,7 @@ class RxNet {
 }
 
 class BuildRequest<T> {
+
   final HttpType _httpType;
 
   final RxNet _rxNet;
@@ -333,15 +365,12 @@ class BuildRequest<T> {
     return this;
   }
 
-  BuildRequest setTag(String tag) {
+  BuildRequest setCancelToken(String tag) {
     _cancelTag = tag;
     _cancelTokens[tag] = CancelToken();
     return this;
   }
 
-  String? getTag() {
-    return _cancelTag;
-  }
 
   BuildRequest setEnableGlobalHeader(bool enable) {
     _enableGlobalHeader = enable;
@@ -391,20 +420,22 @@ class BuildRequest<T> {
           data: _bodyData,
           queryParameters: isRestfulUrl() ? {} : _params,
           options: _options,
-          cancelToken: _cancelTokens[getTag()]);
+          cancelToken: _cancelTokens[_cancelTag]);
 
       ///成功
       if (response.statusCode == 200) {
         if (getJsonConvertAdapter() != null) {
           LogUtil.v("useJsonAdapter：true");
-          var data =
-          getJsonConvertAdapter()?.jsonTransformation.call(response.data);
-          success?.call(data as T, SourcesType.net);
+          try {
+            var data = getJsonConvertAdapter()?.jsonTransformation.call(response.data);
+            success?.call(data as T, SourcesType.net);
+          }catch(e){
+            LogUtil.v("RxNet：请检查json数据结构类型转化类是否正确");
+          }
         } else {
           LogUtil.v("useJsonAdapter：false");
           success?.call(response.data as T, SourcesType.net);
         }
-
         /// 存储数据
         if(cache && !PlatformTools.isWeb){
           String cacheKey = NetUtils.getCacheKeyFromPath("$_path", _params);
@@ -589,7 +620,7 @@ class BuildRequest<T> {
           data: _bodyData,
           queryParameters: isRestfulUrl() ? {} : _params,
           options: _options,
-          cancelToken: _cancelTokens[getTag()]);
+          cancelToken: _cancelTokens[_cancelTag]);
 
       if (response.statusCode == 200) {
         success?.call(response.data, SourcesType.net);
@@ -636,7 +667,7 @@ class BuildRequest<T> {
           queryParameters: isRestfulUrl() ? {} : _params,
           data: _bodyData,
           options: _options,
-          cancelToken: _cancelTokens[getTag()]);
+          cancelToken: _cancelTokens[_cancelTag]);
 
       ///成功
       if (response.statusCode == 200) {
