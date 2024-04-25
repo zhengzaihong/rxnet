@@ -74,7 +74,7 @@
         requestCaptureError: (e){  ///全局抓获 异常
           print(">>>${HandleError.dioError(e).message}");
         },
-         envUrls: {  ///支持多环境 baseUrl调试
+         baseUrlEnv: {  ///支持多环境 baseUrl调试
           "test": "http://t.weather.sojson1.com/",
           "debug": "http://t.weather.sojson2.com/",
           "release": "http://t.weather.sojson.com/",
@@ -98,7 +98,7 @@
     RxNet.get()
         .setPath("api/weather")
         .setParam("city", "101030100")
-        .setEnableRestfulUrl(true) //Restful 
+        .setRestfulUrl(true) //Restful 
         .setCacheMode(CacheMode.requestFailedReadCache)
         .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
         .execute<NormalWaterInfoEntity>(
@@ -115,7 +115,7 @@
      var data = await RxNet.get()
         .setPath("api/weather")
         .setParam("city", "101030100")
-        .setEnableRestfulUrl(true)
+        .setRestfulUrl(true)
         .setCacheMode(CacheMode.onlyRequest)
         .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
         // .executeAsync();
@@ -152,7 +152,7 @@
       RxNet.get<NormalWaterInfoEntity>()  //这里可以省略 泛型声明
         .setPath("api/weather")
         .setParam("city", "101030100")
-        .setEnableRestfulUrl(true) ///Restful
+        .setRestfulUrl(true) ///Restful
         .setCacheMode(CacheMode.onlyRequest)
         .setCheckNetwork((){
           //todo 检查网络的实现（非必要）

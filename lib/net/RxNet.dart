@@ -4,7 +4,6 @@ import 'dart:core';
 import 'dart:io';
 import 'package:dio/io.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_rxnet_forzzh/net/RxResult.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 import 'package:hive/hive.dart';
 import '../utils/RxNetDataBase.dart';
@@ -72,7 +71,7 @@ class RxNet {
     RequestCaptureError? requestCaptureError,
     CacheMode? baseCacheMode,
     HiveCipher? encryptionCipher,
-    Map<String, dynamic>? envUrls,
+    Map<String, dynamic>? baseUrlEnv,
   }) async{
 
     WidgetsFlutterBinding.ensureInitialized();
@@ -91,8 +90,8 @@ class RxNet {
     if (interceptors != null) {
       _client?.interceptors.addAll(interceptors);
     }
-    if(envUrls!= null && envUrls.isNotEmpty){
-      baseUrlEnv.addAll(envUrls);
+    if(baseUrlEnv!= null && baseUrlEnv.isNotEmpty){
+      baseUrlEnv.addAll(baseUrlEnv);
     }
     if(PlatformTools.isWeb){
       LogUtil.v("RxNet 不支持缓存的环境：web");
