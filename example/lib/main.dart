@@ -18,7 +18,7 @@ void main() async{
         requestCaptureError: (e){  ///全局抓获 异常
           print(">>>${HandleError.dioError(e).message}");
         },
-         envUrls: {  ///支持多环境 baseUrl调试
+         baseUrlEnv: {  ///支持多环境 baseUrl调试
           "test": "http://t.weather.sojson1.com/",
           "debug": "http://t.weather.sojson2.com/",
           "release": "http://t.weather.sojson.com/",
