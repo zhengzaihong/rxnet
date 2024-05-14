@@ -687,6 +687,7 @@ class BuildRequest<T> {
     ProgressCallback? onReceiveProgress,
     SuccessCallback? success,
     FailureCallback? failure,
+    CancelToken? cancelToken,
     Function()? cancelCallback,
   }) async {
 
@@ -694,76 +695,61 @@ class BuildRequest<T> {
       return;
     }
 
+    int downloadStart = 0;
+    File file = File(savePath);
     try{
       String url = _path.toString();
       if (isRestfulUrl()) {
         url = NetUtils.restfulUrl(_path.toString(), _params);
       }
-
-      _options?.method = _httpType.name;
-      ///局部头优先与全局
-      if (_headers.isNotEmpty) {
-        _options?.headers = _headers;
-      }
-      if (_enableGlobalHeader) {
-        _options?.headers ??= {};
-        _options?.headers?.addAll(_rxNet.globalHeader);
-      }
-
-      int downloadStart = 0;
-      File file = File(savePath);
       if (file.existsSync()) {
-        // downloadStart = file.readAsBytesSync().length;
+        // downloadStart = file.lengthSync();
         Stream<List<int>> streamFileSize = file.openRead();
         await for (var chunk in streamFileSize) {
           downloadStart += chunk.length;
         }
       }
+      _options?.method = _httpType.name;
       /// 以流的方式接收响应数据
       _options = _options?.copyWith(
         responseType: ResponseType.stream,
         followRedirects: false,
       );
-      _options?.headers = {
-         "Range": "bytes=$downloadStart-",
-     };
-
-      var cancelToken = _cancelTokens[_cancelTag] ;
-      if(cancelToken == null){
-        _cancelTokens[url] =  CancelToken();
+      ///局部头优先与全局
+      if (_headers.isNotEmpty) {
+        _options?.headers?.addAll(_headers);
       }
-      final response = await  _rxNet.client!.get<ResponseBody>(
+      if (_enableGlobalHeader) {
+        _options?.headers ??= {};
+        _options?.headers?.addAll(_rxNet.globalHeader);
+      }
+      _options?.headers?.addAll({"Range": "bytes=$downloadStart-"});
+      final response = await  _rxNet.client!.request<ResponseBody>(
         url,
         options: _options,
         cancelToken: cancelToken,
         data: _bodyData,
         queryParameters: isRestfulUrl() ? {} : _params,
-        // onReceiveProgress: onReceiveProgress,
+        onReceiveProgress: (received, total){
+          if(received<downloadStart){
+            onReceiveProgress?.call(downloadStart, total);
+            return;
+          }
+          onReceiveProgress?.call(received, total);
+        },
       );
-      int received = downloadStart;
       RandomAccessFile raf = file.openSync(mode: FileMode.append);
-      int total = await _getContentLength(response);
-      if (total <= received) {
-        await raf.close();
-        cancelToken?.cancel();
-        success?.call(file, SourcesType.net);
-        return;
-      }
-
       Stream<Uint8List> stream = response.data!.stream;
       final subscription =stream.listen((data) {
-        raf.writeFromSync(data);
-        received = received+data.length;
-        onReceiveProgress?.call(received, total);
-
-        print("-------------received:$received");
-      },
+          raf.writeFromSync(data);
+        },
         onDone: () async {
           success?.call(file, SourcesType.net);
           await raf.close();
         },
         onError: (e) async {
            _collectError(e);
+           failure?.call(e);
            await raf.close();
         },
         cancelOnError: true
@@ -776,6 +762,17 @@ class BuildRequest<T> {
       });
 
     }on DioException catch (error) {
+
+      if(error.response!=null){
+        final content= await getContentLength(error.response!);
+        final total = int.tryParse(content?.split('/').last??"0")??0;
+        if(total<=downloadStart){
+          onReceiveProgress?.call(downloadStart, total);
+          success?.call(file, SourcesType.net);
+          return;
+        }
+      }
+
       _collectError(error);
       if (CancelToken.isCancel(error)) {
         cancelCallback?.call();
@@ -786,13 +783,95 @@ class BuildRequest<T> {
   }
 
 
-  /// 获取下载的文件大小
-   Future<int> _getContentLength(Response<dynamic> response) async {
+  ///上传文件 支持断点上传
+  ///[filePath]  上传文件的路径
+  ///[cancelCallback]  取消下载时的回调
+  ///下载成功 回调[success] 获取文件本身
+  void breakPointUploadFile({
+    required String filePath,
+    ProgressCallback? onSendProgress,
+    SuccessCallback? success,
+    FailureCallback? failure,
+    CancelToken? cancelToken,
+    Function()? cancelCallback,
+    int? start,
+  }) async {
+
+    if (!(await _checkNetWork())) {
+      return;
+    }
+    String url = _path.toString();
+    if (isRestfulUrl()) {
+      url = NetUtils.restfulUrl(_path.toString(), _params);
+    }
+    var progress = start ?? 0;
+    int fileSize = 0;
+    File file = File(filePath);
+    if (file.existsSync()) {
+      Stream<List<int>> streamFileSize = file.openRead();
+      await for (var chunk in streamFileSize) {
+        fileSize += chunk.length;
+      }
+    }
+    var data = file.openRead(progress,fileSize-progress);
     try {
-      final headerContent = response.headers.value(HttpHeaders.contentLengthHeader);
-      return int.parse(headerContent??"0");
+
+      if (_headers.isNotEmpty) {
+        _options?.headers?.addAll(_headers);
+      }
+      if (_enableGlobalHeader) {
+        _options?.headers ??= {};
+        _options?.headers?.addAll(_rxNet.globalHeader);
+      }
+      _options?.headers?.addAll({'Content-Range': 'bytes $progress-${fileSize - 1}/$fileSize'});
+      final response = await _rxNet.client!.post<ResponseBody>(
+        url,
+        options: _options,
+        cancelToken: cancelToken,
+        data: data,
+        queryParameters: isRestfulUrl() ? {} : _params,
+        onSendProgress: (int sent, int total) {
+          if(sent<progress){
+            onSendProgress?.call(sent, total);
+            return;
+          }
+          onSendProgress?.call(sent, total);
+        }
+      );
+
+      Stream<Uint8List> stream = response.data!.stream;
+      final subscription =stream.listen((data) {},
+          onDone: () async {
+            success?.call(file, SourcesType.net);
+          },
+          onError: (e) async {
+            failure?.call(e);
+            _collectError(e);
+          },
+           cancelOnError: true
+      );
+
+      cancelToken?.whenCancel.then((_) async {
+        await subscription?.cancel();
+        cancelCallback?.call();
+      });
+    } on DioException catch (error) {
+      _collectError(error);
+      if (CancelToken.isCancel(error)) {
+        cancelCallback?.call();
+        return;
+      }
+      failure?.call(error);
+    }
+  }
+
+
+  /// 获取下载的文件大小 (0 - max) 文件末尾长度
+   Future<String?> getContentLength(Response<dynamic> response) async {
+    try {
+      return response.headers.value(HttpHeaders.contentRangeHeader);
     } catch (e) {
-      return 0;
+      return null;
     }
   }
 
