@@ -72,6 +72,7 @@ class _DownLoadPageState extends State<DownLoadPage> {
           }
         });
 
+
   }
 
   ///请求系统权限，让用户确认授权

@@ -17,7 +17,6 @@ import '../utils/RxNetDataBase.dart';
 /// create_time: 18:03
 /// describe: 网络请求工具库，支持多种缓存模式
 ///同一个CancelToken可以用于多个请求，当一个CancelToken取消时，所有使用该CancelToken的请求都会被取消。
-final Map<String, CancelToken> _cancelTokens = <String, CancelToken>{};
 
 class RxNet {
   Dio? _client;
@@ -213,22 +212,6 @@ class RxNet {
   Map<String, dynamic> getHeaders() {
     return globalHeader;
   }
-
-  ///获取取消token
-  ///tag 请求的标识
-  CancelToken? getCancelToken(String tag) {
-    return _cancelTokens[tag];
-  }
-
-  ///取消网络请求
-  void cancel(String tag, {dynamic reason}) {
-    if (_cancelTokens.containsKey(tag)) {
-      if (!_cancelTokens[tag]!.isCancelled) {
-        _cancelTokens[tag]?.cancel(reason);
-      }
-      _cancelTokens.remove(tag);
-    }
-  }
 }
 
 class BuildRequest<T> {
@@ -237,7 +220,7 @@ class BuildRequest<T> {
 
   final RxNet _rxNet;
 
-  String? _cancelTag;
+  CancelToken? _cancelToken;
 
   String? _path;
 
@@ -365,12 +348,10 @@ class BuildRequest<T> {
     return this;
   }
 
-  BuildRequest setCancelToken(String tag) {
-    _cancelTag = tag;
-    _cancelTokens[tag] = CancelToken();
+  BuildRequest setCancelToken(CancelToken cancelToken) {
+    _cancelToken= cancelToken;
     return this;
   }
-
 
   BuildRequest setEnableGlobalHeader(bool enable) {
     _enableGlobalHeader = enable;
@@ -393,6 +374,11 @@ class BuildRequest<T> {
     this.checkNetWork = checkNetWork;
     return this;
   }
+
+  CancelToken? getCancelToken() {
+    return _cancelToken;
+  }
+
 
   void _doWorkRequest<T>({
     SuccessCallback<T>? success,
@@ -420,7 +406,7 @@ class BuildRequest<T> {
           data: _bodyData,
           queryParameters: isRestfulUrl() ? {} : _params,
           options: _options,
-          cancelToken: _cancelTokens[_cancelTag]);
+          cancelToken: _cancelToken);
 
       ///成功
       if (response.statusCode == 200) {
@@ -620,7 +606,7 @@ class BuildRequest<T> {
           data: _bodyData,
           queryParameters: isRestfulUrl() ? {} : _params,
           options: _options,
-          cancelToken: _cancelTokens[_cancelTag]);
+          cancelToken: _cancelToken);
 
       if (response.statusCode == 200) {
         success?.call(response.data, SourcesType.net);
@@ -637,7 +623,7 @@ class BuildRequest<T> {
 
   ///下载文件
   ///[savePath]  文件保存路径
-  void download({
+   void download({
     required String savePath,
     ProgressCallback? onReceiveProgress,
     SuccessCallback? success,
@@ -665,7 +651,7 @@ class BuildRequest<T> {
           queryParameters: isRestfulUrl() ? {} : _params,
           data: _bodyData,
           options: _options,
-          cancelToken: _cancelTokens[_cancelTag]);
+          cancelToken: _cancelToken);
       ///成功
       if (response.statusCode == 200) {
         success?.call(response.data, SourcesType.net);
@@ -687,7 +673,6 @@ class BuildRequest<T> {
     ProgressCallback? onReceiveProgress,
     SuccessCallback? success,
     FailureCallback? failure,
-    CancelToken? cancelToken,
     Function()? cancelCallback,
   }) async {
 
@@ -727,21 +712,24 @@ class BuildRequest<T> {
       final response = await  _rxNet.client!.request<ResponseBody>(
         url,
         options: _options,
-        cancelToken: cancelToken,
+        cancelToken: _cancelToken,
         data: _bodyData,
         queryParameters: isRestfulUrl() ? {} : _params,
-        onReceiveProgress: (received, total){
-          if(received<downloadStart){
-            onReceiveProgress?.call(downloadStart, total);
-            return;
-          }
-          onReceiveProgress?.call(received, total);
-        },
       );
       RandomAccessFile raf = file.openSync(mode: FileMode.append);
       Stream<Uint8List> stream = response.data!.stream;
+
+      final content= await getContentLength(response);
+      final total = int.tryParse(content?.split('/').last??"0")??0;
+
       final subscription =stream.listen((data) {
           raf.writeFromSync(data);
+          downloadStart = downloadStart+data.length;
+          if(total<downloadStart){
+            onReceiveProgress?.call(total, total);
+            return;
+          }
+          onReceiveProgress?.call(downloadStart, total);
         },
         onDone: () async {
           success?.call(file, SourcesType.net);
@@ -755,30 +743,28 @@ class BuildRequest<T> {
         cancelOnError: true
       );
 
-      cancelToken?.whenCancel.then((_) async {
-        await subscription?.cancel();
+      _cancelToken?.whenCancel?.then((_) async {
+        await subscription.cancel();
         await raf.close();
         cancelCallback?.call();
       });
 
     }on DioException catch (error) {
-
       if(error.response!=null){
         final content= await getContentLength(error.response!);
         final total = int.tryParse(content?.split('/').last??"0")??0;
         if(total<=downloadStart){
-          onReceiveProgress?.call(downloadStart, total);
+          onReceiveProgress?.call(total, total);
           success?.call(file, SourcesType.net);
           return;
         }
       }
-
       _collectError(error);
+      failure?.call(error);
       if (CancelToken.isCancel(error)) {
         cancelCallback?.call();
         return;
       }
-      failure?.call(error);
     }
   }
 
@@ -792,7 +778,6 @@ class BuildRequest<T> {
     ProgressCallback? onSendProgress,
     SuccessCallback? success,
     FailureCallback? failure,
-    CancelToken? cancelToken,
     Function()? cancelCallback,
     int? start,
   }) async {
@@ -816,6 +801,7 @@ class BuildRequest<T> {
     var data = file.openRead(progress,fileSize-progress);
     try {
 
+      _options?.method = _httpType.name;
       if (_headers.isNotEmpty) {
         _options?.headers?.addAll(_headers);
       }
@@ -824,23 +810,19 @@ class BuildRequest<T> {
         _options?.headers?.addAll(_rxNet.globalHeader);
       }
       _options?.headers?.addAll({'Content-Range': 'bytes $progress-${fileSize - 1}/$fileSize'});
-      final response = await _rxNet.client!.post<ResponseBody>(
+      final response = await _rxNet.client!.request<ResponseBody>(
         url,
         options: _options,
-        cancelToken: cancelToken,
+        cancelToken: _cancelToken,
         data: data,
         queryParameters: isRestfulUrl() ? {} : _params,
-        onSendProgress: (int sent, int total) {
-          if(sent<progress){
-            onSendProgress?.call(sent, total);
-            return;
-          }
-          onSendProgress?.call(sent, total);
-        }
       );
 
       Stream<Uint8List> stream = response.data!.stream;
-      final subscription =stream.listen((data) {},
+      final subscription =stream.listen((data) {
+           progress = progress+data.length;
+           onSendProgress?.call(progress, fileSize);
+         },
           onDone: () async {
             success?.call(file, SourcesType.net);
           },
@@ -850,12 +832,18 @@ class BuildRequest<T> {
           },
            cancelOnError: true
       );
-
-      cancelToken?.whenCancel.then((_) async {
+      _cancelToken?.whenCancel.then((_) async {
         await subscription?.cancel();
         cancelCallback?.call();
       });
     } on DioException catch (error) {
+      if(error.response!=null){
+        if(progress<=fileSize){
+          onSendProgress?.call(progress, fileSize);
+          success?.call(file, SourcesType.net);
+          return;
+        }
+      }
       _collectError(error);
       if (CancelToken.isCancel(error)) {
         cancelCallback?.call();

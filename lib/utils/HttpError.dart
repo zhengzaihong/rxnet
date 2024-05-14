@@ -8,7 +8,7 @@ import 'package:dio/dio.dart';
 /// create_time: 15:17
 /// describe: HTTP 状态码
 ///
-class HandleError {
+class HttpError {
 
   ///请求失败
   static const String REQUEST_FAILE = "REQUEST_FAILE";
@@ -46,9 +46,9 @@ class HandleError {
 
   dynamic bodyData;
 
-  HandleError._(this.code, this.message,this.bodyData);
+  HttpError._(this.code, this.message,this.bodyData);
 
-  HandleError.dioError(DioException error) {
+  HttpError.dioError(DioException error) {
     message = error.message;
     switch (error.type) {
       case DioExceptionType.connectionTimeout:

@@ -16,7 +16,7 @@ void main() async{
         // useSystemPrint: true,
         baseCheckNet:checkNet, ///全局检查网络
         requestCaptureError: (e){  ///全局抓获 异常
-          print(">>>${HandleError.dioError(e).message}");
+          print(">>>${HttpError.dioError(e).message}");
         },
          baseUrlEnv: {  ///支持多环境 baseUrl调试
           "test": "http://t.weather.sojson1.com/",

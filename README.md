@@ -1,16 +1,14 @@
 # RxNet 
 
-一款极简且强大Flutter网络请求工具，支持restful、泛型请求、数据缓存(无网请求)。该库是对Dio的扩展,同步的写法异步的实现，使用更加自然。
+一款极简且强大Flutter网络请求工具，支持restful、泛型请求、数据缓存(无网请求，非web)。该库是对Dio的扩展,使用更加自然。
 
-0.1.0版本之后缓存升级：支持全平台缓存(非web)，无网请求。
+已支持断点上传 / 下载
 
-注意：0.0.9以前版本 数据缓存只支持 Android、HarmonyOS 和 IOS 、MACOS平台。
 
 ## 依赖：
 
     dependencies:
-    
-       flutter_rxnet_forzzh:0.1.7
+       flutter_rxnet_forzzh:0.1.8
 
 
 ## 常用参数：
@@ -178,7 +176,7 @@
          setJsonConvertAdapter()设置需要转换的模型
 
 
- 5.上传下载：(根据业务添加参数 setParam等),注意移动终端的文件读写权限。
+ 5.上传下载(支持断点上传下载)：(根据业务添加参数 setParam等),注意移动终端的文件读写权限。
 
   
     RxNet.get() 
