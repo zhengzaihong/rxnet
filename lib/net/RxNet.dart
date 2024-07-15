@@ -23,9 +23,6 @@ class RxNet {
 
   static final RxNet _instance = RxNet._internal();
 
-  /// 是否使用代理
-  bool _isProxyEnable = false;
-
   factory RxNet() => _instance;
 
   Dio? get client => _client;
@@ -133,32 +130,6 @@ class RxNet {
     return _dataBase;
   }
 
-  /// 是否开启代理
-  RxNet setEnableProxy(bool enable) {
-    _isProxyEnable = enable;
-    return this;
-  }
-
-  /// 是否开启代理
-  bool isEnableProxy() {
-    return _isProxyEnable;
-  }
-
-  /// isProxyEnable 为true 才会生效
-  /// 前置方法 setEnableProxy
-  void setProxy(String address) {
-    if (isEnableProxy()) {
-      (_instance.client?.httpClientAdapter as DefaultHttpClientAdapter)
-          .onHttpClientCreate = (client) {
-        client.findProxy = (uri) {
-          ///ip:prort
-          return address;
-        };
-        client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
-        return null;
-      };
-    }
-  }
 
   ///这里提供一个收集日字的方法，便于后期排查
   ///文件需要有写的权限，eg:xxx/xxx/log.txt
@@ -332,6 +303,19 @@ class BuildRequest<T> {
     }
     return this;
   }
+
+  BuildRequest removeNullValueKeys() {
+    if(_httpType == HttpType.post) {
+      if (_bodyData is Map) {
+        _bodyData.removeWhere((key, value) => value == null);
+      }
+    }else{
+      _params.removeWhere((key, value) =>  value == null);
+    }
+    return this;
+  }
+
+
 
   BuildRequest getParams(ParamCallBack callBack) {
     callBack.call(_params);

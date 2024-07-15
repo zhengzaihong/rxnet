@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 import 'package:flutter_uikit_forzzh/uikitlib.dart';
@@ -34,6 +36,14 @@ void main() async{
             }
           )
         ]);
+     //
+     // (RxNet().getClient()  as DefaultHttpClientAdapter).onHttpClientCreate = (client) {
+     //   client.findProxy = (uri) {
+     //     return "http://127.0.0.1:8888";
+     //   };
+     //   client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+     //   return null;
+     // };
 
 
   runApp(const MyApp());
