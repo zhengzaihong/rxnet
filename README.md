@@ -8,7 +8,7 @@
 ## 依赖：
 
     dependencies:
-       flutter_rxnet_forzzh:0.1.8
+       flutter_rxnet_forzzh:0.1.9
 
 
 ## 常用参数：
@@ -93,7 +93,7 @@
 
     1.回调模式：
 
-    RxNet.get()
+    RxNet.get()  // post, get, delete, put, patch
         .setPath("api/weather")
         .setParam("city", "101030100")
         .setRestfulUrl(true) //Restful 
@@ -110,7 +110,7 @@
 
     2. await方式：
 
-     var data = await RxNet.get()
+     var data = await RxNet.get()  // post, get, delete, put, patch
         .setPath("api/weather")
         .setParam("city", "101030100")
         .setRestfulUrl(true)
@@ -252,17 +252,3 @@
     [log] ###输出日志信息：  v  ***************** Response End *****************
     [log] ###输出日志信息：  v  useJsonAdapter：true
 
-
-   特殊说明：
-
-    如果web端遇到跨域问题：The connection errored: The XMLHttpRequest onError callback was called.  
-
-    解决办法如下：
-
-    1.找到当前项目使用的flutter sdk目录
-    
-    2.然后找到flutter\packages\flutter_tools\lib\src\web\chrome.dart文件并打开
-
-    3.找到'--disable-extensions'位置，然后添加'--disable-web-security'
-
-    4.另外还需要到flutter\bin\cache目录下，删除flutter_tools.stamp和flutter_tools.snapshot的文件，否则改动不生效

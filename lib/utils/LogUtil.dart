@@ -7,7 +7,7 @@ import 'dart:developer';
 /// describe: 日志输出
 ///
 class LogUtil {
-  static const String _TAG_DEFAULT = "###输出日志信息：";
+  static const String _TAG_DEFAULT = "###日志：";
 
   ///是否 debug
   static bool debug = false;
