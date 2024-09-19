@@ -12,6 +12,8 @@ typedef SuccessCallback<T> = void Function(T data,SourcesType model);
 ///失败回调
 typedef FailureCallback<T> = void Function(dynamic data);
 
+/// 成功或失败都会执行的方法
+typedef FinallyCallback<T> = void Function();
 
 typedef ParamCallBack = void Function(Map<String, dynamic> params);
 

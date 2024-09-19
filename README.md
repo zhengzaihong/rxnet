@@ -79,7 +79,7 @@
            //xxxxx
         },
         interceptors: [  ///拦截器
-          CustomLogInterceptor(
+          RxNetLogInterceptor(
             handlerRequest: (e,f) {
             },
             handlerResponse: (e,f) {
@@ -96,6 +96,7 @@
     RxNet.get()  // post, get, delete, put, patch
         .setPath("api/weather")
         .setParam("city", "101030100")
+        //.addParams(Map)  
         .setRestfulUrl(true) //Restful 
         .setCacheMode(CacheMode.requestFailedReadCache)
         .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
@@ -113,6 +114,7 @@
      var data = await RxNet.get()  // post, get, delete, put, patch
         .setPath("api/weather")
         .setParam("city", "101030100")
+        //.addParams(Map)
         .setRestfulUrl(true)
         .setCacheMode(CacheMode.onlyRequest)
         .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
@@ -181,6 +183,7 @@
   
     RxNet.get() 
         .setPath("https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg")
+         //breakPointDownload() 断点下载
         .download(
           savePath:"${appDocPath}/55.jpg",
           onReceiveProgress: (len,total){
@@ -193,8 +196,8 @@
    
   
     RxNet.post()
-        .setPath(
-            "xxxxx.jpg")
+        .setPath("xxxxx.jpg")
+        // breakPointUploadFile() 断点续传
         .upload(
             success: (data, sourcesType) {},
             failure: (e) {},
@@ -204,51 +207,59 @@
    
    6.清晰的日志拦截器，拒绝调试抓瞎。
      
-    需要日志信息，初始化配置网络框架时请添加 CustomLogInterceptor 拦截器
+    需要日志信息，初始化配置网络框架时请添加 RxNetLogInterceptor 拦截器
 
       RxNet().init(
        ...xxx
           isDebug: true, ///是否调试 打印日志
           interceptors: [  ///拦截器
-          CustomLogInterceptor() // 可自行添加自定义
+          RxNetLogInterceptor() // 可自行添加自定义
       ]);
 
 
    输出格式：
 
-    [log] ###输出日志信息：  v  ***************** Request Start *****************
-    [log] ###输出日志信息：  v  uri: http://t.weather.sojson.com/api/weather/city/101030100
-    [log] ###输出日志信息：  v  method: GET
-    [log] ###输出日志信息：  v  responseType: ResponseType.json
-    [log] ###输出日志信息：  v  followRedirects: true
-    [log] ###输出日志信息：  v  connectTimeout:
-    [log] ###输出日志信息：  v  receiveTimeout:
-    [log] ###输出日志信息：  v  extra: {}
-    [log] ###输出日志信息：  v  Request Headers:
-    [log] ###输出日志信息：  v  {"content-type":"application/json"}
-    [log] ###输出日志信息：  v  data:
-    [log] ###输出日志信息：  v  null
-    [log] ###输出日志信息：  v  ***************** Request End *****************
-    [log] ###输出日志信息：  v  ***************** Response Start *****************
-    [log] ###输出日志信息：  v  statusCode: 200
-    [log] ###输出日志信息：  v  Response Headers:
-    [log] ###输出日志信息：  v   connection: keep-alive
-    [log] ###输出日志信息：  v   cache-control: max-age=3000
-    [log] ###输出日志信息：  v   transfer-encoding: chunked
-    [log] ###输出日志信息：  v   date: Wed, 07 Feb 2024 13:09:47 GMT
-    [log] ###输出日志信息：  v   vary: Accept-Encoding
-    [log] ###输出日志信息：  v   content-encoding: gzip
-    [log] ###输出日志信息：  v   age: 2404
-    [log] ###输出日志信息：  v   content-type: application/json;charset=UTF-8
-    [log] ###输出日志信息：  v   x-source: C/200
-    [log] ###输出日志信息：  v   server: marco/2.20
-    [log] ###输出日志信息：  v   x-request-id: c58182a21ddcaed97d76dbb49f4771d8; 32238019a67857706c0e40b6dd0e1238
-    [log] ###输出日志信息：  v   via: S.mix-hz-fdi1-213, T.213.H, V.mix-hz-fdi1-217, T.194.H, M.cun-he-sjw8-194
-    [log] ###输出日志信息：  v   expires: Wed, 07 Feb 2024 13:19:43 GMT
-    [log] ###输出日志信息：  v  Response Text:
-    [log] ###输出日志信息：  v  {"message":"success感谢又拍云(upyun.com)提供CDN赞助","status":200,"date":"20240207","time":"2024-02-07 20:26:47","cityInfo":{"city":"天津市","citykey":"101030100","parent":"天津","updateTime":"18:31"},"data":{"shidu":"31%","pm25":13.0,"pm10":21.0,"quality":"优","wendu":"-1","ganmao":"各类人群可自由活动","forecast":[{"date":"07","high":"高温 5℃","low":"低温 -4℃","ymd":"2024-02-07","week":"星期三","sunrise":"07:11","sunset":"17:38","aqi":35,"fx":"西北风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"08","high":"高温 5℃","low":"低温 -5℃","ymd":"2024-02-08","week":"星期四","sunrise":"07:10","sunset":"17:39","aqi":62,"fx":"西北风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"09","high":"高温 7℃","low":"低温 -5℃","ymd":"2024-02-09","week":"星期五","sunrise":"07:09","sunset":"17:40","aqi":64,"fx":"西北风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"10","high":"高温 5℃","low":"低温 -4℃","ymd":"2024-02-10","week":"星期六","sunrise":"07:08","sunset":"17:41","aqi":68,"fx":"北风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"11","high":"高温 10℃","low":"低温 -4℃","ymd":"2024-02-11","week":"星期日","sunrise":"07:07","sunset":"17:42","aqi":58,"fx":"西南风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"12","high":"高温 11℃","low":"低温 -2℃","ymd":"2024-02-12","week":"星期一","sunrise":"07:06","sunset":"17:44","aqi":60,"fx":"西南风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"13","high":"高温 12℃","low":"低温 0℃","ymd":"2024-02-13","week":"星期二","sunrise":"07:05","sunset":"17:45","aqi":72,"fx":"西南风","fl":"1级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"14","high":"高温 9℃","low":"低温 0℃","ymd":"2024-02-14","week":"星期三","sunrise":"07:03","sunset":"17:46","aqi":40,"fx":"西北风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"15","high":"高温 4℃","low":"低温 -2℃","ymd":"2024-02-15","week":"星期四","sunrise":"07:02","sunset":"17:47","aqi":46,"fx":"西北风","fl":"4级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"16","high":"高温 8℃","low":"低温 -3℃","ymd":"2024-02-16","week":"星期五","sunrise":"07:01","sunset":"17:48","aqi":38,"fx":"南风","fl":"3级","type":"阴","notice":"不要被阴云遮挡住好心情"},{"date":"17","high":"高温 10℃","low":"低温 3℃","ymd":"2024-02-17","week":"星期六","sunrise":"07:00","sunset":"17:49","aqi":34,"fx":"东风","fl":"2级","type":"阴","notice":"不要被阴云遮挡住好心情"},{"date":"18","high":"高温 6℃","low":"低温 -1℃","ymd":"2024-02-18","week":"星期日","sunrise":"06:58","sunset":"17:50","aqi":57,"fx":"北风","fl":"3级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"19","high":"高温 3℃","low":"低温 -5℃","ymd":"2024-02-19","week":"星期一","sunrise":"06:57","sunset":"17:51","aqi":59,"fx":"东风","fl":"2级","type":"阴","notice":"不要被阴云遮挡住好心情"},{"date":"20","high":"高温 3℃","low":"低温 -5℃","ymd":"2024-02-20","week":"星期二","sunrise":"06:56","sunset":"17:53","aqi":56,"fx":"西北风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"21","high":"高温 2℃","low":"低温 -6℃","ymd":"2024-02-21","week":"星期三","sunrise":"06:54","sunset":"17:54","aqi":97,"fx":"北风","fl":"2级","type":"霾","notice":"雾霾来袭，戴好口罩再出门"}],"yesterday":{"date":"06","high":"高温 5℃","low":"低温 -7℃","ymd":"2024-02-06","week":"星期二","sunrise":"07:12","sunset":"17:37","aqi":48,"fx":"西北风","fl":"2级","type":"霾","notice":"雾霾来袭，戴好口罩再出门"}}}
-    [log] ###输出日志信息：  v  useTime:0分:0秒:215毫秒
-    [log] ###输出日志信息：  v  Response url :http://t.weather.sojson.com/api/weather/city/101030100
-    [log] ###输出日志信息：  v  ***************** Response End *****************
-    [log] ###输出日志信息：  v  useJsonAdapter：true
+    [log] ###日志：  v  ***************** Request Start *****************
+    [log] ###日志：  v  uri: http://t.weather.sojson.com/api/weather/city/101030100
+    [log] ###日志：  v  method: GET
+    [log] ###日志：  v  responseType: ResponseType.json
+    [log] ###日志：  v  followRedirects: true
+    [log] ###日志：  v  connectTimeout:
+    [log] ###日志：  v  receiveTimeout:
+    [log] ###日志：  v  extra: {}
+    [log] ###日志：  v  Request Headers:
+    [log] ###日志：  v  {"content-type":"application/json"}
+    [log] ###日志：  v  data:
+    [log] ###日志：  v  null
+    [log] ###日志：  v  ***************** Request End *****************
+    [log] ###日志：  v  ***************** Response Start *****************
+    [log] ###日志：  v  statusCode: 200
+    [log] ###日志：  v  Response Headers:
+    [log] ###日志：  v   connection: keep-alive
+    [log] ###日志：  v   cache-control: max-age=3000
+    [log] ###日志：  v   transfer-encoding: chunked
+    [log] ###日志：  v   date: Wed, 07 Feb 2024 13:09:47 GMT
+    [log] ###日志：  v   vary: Accept-Encoding
+    [log] ###日志：  v   content-encoding: gzip
+    [log] ###日志：  v   age: 2404
+    [log] ###日志：  v   content-type: application/json;charset=UTF-8
+    [log] ###日志：  v   x-source: C/200
+    [log] ###日志：  v   server: marco/2.20
+    [log] ###日志：  v   x-request-id: c58182a21ddcaed97d76dbb49f4771d8; 32238019a67857706c0e40b6dd0e1238
+    [log] ###日志：  v   via: S.mix-hz-fdi1-213, T.213.H, V.mix-hz-fdi1-217, T.194.H, M.cun-he-sjw8-194
+    [log] ###日志：  v   expires: Wed, 07 Feb 2024 13:19:43 GMT
+    [log] ###日志：  v  Response Text:
+    [log] ###日志：  v  {"message":"success感谢又拍云(upyun.com)提供CDN赞助","status":200,"date":"20240207","time":"2024-02-07 20:26:47","cityInfo":{"city":"天津市","citykey":"101030100","parent":"天津","updateTime":"18:31"},"data":{"shidu":"31%","pm25":13.0,"pm10":21.0,"quality":"优","wendu":"-1","ganmao":"各类人群可自由活动","forecast":[{"date":"07","high":"高温 5℃","low":"低温 -4℃","ymd":"2024-02-07","week":"星期三","sunrise":"07:11","sunset":"17:38","aqi":35,"fx":"西北风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"08","high":"高温 5℃","low":"低温 -5℃","ymd":"2024-02-08","week":"星期四","sunrise":"07:10","sunset":"17:39","aqi":62,"fx":"西北风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"09","high":"高温 7℃","low":"低温 -5℃","ymd":"2024-02-09","week":"星期五","sunrise":"07:09","sunset":"17:40","aqi":64,"fx":"西北风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"10","high":"高温 5℃","low":"低温 -4℃","ymd":"2024-02-10","week":"星期六","sunrise":"07:08","sunset":"17:41","aqi":68,"fx":"北风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"11","high":"高温 10℃","low":"低温 -4℃","ymd":"2024-02-11","week":"星期日","sunrise":"07:07","sunset":"17:42","aqi":58,"fx":"西南风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"12","high":"高温 11℃","low":"低温 -2℃","ymd":"2024-02-12","week":"星期一","sunrise":"07:06","sunset":"17:44","aqi":60,"fx":"西南风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"13","high":"高温 12℃","low":"低温 0℃","ymd":"2024-02-13","week":"星期二","sunrise":"07:05","sunset":"17:45","aqi":72,"fx":"西南风","fl":"1级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"14","high":"高温 9℃","low":"低温 0℃","ymd":"2024-02-14","week":"星期三","sunrise":"07:03","sunset":"17:46","aqi":40,"fx":"西北风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"15","high":"高温 4℃","low":"低温 -2℃","ymd":"2024-02-15","week":"星期四","sunrise":"07:02","sunset":"17:47","aqi":46,"fx":"西北风","fl":"4级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"16","high":"高温 8℃","low":"低温 -3℃","ymd":"2024-02-16","week":"星期五","sunrise":"07:01","sunset":"17:48","aqi":38,"fx":"南风","fl":"3级","type":"阴","notice":"不要被阴云遮挡住好心情"},{"date":"17","high":"高温 10℃","low":"低温 3℃","ymd":"2024-02-17","week":"星期六","sunrise":"07:00","sunset":"17:49","aqi":34,"fx":"东风","fl":"2级","type":"阴","notice":"不要被阴云遮挡住好心情"},{"date":"18","high":"高温 6℃","low":"低温 -1℃","ymd":"2024-02-18","week":"星期日","sunrise":"06:58","sunset":"17:50","aqi":57,"fx":"北风","fl":"3级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"19","high":"高温 3℃","low":"低温 -5℃","ymd":"2024-02-19","week":"星期一","sunrise":"06:57","sunset":"17:51","aqi":59,"fx":"东风","fl":"2级","type":"阴","notice":"不要被阴云遮挡住好心情"},{"date":"20","high":"高温 3℃","low":"低温 -5℃","ymd":"2024-02-20","week":"星期二","sunrise":"06:56","sunset":"17:53","aqi":56,"fx":"西北风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"21","high":"高温 2℃","low":"低温 -6℃","ymd":"2024-02-21","week":"星期三","sunrise":"06:54","sunset":"17:54","aqi":97,"fx":"北风","fl":"2级","type":"霾","notice":"雾霾来袭，戴好口罩再出门"}],"yesterday":{"date":"06","high":"高温 5℃","low":"低温 -7℃","ymd":"2024-02-06","week":"星期二","sunrise":"07:12","sunset":"17:37","aqi":48,"fx":"西北风","fl":"2级","type":"霾","notice":"雾霾来袭，戴好口罩再出门"}}}
+    [log] ###日志：  v  useTime:0分:0秒:215毫秒
+    [log] ###日志：  v  Response url :http://t.weather.sojson.com/api/weather/city/101030100
+    [log] ###日志：  v  ***************** Response End *****************
+    [log] ###日志：  v  useJsonAdapter：true
 
+   7.对于线上的APP接口错误信息，也可通过RxNet查看请求日志信息。
+     
+    打开调试日志窗口： RxNet().showDebugWindow(context);
+    关闭调试日志窗口： RxNet().closeDebugWindow();
+
+    ## 调试窗口：
+    ![调试窗口](https://github.com/zhengzaihong/rxnet/blob/master/images/app_logcat.jpg) 
+   

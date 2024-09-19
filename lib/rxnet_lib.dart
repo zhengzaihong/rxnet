@@ -12,7 +12,7 @@ export 'package:flutter_rxnet_forzzh/utils/TextUtil.dart';
 export 'package:flutter_rxnet_forzzh/utils/PlatformTools.dart';
 export 'package:flutter_rxnet_forzzh/utils/downloader.dart';
 export 'package:flutter_rxnet_forzzh/utils/ext.dart';
-export 'package:flutter_rxnet_forzzh/net/interceptor/CustomLogInterceptor.dart';
+export 'package:flutter_rxnet_forzzh/net/interceptor/rxnet_log_interceptor.dart';
 export 'package:flutter_rxnet_forzzh/net/RxResult.dart';
 export 'package:flutter_rxnet_forzzh/net/rxnet_exception.dart';
 export 'package:dio/dio.dart';
@@ -22,3 +22,6 @@ export 'package:dio/src/dio.dart';
 export 'package:dio/src/options.dart';
 export 'package:dio/src/response.dart';
 export 'package:dio/src/transformer.dart';
+
+export 'package:flutter_rxnet_forzzh/logcat/debug_page.dart';
+export 'package:flutter_rxnet_forzzh/logcat/drag_box.dart';

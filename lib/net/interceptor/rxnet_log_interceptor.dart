@@ -17,8 +17,8 @@ void log2Console(Object object) {
   LogUtil.v(object);
 }
 
-class CustomLogInterceptor extends Interceptor {
-  CustomLogInterceptor({
+class RxNetLogInterceptor extends Interceptor {
+  RxNetLogInterceptor({
     this.request = true,
     this.requestHeader = true,
     this.requestBody = true,
@@ -80,8 +80,10 @@ class CustomLogInterceptor extends Interceptor {
       printAll(jsonEncode(options.headers));
     }
     if (requestBody) {
-      logPrint("data:");
-      printAll(jsonEncode(options.data));
+      if (options.data is! FormData) {
+        logPrint("data:");
+        printAll(jsonEncode(options.data));
+      }
     }
     logPrint('***************** Request End *****************');
     handlerRequest?.call(options, handler);
@@ -104,8 +106,7 @@ class CustomLogInterceptor extends Interceptor {
   }
 
   @override
-  Future onResponse(
-      Response response, ResponseInterceptorHandler handler) async {
+  Future onResponse(Response response, ResponseInterceptorHandler handler) async {
     logPrint("***************** Response Start *****************");
     _printResponse(response);
     handlerResponse?.call(response, handler);
@@ -128,13 +129,11 @@ class CustomLogInterceptor extends Interceptor {
       printAll(response.toString());
     }
 
-    DateTime oldTime =
-        _requestMaps[response?.requestOptions?.uri?.toString()] ??
-            DateTime.now();
+    DateTime oldTime = _requestMaps[response?.requestOptions.uri.toString()] ?? DateTime.now();
     DateTime responseTime = DateTime.now();
     Duration duration = responseTime.difference(oldTime);
     logPrint('useTime:${duration.inMinutes}分:${duration.inSeconds}秒:${duration.inMilliseconds}毫秒');
-    logPrint('Response url :${response?.requestOptions?.uri}');
+    logPrint('Response url :${response?.requestOptions.uri}');
 
     logPrint("***************** Response End *****************");
   }

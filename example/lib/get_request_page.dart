@@ -16,6 +16,9 @@ class _GetRequestPageState extends State<GetRequestPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text("get请求示例，其它请求：RxNet.post,RxNet.put等同样适用方式"),
+      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[

@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:core';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:dio/io.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 import 'package:hive/hive.dart';
@@ -19,23 +18,37 @@ import '../utils/RxNetDataBase.dart';
 ///同一个CancelToken可以用于多个请求，当一个CancelToken取消时，所有使用该CancelToken的请求都会被取消。
 
 class RxNet {
+
   Dio? _client;
 
   static final RxNet _instance = RxNet._internal();
 
   factory RxNet() => _instance;
-
   Dio? get client => _client;
 
   CheckNetWork? baseCheckNet;
 
+  ///请求拦截,可以拦截错误信息,也可以在你外部自定义拦截器中实现
   RequestCaptureError? requestCaptureError;
 
+  ///缓存模式
   CacheMode? baseCacheMode;
 
+  ///全局请求头
   Map<String, dynamic> globalHeader = {};
 
+  ///本地缓存数据库
   RxNetDataBase? _dataBase;
+
+  ///是否开启日志收集
+  bool _isCollectLogs = false;
+
+
+  ///调试窗口大小
+  late ValueNotifier<Size> debugWindowSizeNotifier;
+
+  ///收集的日志信息，用于界面呈现
+  ValueNotifier<List<String>> logsNotifier = ValueNotifier([]);
 
   /// 支持多环境 baseUrl调试 ,
   /// 例如：
@@ -69,6 +82,8 @@ class RxNet {
     CacheMode? baseCacheMode,
     HiveCipher? encryptionCipher,
     Map<String, dynamic>? baseUrlEnv,
+    double debugWindowWidth = 600,
+    double debugWindowHeight = 500
   }) async{
 
     WidgetsFlutterBinding.ensureInitialized();
@@ -99,6 +114,8 @@ class RxNet {
         directory: cacheDir,
         hiveBoxName: cacheName,
         encryptionCipher: encryptionCipher);
+
+    debugWindowSizeNotifier = ValueNotifier(Size(debugWindowWidth, debugWindowHeight));
   }
 
 
@@ -182,6 +199,60 @@ class RxNet {
 
   Map<String, dynamic> getHeaders() {
     return globalHeader;
+  }
+
+
+
+  bool get collectLogs => _isCollectLogs;
+  void setCollectLogs(bool collect) {
+    _isCollectLogs = collect;
+  }
+
+
+  void addLogs(String log) {
+    if (collectLogs) {
+      logsNotifier.value.add(log);
+      logsNotifier.notifyListeners();
+    }
+  }
+  void clearLogs() {
+    logsNotifier.value = [];
+    logsNotifier.notifyListeners();
+  }
+
+
+  OverlayEntry? _overlayEntry;
+  void showDebugWindow(BuildContext context) {
+    LogUtil.debug = true;
+    _isCollectLogs = true;
+    closeDebugWindow();
+    OverlayState? overlayState = Overlay.of(context);
+    Size size = MediaQuery.of(context).size;
+    _overlayEntry = OverlayEntry(
+      builder: (context) => SizedBox(
+        width: size.width,
+        height: size.height,
+        child: Center(
+          child: DragBox(child: ValueListenableBuilder<Size>(
+            valueListenable: debugWindowSizeNotifier,
+            builder: (context, value, child) {
+              return SizedBox(
+                width: value.width,
+                height: value.height,
+                child: const DebugPage(),
+              );
+            }
+          )),
+        ),
+      ),
+    );
+    overlayState?.insert(_overlayEntry!);
+  }
+
+  //关闭调试窗口
+  void closeDebugWindow() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
   }
 }
 
@@ -367,6 +438,7 @@ class BuildRequest<T> {
   void _doWorkRequest<T>({
     SuccessCallback<T>? success,
     FailureCallback<T>? failure,
+    FinallyCallback? finallyCallback,
     bool cache = false,
     Function? readCache,
   }) async {
@@ -418,6 +490,8 @@ class BuildRequest<T> {
       failure?.call(response.data);
     } catch (e, s) {
       _catchError(success, failure, readCache, e, s);
+    }finally {
+      finallyCallback?.call();
     }
   }
 
@@ -425,6 +499,7 @@ class BuildRequest<T> {
   void _readCache<T>(
       SuccessCallback<T>? success,
       FailureCallback<T>? failure,
+      FinallyCallback? finallyCallback,
       ) async {
     if(PlatformTools.isWeb){
       return;
@@ -434,16 +509,17 @@ class BuildRequest<T> {
       var value =
       await _rxNet.readCache(NetUtils.getCacheKeyFromPath('$_path', _params));
       if (value != null) {
-        _parseLocalData<T>(success, failure, value);
+        _parseLocalData<T>(success, failure,finallyCallback, value);
       } else {
         failure?.call({});
       }
       LogUtil.v("缓存数据:$value");
+      finallyCallback?.call();
       return;
     }
 
     RxNetDataBase.setDataBaseReadListener((isOk){
-      _readCache(success,failure);
+      _readCache(success,failure,finallyCallback);
     });
   }
 
@@ -451,6 +527,7 @@ class BuildRequest<T> {
   void _parseLocalData<T>(
       SuccessCallback<T>? success,
       FailureCallback<T>? failure,
+      FinallyCallback? finallyCallback,
       dynamic cacheValue,
       ) {
     if (getJsonConvertAdapter() != null) {
@@ -463,6 +540,7 @@ class BuildRequest<T> {
       LogUtil.v("useJsonAdapter：false");
       success?.call(cacheValue, SourcesType.cache);
     }
+    finallyCallback?.call();
   }
 
   Future<bool> _checkNetWork() async {
@@ -482,31 +560,33 @@ class BuildRequest<T> {
 
   ///基于异步回调方式 支持同时请求和缓存策略
   ///对于外部需要可接收多种状态的数据 建议使用此方式。
-  void execute<T>({SuccessCallback<T>? success, FailureCallback? failure}) async {
+  void execute<T>({SuccessCallback<T>? success, FailureCallback? failure, FinallyCallback? finallyCallback, }) async {
     if (!(await _checkNetWork())) {
+      finallyCallback?.call();
       return;
     }
     _cacheMode = _cacheMode ?? (_rxNet.baseCacheMode ?? CacheMode.onlyRequest);
     if (_cacheMode == CacheMode.onlyRequest) {
-      return  _doWorkRequest(success: success, failure: failure);
+      return  _doWorkRequest(success: success, failure: failure,finallyCallback: finallyCallback);
     }
 
     if (_cacheMode == CacheMode.firstCacheThenRequest) {
-      _readCache(success, failure);
-      return _doWorkRequest(success: success, failure: failure, cache: true);
+      _readCache(success, failure,finallyCallback);
+      return _doWorkRequest(success: success, failure: failure, finallyCallback: finallyCallback, cache: true);
     }
 
     if (_cacheMode == CacheMode.requestFailedReadCache) {
       return  _doWorkRequest(
           success: success,
           failure: failure,
+          finallyCallback: finallyCallback,
           cache: true,
           readCache: () {
-            _readCache(success, failure);
+            _readCache(success, failure,finallyCallback);
           });
     }
     if (_cacheMode == CacheMode.onlyCache) {
-      return _readCache(success, failure);
+      return _readCache(success, failure,finallyCallback);
     }
   }
 
@@ -538,7 +618,7 @@ class BuildRequest<T> {
         _successHandler<T>(completer, data: data, model: model);
       }, (e){
         _errorHandler<T>(completer,model:SourcesType.cache, error: e);
-      });
+      },null);
     }
     return completer.future;
   }

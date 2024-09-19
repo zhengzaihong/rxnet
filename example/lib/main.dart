@@ -27,7 +27,7 @@ void main() async{
            //xxxxx
         },
         interceptors: [  ///拦截器
-          CustomLogInterceptor(
+          RxNetLogInterceptor(
             handlerRequest: (e,f) {
             },
             handlerResponse: (e,f) {

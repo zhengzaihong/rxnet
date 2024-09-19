@@ -1,4 +1,8 @@
 import 'dart:developer';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
+
 ///
 /// create_user: zhengzaihong
 /// email:1096877329@qq.com
@@ -7,10 +11,11 @@ import 'dart:developer';
 /// describe: 日志输出
 ///
 class LogUtil {
+  LogUtil._();
   static const String _TAG_DEFAULT = "###日志：";
 
   ///是否 debug
-  static bool debug = false;
+  static bool debug = kDebugMode;
 
   static String tagDefault = _TAG_DEFAULT;
 
@@ -33,6 +38,9 @@ class LogUtil {
   static void v(Object object, {String? tag}) {
     if (debug) {
       if (isSystemPrint){
+        if(RxNet().collectLogs){
+          RxNet().addLogs("${tag??tagDefault} ${object.toString()}");
+        }
         print("${tag??tagDefault} ${object.toString()}");
         return;
       }
@@ -46,5 +54,8 @@ class LogUtil {
     sb.write(stag);
     sb.write(object);
     log(sb.toString());
+    if(RxNet().collectLogs){
+      RxNet().addLogs(sb.toString());
+    }
   }
 }
