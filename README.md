@@ -72,13 +72,15 @@
         requestCaptureError: (e){  ///全局抓获 异常
           print(">>>${HandleError.dioError(e).message}");
         },
-         baseUrlEnv: {  ///支持多环境 baseUrl调试
+         baseUrlEnv: {  ///支持多环境 baseUrl调试， RxNet().setEnv("test")方式切换;
           "test": "http://t.weather.sojson1.com/",
           "debug": "http://t.weather.sojson2.com/",
           "release": "http://t.weather.sojson.com/",
            //xxxxx
-        },
+        }, 
         interceptors: [  ///拦截器
+          //可以添加多个你自己的拦截器
+
           RxNetLogInterceptor(
             handlerRequest: (e,f) {
             },
