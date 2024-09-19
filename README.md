@@ -260,6 +260,7 @@
     打开调试日志窗口： RxNet().showDebugWindow(context);
     关闭调试日志窗口： RxNet().closeDebugWindow();
 
-    ## 调试窗口：
-    ![调试窗口](https://github.com/zhengzaihong/rxnet/blob/master/images/app_logcat.jpg) 
+
+## 调试窗口：
+![调试窗口](https://github.com/zhengzaihong/rxnet/blob/master/images/app_logcat.jpg) 
    
