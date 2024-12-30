@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 
-class PlatformTools {
-  PlatformTools._();
+class RxNetPlatform {
+  RxNetPlatform._();
   static bool _isWeb() {
     return kIsWeb == true;
   }

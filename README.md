@@ -1,14 +1,26 @@
 # RxNet 
 
-一款极简且强大Flutter网络请求工具，支持restful、泛型请求、数据缓存(无网请求，非web)。该库是对Dio的扩展,使用更加自然。
+一款极简Flutter网络请求工具，该库是对Dio的扩展，使用更加自然，让应用更加丝滑,开屏即有数据等特性。
 
-已支持断点上传 / 下载
+* 支持多种缓存策略。
+* 支持断点上传、下载。
+* 支持失败重试。
+* 支持缓存时效。
+* 支持restful风格请求。
+* 支持循环请求，外部不用维护请求队列或定时执行。
+* 支持json转实体请求。
+* 支持全局拦截器。
+* 支持async/await 方式调用。
+* 支持原生开发的回调方式。
+* 支持全局异常捕获。
+* 支持日志控制台界面展示
+* 支持少量键值对数据存储
 
 
 ## 依赖：
 
     dependencies:
-       flutter_rxnet_forzzh:0.2.0
+       flutter_rxnet_forzzh:0.2.1
 
 
 ## 常用参数：
@@ -28,6 +40,9 @@
 
     4.只使用缓存
     onlyCache;
+
+    5.先使用缓存，无缓存或超时效则请求网络(推荐)
+    cacheNoneToRequest;
 
 
 注意：
@@ -100,7 +115,10 @@
         .setParam("city", "101030100")
         //.addParams(Map)  
         .setRestfulUrl(true) //Restful 
-        .setCacheMode(CacheMode.requestFailedReadCache)
+        .setCacheMode(CacheMode.onlyRequest)
+        .setRetryCount(2)  //重试次数
+        .setRetryInterval(5000) //毫秒
+        .setFailRetry(true)
         .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
         .execute<NormalWaterInfoEntity>(
             success: (data, source) {

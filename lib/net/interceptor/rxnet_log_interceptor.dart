@@ -108,8 +108,8 @@ class RxNetLogInterceptor extends Interceptor {
   @override
   Future onResponse(Response response, ResponseInterceptorHandler handler) async {
     logPrint("***************** Response Start *****************");
-    _printResponse(response);
     handlerResponse?.call(response, handler);
+    _printResponse(response);
     return super.onResponse(response, handler);
   }
 

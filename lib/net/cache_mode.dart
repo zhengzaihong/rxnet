@@ -4,7 +4,7 @@
 /// email:1096877329@qq.com
 /// create_date: 2022/8/11
 /// create_time: 9:08
-/// describe: Rxnet 请求缓存策略模式
+/// describe: RxNet 请求缓存策略模式
 ///
 enum CacheMode {
 
@@ -18,5 +18,8 @@ enum CacheMode {
   firstCacheThenRequest,
 
   ///只使用缓存
-  onlyCache;
+  onlyCache,
+
+  ///先使用缓存，无缓存或超过时效则请求网络
+  cacheNoneToRequest;
 }

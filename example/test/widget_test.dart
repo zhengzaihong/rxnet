@@ -5,23 +5,23 @@
 // gestures. You can also use WidgetTester to find child widgets in the widget
 // tree, read text, and verify that the values of widget properties are correct.
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:rxnet_example/main.dart';
 
 void main() {
-  testWidgets('Verify Platform version', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  final map = <String, String>{};
+  map['test'] = 'test';
+  map['test2'] = 'test2';
+  map['test3'] = 'test3';
+  map['test4'] = 'test4';
 
-    // Verify that platform version is retrieved.
-    expect(
-      find.byWidgetPredicate(
-        (Widget widget) => widget is Text &&
-                           widget.data!.startsWith('Running on:'),
-      ),
-      findsOneWidget,
-    );
-  });
+  final list = ["test","test4","test4","test4"];
+
+  map.removeWhere((key, value) => list.contains(key));
+
+  print('-----map:${jsonEncode(map)}');
 }

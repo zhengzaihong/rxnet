@@ -34,6 +34,9 @@ class HttpError {
   ///响应超时
   static const String RECEIVE_TIMEOUT = "RECEIVE_TIMEOUT";
 
+  ///连接异常
+  static const String CONNECT_ERROR = "CONNECT_ERROR";
+
   ///发送超时
   static const String SEND_TIMEOUT = "SEND_TIMEOUT";
 
@@ -74,6 +77,14 @@ class HttpError {
       case DioExceptionType.unknown:
         code = UNKNOWN;
         message = "网络异常，请稍后重试！";
+        break;
+      case DioExceptionType.badCertificate:
+        code = SSL_ERROR;
+        message = "证书异常，请稍后重试！";
+        break;
+      case DioExceptionType.connectionError:
+        code = CONNECT_ERROR;
+        message = "连接异常，请检查网络设置";
         break;
     }
   }

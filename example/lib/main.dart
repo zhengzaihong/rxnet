@@ -10,22 +10,17 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 void main() async{
 
      await RxNet().init(
-        baseUrl: "http://t.weather.sojson.com/",
+        // baseUrl: "http://t.weather.sojson.com/",
+        baseUrl: "http://10.88.33.195:8001/",
         // cacheDir: "xxx",   ///缓存目录
         // cacheName: "local_cache_app", ///缓存文件
         isDebug: true,   ///是否调试 打印日志
         baseCacheMode: CacheMode.requestFailedReadCache,
         // useSystemPrint: true,
         baseCheckNet:checkNet, ///全局检查网络
-        requestCaptureError: (e){  ///全局抓获 异常
-          print(">>>${HttpError.dioError(e).message}");
-        },
-         baseUrlEnv: {  ///支持多环境 baseUrl调试
-          "test": "http://t.weather.sojson1.com/",
-          "debug": "http://t.weather.sojson2.com/",
-          "release": "http://t.weather.sojson.com/",
-           //xxxxx
-        },
+        // requestCaptureError: (e){  ///全局抓获 异常 建议在拦截器中处理
+        //   print(">>>${HttpError.dioError(e).message}");
+        // },
         interceptors: [  ///拦截器
           RxNetLogInterceptor(
             handlerRequest: (e,f) {
@@ -54,7 +49,7 @@ void main() async{
 Future<bool> checkNet() async{
   var connectivityResult = await (Connectivity().checkConnectivity());
   if (connectivityResult == ConnectivityResult.none) {
-    print( "当前无网络");
+    Toast.show( "当前无网络");
     return true;
   }
   return Future.value(true);
@@ -67,6 +62,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter RxNet',
+      navigatorKey: Toast.navigatorState,
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),

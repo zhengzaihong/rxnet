@@ -19,16 +19,18 @@ class NetUtils {
     return buffer.toString().replaceAll("//", "/");
   }
 
-  static String getCacheKeyFromPath(String path, Map<String, dynamic> params) {
+  static String getCacheKeyFromPath(String? path, Map<String, dynamic> params,List<String> ignoreKeys) {
     String cacheKey = "";
     if (!(TextUtil.isEmpty(path))) {
-      cacheKey = cacheKey + MD5Util.generateMd5(path);
+      cacheKey = cacheKey + MD5Util.generateMd5(path!);
     } else {
       throw Exception("请求地址不能为空！");
     }
     if (params.isNotEmpty) {
+      final tempParams = Map.from(params);
+      tempParams.removeWhere((key, value) => ignoreKeys.contains(key));
       String paramsStr = "";
-      params.forEach((key, value) {
+      tempParams.forEach((key, value) {
         paramsStr = "$paramsStr$key$value";
       });
       cacheKey = cacheKey + MD5Util.generateMd5(paramsStr);

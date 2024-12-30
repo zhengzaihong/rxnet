@@ -4,7 +4,7 @@ import 'package:dio/dio.dart';
 
 import '../type/sources_type.dart';
 
-typedef JsonTransformation = dynamic Function(dynamic data);
+typedef JsonTransformation<E> = E Function(dynamic data);
 
 ///http请求成功回调
 typedef SuccessCallback<T> = void Function(T data,SourcesType model);
@@ -14,6 +14,9 @@ typedef FailureCallback<T> = void Function(dynamic data);
 
 /// 成功或失败都会执行的方法
 typedef FinallyCallback<T> = void Function();
+
+/// 缓存失效超时回调
+typedef CacheInvalidationCallback<T> = void Function();
 
 typedef ParamCallBack = void Function(Map<String, dynamic> params);
 

@@ -50,7 +50,7 @@ class _DownLoadPageState extends State<DownLoadPage> {
   String downloadPath = "";
   void download() async{
 
-    if(PlatformTools.isWeb){
+    if(RxNetPlatform.isWeb){
       Downloader.downloadFile(url: "https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg");
       return;
     }

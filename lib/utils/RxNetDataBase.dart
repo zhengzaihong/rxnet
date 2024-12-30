@@ -6,7 +6,7 @@ import 'package:path/path.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-import 'PlatformTools.dart';
+import 'RxNetPlatform.dart';
 
 ///
 /// create_user: zhengzaihong
@@ -47,12 +47,12 @@ class RxNetDataBase {
       Directory? appDir = directory;
 
       try{
-        if (PlatformTools.isWindows) {
+        if (RxNetPlatform.isWindows) {
           appDir = appDir??await getApplicationSupportDirectory();
-        } else if (PlatformTools.isLinux) {
+        } else if (RxNetPlatform.isLinux) {
           final home = Platform.environment['HOME'];
           appDir = appDir??Directory(join(home!, '.rxnet_local_cache'));
-        } else if(PlatformTools.isAndroidOrIOS){
+        } else if(RxNetPlatform.isAndroidOrIOS){
           appDir = appDir??await getTemporaryDirectory();
         } else{
           appDir = appDir??await getApplicationDocumentsDirectory();

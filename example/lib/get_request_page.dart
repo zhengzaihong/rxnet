@@ -1,6 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
-import 'package:rxnet_example/bean/normal_water_info_entity.dart';
+import 'bean/weather_info.dart';
 
 class GetRequestPage extends StatefulWidget {
   const GetRequestPage({Key? key}) : super(key: key);
@@ -12,7 +14,7 @@ class GetRequestPage extends StatefulWidget {
 class _GetRequestPageState extends State<GetRequestPage> {
   SourcesType sourcesType = SourcesType.net;
   String content = "";
-
+  // 35b3914e389f495d790f30b455004910c318c6743719fca30b4f58094bcc42c1
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -25,8 +27,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
           const SizedBox(height: 40),
           TextButton(
             onPressed: () {
-              RxNet().setEnv('release');
-              request();
+              request(code: '101030100');
             },
             style: ButtonStyle(
               backgroundColor: MaterialStateProperty.all(Colors.cyan),
@@ -34,31 +35,6 @@ class _GetRequestPageState extends State<GetRequestPage> {
             child: const Text("发起get请求",
                 style: TextStyle(color: Colors.black, fontSize: 16)),
           ),
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () {
-              RxNet().setEnv('test');
-              request();
-            },
-            style: ButtonStyle(
-              backgroundColor: MaterialStateProperty.all(Colors.cyan),
-            ),
-            child: const Text("测试环境",
-                style: TextStyle(color: Colors.black, fontSize: 16)),
-          ),
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () {
-              RxNet().setEnv('debug');
-              request();
-            },
-            style: ButtonStyle(
-              backgroundColor: MaterialStateProperty.all(Colors.cyan),
-            ),
-            child: const Text("debug环境测试",
-                style: TextStyle(color: Colors.black, fontSize: 16)),
-          ),
-
           const SizedBox(height: 20),
           Expanded(
               child: Column(
@@ -79,32 +55,50 @@ class _GetRequestPageState extends State<GetRequestPage> {
     );
   }
 
-  void request() async {
+  void request({String? code}) async {
     // RxNet().setHeaders({
-    //   "Authorization": "bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjo2LCJ1c2VyX3R5cGUiOmZhbHNlLCJleHAiOjE2ODM0NDM3ODh9.K1GPsVGsvKc_6LN2iMdow6HRT_J-mlisDUtg6o1_vyY",
+    //   "User-Agent": "PostmanRuntime-ApipostRuntime/1.1.0",
+    //   "Cache-Control": "no-cache",
+    //   "Accept": "*",
+    //   "Accept-Encoding": "gzip, deflate, br",
+    //   "Connection": "keep-alive",
     // });
     // RxNet().getCancelToken("tag");
 
     RxNet.get()
-        .setPath("api/weather")
-        .setParam("city", "101030100")
-        .setRestfulUrl(true)
+        // .setPath('api/weather/')
+        .setPath('api/v1/default/getWeather')
+        // .setParam("city", code??"101030100")
+        // .setRestfulUrl(true)
          // .setCancelToken(tag)
         ///Restful  http://t.weather.sojson.com/api/weather/city/101030100
-        // .setCacheMode(CacheMode.onlyCache)
-        // .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
-        .setJsonConvert((data)=> NormalWaterInfoEntity.fromJson(data))
-        .execute<NormalWaterInfoEntity>(
+        .setCacheMode(CacheMode.cacheNoneToRequest)
+        .setJsonConvert(WeatherInfo.fromJson)
+        // .setJsonConvert((data) => WeatherInfo.fromJson(data).data?.cityInfo)
+        .setRetryCount(2)  //重试次数
+        .setRetryInterval(7000) //毫秒
+        .setFailRetry(true)
+        // .setCacheInvalidationTime(1000*10)  //毫秒
+        .execute<WeatherInfo>(
             success: (data, source) {
-              content = data.toString();
+              content = jsonEncode(data);
               sourcesType = source;
               setState(() {});
             },
             failure: (e) {
-              content = "null";
+              content = "";
               setState(() {});
-              print("----------e$e");
-            });
+         });
+        // .execute<CityInfo>(
+        //     success: (data, source) {
+        //       content = jsonEncode(data);
+        //       sourcesType = source;
+        //       setState(() {});
+        //     },
+        //     failure: (e) {
+        //       content = "";
+        //       setState(() {});
+        //  });
   }
 
   void request1() async {
@@ -114,9 +108,8 @@ class _GetRequestPageState extends State<GetRequestPage> {
         .setParam("city", "101030100")
         .setRestfulUrl(true)
         .setCacheMode(CacheMode.onlyRequest)
-        .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
-        // .executeAsync();
-        .executeAsync<NormalWaterInfoEntity?>();
+        .setJsonConvert((data) => WeatherInfo.fromJson(data))
+        .executeAsync<WeatherInfo>();
 
       print("--------->#${data.isError}");
       print("--------->#${data.error}");
