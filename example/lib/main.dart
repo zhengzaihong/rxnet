@@ -10,8 +10,8 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 void main() async{
 
      await RxNet().init(
-        // baseUrl: "http://t.weather.sojson.com/",
-        baseUrl: "http://10.88.33.195:8001/",
+        baseUrl: "http://t.weather.sojson.com/",
+        // baseUrl: "http://10.88.33.195:8001/",
         // cacheDir: "xxx",   ///缓存目录
         // cacheName: "local_cache_app", ///缓存文件
         isDebug: true,   ///是否调试 打印日志

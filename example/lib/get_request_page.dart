@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
+import 'bean/new_weather_info.dart';
 import 'bean/weather_info.dart';
 
 class GetRequestPage extends StatefulWidget {
@@ -66,20 +67,20 @@ class _GetRequestPageState extends State<GetRequestPage> {
     // RxNet().getCancelToken("tag");
 
     RxNet.get()
-        // .setPath('api/weather/')
-        .setPath('api/v1/default/getWeather')
-        // .setParam("city", code??"101030100")
-        // .setRestfulUrl(true)
+        .setPath('api/weather/')
+        // .setPath('api/v1/default/getWeather')
+        .setParam("city", code??"101030100")
+        .setRestfulUrl(true)
          // .setCancelToken(tag)
         ///Restful  http://t.weather.sojson.com/api/weather/city/101030100
         .setCacheMode(CacheMode.cacheNoneToRequest)
-        .setJsonConvert(WeatherInfo.fromJson)
-        // .setJsonConvert((data) => WeatherInfo.fromJson(data).data?.cityInfo)
+        .setJsonConvert((data) => NewWeatherInfo.fromJson(data))
+        // .setJsonConvert((data) => NewWeatherInfo.fromJson(data).data?.yesterday)
         .setRetryCount(2)  //重试次数
         .setRetryInterval(7000) //毫秒
         .setFailRetry(true)
-        // .setCacheInvalidationTime(1000*10)  //毫秒
-        .execute<WeatherInfo>(
+        .setCacheInvalidationTime(1000*10)  //毫秒
+        .execute<NewWeatherInfo>(
             success: (data, source) {
               content = jsonEncode(data);
               sourcesType = source;
@@ -89,7 +90,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
               content = "";
               setState(() {});
          });
-        // .execute<CityInfo>(
+        // .execute<Yesterday>(
         //     success: (data, source) {
         //       content = jsonEncode(data);
         //       sourcesType = source;

@@ -523,7 +523,7 @@ class BuildRequest<T> {
 
     Response<dynamic> response = await _rxNet.client!.request(
           url,
-          data: _bodyData??_params,
+          data: _httpType == HttpType.post?_bodyData:null,
           queryParameters: (isRestfulUrl() ||_httpType == HttpType.post)? {} : _params,
           options: _options,
           cancelToken: _cancelToken);
@@ -620,6 +620,7 @@ class BuildRequest<T> {
         if (timestamp != null) {
           final now = DateTime.now().millisecondsSinceEpoch;
           if (now - timestamp > (_cacheInvalidationTime??_rxNet._cacheInvalidationTime)) {
+            LogUtil.v("-->缓存数据:超时效");
             cacheInvalidationCallback?.call();
             return;
           }
@@ -724,7 +725,8 @@ class BuildRequest<T> {
                 success: success,
                 failure: failure,
                 finallyCallback: finallyCallback,
-                cache: true);
+                cache: true
+            );
           },
           finallyCallback,
           cacheInvalidationCallback: () {
@@ -732,7 +734,8 @@ class BuildRequest<T> {
                 success: success,
                 failure: failure,
                 finallyCallback: finallyCallback,
-                cache: true);
+                cache: true
+            );
           });
     }
     if (_cacheMode == CacheMode.onlyCache) {
