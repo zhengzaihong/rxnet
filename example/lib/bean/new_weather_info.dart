@@ -14,7 +14,7 @@ class NewWeatherInfo {
       this.cityInfo, 
       this.data,});
 
-  NewWeatherInfo.fromJson(dynamic json) {
+  NewWeatherInfo.fromJson(Map<String, dynamic> json) {
     message = json['message'];
     status = json['status'];
     date = json['date'];

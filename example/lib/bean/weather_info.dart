@@ -8,7 +8,7 @@ class WeatherInfo {
       this.msg, 
       this.data,});
 
-  WeatherInfo.fromJson(dynamic json) {
+  WeatherInfo.fromJson(Map<String, dynamic> json) {
     code = json['code'];
     msg = json['msg'];
     data = json['data'] != null ? Data.fromJson(json['data']) : null;

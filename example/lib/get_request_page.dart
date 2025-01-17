@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 import 'bean/new_weather_info.dart';
-import 'bean/weather_info.dart';
 
 class GetRequestPage extends StatefulWidget {
   const GetRequestPage({Key? key}) : super(key: key);
@@ -28,7 +27,8 @@ class _GetRequestPageState extends State<GetRequestPage> {
           const SizedBox(height: 40),
           TextButton(
             onPressed: () {
-              request(code: '101030100');
+              // request(code: '101030100');
+              request1();
             },
             style: ButtonStyle(
               backgroundColor: MaterialStateProperty.all(Colors.cyan),
@@ -66,6 +66,8 @@ class _GetRequestPageState extends State<GetRequestPage> {
     // });
     // RxNet().getCancelToken("tag");
 
+    print('------------>${code}');
+
     RxNet.get()
         .setPath('api/weather/')
         // .setPath('api/v1/default/getWeather')
@@ -74,12 +76,13 @@ class _GetRequestPageState extends State<GetRequestPage> {
          // .setCancelToken(tag)
         ///Restful  http://t.weather.sojson.com/api/weather/city/101030100
         .setCacheMode(CacheMode.cacheNoneToRequest)
-        .setJsonConvert((data) => NewWeatherInfo.fromJson(data))
-        // .setJsonConvert((data) => NewWeatherInfo.fromJson(data).data?.yesterday)
+        // .setJsonConvert(NewWeatherInfo.fromJson)
+        .setJsonConvert(NewWeatherInfo.fromJson)
         .setRetryCount(2)  //重试次数
         .setRetryInterval(7000) //毫秒
         .setFailRetry(true)
         .setCacheInvalidationTime(1000*10)  //毫秒
+        // .execute(
         .execute<NewWeatherInfo>(
             success: (data, source) {
               content = jsonEncode(data);
@@ -90,32 +93,27 @@ class _GetRequestPageState extends State<GetRequestPage> {
               content = "";
               setState(() {});
          });
-        // .execute<Yesterday>(
-        //     success: (data, source) {
-        //       content = jsonEncode(data);
-        //       sourcesType = source;
-        //       setState(() {});
-        //     },
-        //     failure: (e) {
-        //       content = "";
-        //       setState(() {});
-        //  });
   }
 
   void request1() async {
 
-    var data = await RxNet.get()
+    final data = await RxNet.get()
         .setPath("api/weather")
         .setParam("city", "101030100")
         .setRestfulUrl(true)
         .setCacheMode(CacheMode.onlyRequest)
-        .setJsonConvert((data) => WeatherInfo.fromJson(data))
-        .executeAsync<WeatherInfo>();
+        // .setJsonConvert((data) => NewWeatherInfo.fromJson(data))
+        .setJsonConvert(NewWeatherInfo.fromJson)
+        .executeAsync();
 
       print("--------->#${data.isError}");
       print("--------->#${data.error}");
       var result = data.value;
-      content = result.toString();
+
+      // print("--------->#${result}");
+      // content = jsonEncode(result);
+
+      content = jsonEncode(result?.toJson());
       sourcesType = data.model;
 
       setState(() {});

@@ -22,8 +22,7 @@ class RxNet {
   Dio? _client;
 
   ///最大重试次数
-  static int maxRetryCount = 9223372036854775807;
-
+  static int maxRetryCount = 100000;
   static final RxNet _instance = RxNet._internal();
 
   factory RxNet() => _instance;
@@ -119,6 +118,7 @@ class RxNet {
       _baseUrlEnv.addAll(baseUrlEnv);
     }
     if(RxNetPlatform.isWeb){
+      this._baseCacheMode = CacheMode.onlyRequest;
       LogUtil.v("RxNet 不支持缓存的环境：web");
       return;
     }
@@ -181,7 +181,7 @@ class RxNet {
     return BuildRequest(
       HttpType.post,
       RxNet(),
-    );
+    ).setParamsToBodyData(true);
   }
 
   static BuildRequest delete<T>() {
@@ -292,6 +292,12 @@ class BuildRequest<T> {
 
   dynamic _bodyData;
 
+  ///是否将参数转换为 FormData body 参数 请求
+  bool _toFormData = false;
+
+  ///是否将参数转换为  body 参数请求
+  bool _toBodyData = false;
+
   JsonTransformation? _jsonTransformation;
 
   Options? _options;
@@ -370,6 +376,9 @@ class BuildRequest<T> {
   ///用于文件表单上传( FormData )和有些特殊的请求，无具体key等
   BuildRequest setFormParams(dynamic param) {
     _bodyData = param;
+    //禁止将查询参数转换为body
+    setParamsToFormData(false);
+    setParamsToBodyData(true);
     return this;
   }
 
@@ -385,6 +394,31 @@ class BuildRequest<T> {
 
   BuildRequest addParams(Map<String, dynamic> params) {
     _params.addAll(params);
+    return this;
+  }
+
+  BuildRequest setParamsToFormData(bool toFormData) {
+    _toFormData = toFormData;
+    _toBodyData = false;
+    return this;
+  }
+  BuildRequest setParamsToBodyData(bool toBody) {
+    _toBodyData = toBody;
+    _toFormData = false;
+    return this;
+  }
+
+
+  ///用于表单( FormData )。默认 raw json, 其它方式 setOptionConfig自行处理
+  BuildRequest toFormData() {
+    setParamsToFormData(true);
+    return this;
+  }
+
+  ///用于表单( FormData )。 默认 raw json， 其它方式 setOptionConfig自行处理
+  BuildRequest toUrlEncoded() {
+    setParamsToFormData(true);
+    _options?.contentType = Headers.formUrlEncodedContentType;
     return this;
   }
 
@@ -421,6 +455,9 @@ class BuildRequest<T> {
 
   BuildRequest setCacheMode(CacheMode cacheMode) {
     _cacheMode = cacheMode;
+    if(RxNetPlatform.isWeb){
+      _cacheMode = CacheMode.onlyRequest;
+    }
     return this;
   }
 
@@ -498,9 +535,9 @@ class BuildRequest<T> {
   }
 
   Future<void> _doWorkRequest<T>({
-    SuccessCallback<T>? success,
-    FailureCallback<T>? failure,
-    FinallyCallback? finallyCallback,
+    Success<T>? success,
+    Failure<T>? failure,
+    Completed? completed,
     bool cache = false,
     Function? readCache,
   }) async {
@@ -520,30 +557,46 @@ class BuildRequest<T> {
         _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet._globalHeader);
       }
+      if(_toFormData){
+        _bodyData = FormData.fromMap(_params);
+      }
+      if(_toBodyData){
+        _bodyData = _params;
+      }
 
-    Response<dynamic> response = await _rxNet.client!.request(
+      Response<dynamic> response = await _rxNet.client!.request(
           url,
-          data: _httpType == HttpType.post?_bodyData:null,
-          queryParameters: (isRestfulUrl() ||_httpType == HttpType.post)? {} : _params,
+          data: _bodyData,
+          queryParameters: (isRestfulUrl() || _toFormData || _toBodyData)? {} : _params,
           options: _options,
           cancelToken: _cancelToken);
+
       onResponse?.call(response);
-
-
+      var responseData = response.data;
       ///成功
       if (response.statusCode == 200) {
         if (_jsonTransformation != null) {
           try {
+            //先判断是不是原始字符串格式Map数据，是则先将字符串转json格式
+            if(responseData is String){
+              try{
+                responseData = jsonDecode(responseData);
+              }catch(e){
+                LogUtil.v("JsonConvert：字符串转json失败，非Map格式数据");
+                return;
+              }
+            }
             LogUtil.v("JsonConvert：true");
-            final data = await _jsonTransformation?.call(response.data);
+            final data = await _jsonTransformation?.call(responseData);
             success?.call(data as T, SourcesType.net);
           }catch(e){
             LogUtil.v("RxNet：请检查json数据接收实体类是否正确");
+            return;
           }
         }
         else {
           LogUtil.v("JsonConvert：false");
-          success?.call(response.data, SourcesType.net);
+          success?.call(responseData, SourcesType.net);
         }
         /// 存储数据
         if(cache && !RxNetPlatform.isWeb){
@@ -554,27 +607,26 @@ class BuildRequest<T> {
           String cacheKey = NetUtils.getCacheKeyFromPath("$_path", _params,_ignoreCacheKeys);
           final map = <String, dynamic>{
             'timestamp': DateTime.now().millisecondsSinceEpoch,
-            'data': response.data
+            'data':responseData
           };
           _rxNet.saveCache(cacheKey, jsonEncode(map));
         }
         return;
       }
-
       ///失败
       isFailure = true;
-      failure?.call(response.data);
+      failure?.call(responseData);
     } catch (e, s) {
       isFailure = true;
       _catchError(success, failure, readCache, e, s);
     }finally {
-      finallyCallback?.call();
+      completed?.call();
       if (_isLoop) {
         Future.delayed(Duration(milliseconds: _retryInterval), () {
           _doWorkRequest(
               success: success,
               failure: failure,
-              finallyCallback: finallyCallback,
+              completed: completed,
               cache: cache,
               readCache: readCache);
         });
@@ -585,7 +637,7 @@ class BuildRequest<T> {
             _doWorkRequest(
                 success: success,
                 failure: failure,
-                finallyCallback: finallyCallback,
+                completed: completed,
                 cache: cache,
                 readCache: readCache);
           });
@@ -596,9 +648,9 @@ class BuildRequest<T> {
 
 
   void _readCache<T>(
-      SuccessCallback<T>? success,
-      FailureCallback<T>? failure,
-      FinallyCallback? finallyCallback,{
+      Success<T>? success,
+      Failure<T>? failure,
+      Completed? completed,{
       CacheInvalidationCallback? cacheInvalidationCallback
   }) async {
     if(RxNetPlatform.isWeb){
@@ -626,27 +678,27 @@ class BuildRequest<T> {
           }
         }
         if(dataValue is Map && dataValue.length>0){
-          _parseLocalData<T>(success, failure,finallyCallback, dataValue);
+          _parseLocalData<T>(success, failure,completed, dataValue);
           return;
         }
         cacheInvalidationCallback?.call();
       } else {
         failure?.call({});
       }
-      finallyCallback?.call();
+      completed?.call();
       return;
     }
 
     RxNetDataBase.setDataBaseReadListener((isOk){
-      _readCache(success,failure,finallyCallback);
+      _readCache(success,failure,completed);
     });
   }
 
   ///解析本地缓存数据
   void _parseLocalData<T>(
-      SuccessCallback<T>? success,
-      FailureCallback<T>? failure,
-      FinallyCallback? finallyCallback,
+      Success<T>? success,
+      Failure<T>? failure,
+      Completed? completed,
       dynamic cacheValue,
       ) {
     if (_jsonTransformation != null) {
@@ -657,7 +709,7 @@ class BuildRequest<T> {
       LogUtil.v("JsonConvert：false");
       success?.call(cacheValue, SourcesType.cache);
     }
-    finallyCallback?.call();
+    completed?.call();
   }
 
   Future<bool> _checkNetWork() async {
@@ -677,9 +729,9 @@ class BuildRequest<T> {
 
   ///基于异步回调方式 支持同时请求和缓存策略
   ///对于外部需要可接收多种状态的数据 建议使用此方式。
-  void execute<T>({SuccessCallback<T>? success, FailureCallback? failure, FinallyCallback? finallyCallback}) async {
+  void execute<T>({Success<T>? success, Failure? failure, Completed? completed}) async {
     if (!(await _checkNetWork())) {
-      finallyCallback?.call();
+      completed?.call();
       return;
     }
     _cacheMode ??= (_rxNet._baseCacheMode ?? CacheMode.onlyRequest);
@@ -687,7 +739,7 @@ class BuildRequest<T> {
       return _doWorkRequest(
           success: success,
           failure: failure,
-          finallyCallback: finallyCallback);
+          completed: completed);
     }
 
     if (_cacheMode == CacheMode.firstCacheThenRequest) {
@@ -695,7 +747,7 @@ class BuildRequest<T> {
         _doWorkRequest(
             success: success,
             failure: failure,
-            finallyCallback: finallyCallback,
+            completed: completed,
             cache: true);
       });
     }
@@ -704,10 +756,10 @@ class BuildRequest<T> {
       return  _doWorkRequest(
           success: success,
           failure: failure,
-          finallyCallback: finallyCallback,
+          completed: completed,
           cache: true,
           readCache: () {
-            _readCache(success, failure,finallyCallback);
+            _readCache(success, failure,completed);
           });
     }
 
@@ -716,7 +768,7 @@ class BuildRequest<T> {
         return _doWorkRequest(
             success: success,
             failure: failure,
-            finallyCallback: finallyCallback,
+            completed: completed,
             cache: true);
       }
       return _readCache(
@@ -724,22 +776,22 @@ class BuildRequest<T> {
             _doWorkRequest(
                 success: success,
                 failure: failure,
-                finallyCallback: finallyCallback,
+                completed: completed,
                 cache: true
             );
           },
-          finallyCallback,
+          completed,
           cacheInvalidationCallback: () {
             _doWorkRequest(
                 success: success,
                 failure: failure,
-                finallyCallback: finallyCallback,
+                completed: completed,
                 cache: true
             );
           });
     }
     if (_cacheMode == CacheMode.onlyCache) {
-      return _readCache(success, failure,finallyCallback);
+      return _readCache(success, failure,completed);
     }
   }
 
@@ -797,8 +849,8 @@ class BuildRequest<T> {
   ///上传文件
   void upload({
     ProgressCallback? onSendProgress,
-    SuccessCallback? success,
-    FailureCallback? failure,
+    Success? success,
+    Failure? failure,
   }) async {
     if (!(await _checkNetWork())) {
       return;
@@ -819,13 +871,21 @@ class BuildRequest<T> {
         _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet._globalHeader);
       }
+      if(_toFormData){
+        _bodyData = FormData.fromMap(_params);
+      }
+      if(_toBodyData){
+        _bodyData = _params;
+      }
 
-      final response = await _rxNet.client!.request(url,
-          onSendProgress: onSendProgress,
+      Response response = await _rxNet.client!.request(
+          url,
           data: _bodyData,
-          queryParameters: isRestfulUrl() ? {} : _params,
+          queryParameters: (isRestfulUrl() || _toFormData || _toBodyData)? {} : _params,
           options: _options,
           cancelToken: _cancelToken);
+
+
       onResponse?.call(response);
       if (response.statusCode == 200) {
         success?.call(response.data, SourcesType.net);
@@ -844,8 +904,8 @@ class BuildRequest<T> {
    void download({
     required String savePath,
     ProgressCallback? onReceiveProgress,
-    SuccessCallback? success,
-    FailureCallback? failure,
+    Success? success,
+    Failure? failure,
   }) async {
     if (!(await _checkNetWork())) {
       return;
@@ -864,6 +924,13 @@ class BuildRequest<T> {
         _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet._globalHeader);
       }
+      if(_toFormData){
+        _bodyData = FormData.fromMap(_params);
+      }
+      if(_toBodyData){
+        _bodyData = _params;
+      }
+
       final response = await _rxNet.client!.download(url, savePath,
           onReceiveProgress: (received, total) {
             if (total != -1) {
@@ -874,7 +941,7 @@ class BuildRequest<T> {
               success?.call(savePath, SourcesType.net);
             }
           },
-          queryParameters: isRestfulUrl() ? {} : _params,
+          queryParameters: (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
           data: _bodyData,
           options: _options,
           cancelToken: _cancelToken);
@@ -897,8 +964,8 @@ class BuildRequest<T> {
   void breakPointDownload({
     required String savePath,
     ProgressCallback? onReceiveProgress,
-    SuccessCallback? success,
-    FailureCallback? failure,
+    Success? success,
+    Failure? failure,
     Function()? cancelCallback,
   }) async {
 
@@ -934,12 +1001,19 @@ class BuildRequest<T> {
         _options?.headers?.addAll(_rxNet._globalHeader);
       }
       _options?.headers?.addAll({"Range": "bytes=$downloadStart-"});
+      if(_toFormData){
+        _bodyData = FormData.fromMap(_params);
+      }
+      if(_toBodyData){
+        _bodyData = _params;
+      }
+
       final response = await  _rxNet.client!.request<ResponseBody>(
         url,
         options: _options,
         cancelToken: _cancelToken,
         data: _bodyData,
-        queryParameters: isRestfulUrl() ? {} : _params,
+        queryParameters: (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
       );
       onResponse?.call(response);
       RandomAccessFile raf = file.openSync(mode: FileMode.append);
@@ -1002,8 +1076,8 @@ class BuildRequest<T> {
   void breakPointUploadFile({
     required String filePath,
     ProgressCallback? onSendProgress,
-    SuccessCallback? success,
-    FailureCallback? failure,
+    Success? success,
+    Failure? failure,
     Function()? cancelCallback,
     int? start,
   }) async {
@@ -1036,12 +1110,19 @@ class BuildRequest<T> {
         _options?.headers?.addAll(_rxNet._globalHeader);
       }
       _options?.headers?.addAll({'Content-Range': 'bytes $progress-${fileSize - 1}/$fileSize'});
+
+      if(_toFormData){
+        _bodyData = FormData.fromMap(_params);
+      }
+      if(_toBodyData){
+        _bodyData = _params;
+      }
       final response = await _rxNet.client!.request<ResponseBody>(
         url,
         options: _options,
         cancelToken: _cancelToken,
         data: data,
-        queryParameters: isRestfulUrl() ? {} : _params,
+        queryParameters: (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
       );
       onResponse?.call(response);
       Stream<Uint8List> stream = response.data!.stream;
@@ -1089,7 +1170,7 @@ class BuildRequest<T> {
     }
   }
 
-  void _catchError<T>(SuccessCallback<T>? success, FailureCallback<T>? failure,
+  void _catchError<T>(Success<T>? success, Failure<T>? failure,
       Function? readCache, e, s) {
     _collectError(e);
     LogUtil.v("请求出错：$e\n$s");

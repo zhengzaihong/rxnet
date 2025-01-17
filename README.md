@@ -20,7 +20,7 @@
 ## 依赖：
 
     dependencies:
-       flutter_rxnet_forzzh:0.2.1
+       flutter_rxnet_forzzh:0.2.2   #请使用 0.2.2 版本及其以上
 
 
 ## 常用参数：
@@ -55,14 +55,14 @@
 
 额外功能：小量数据支持 RxNet 数据存储来替换 ShardPreference使用：
 
-        // web 端不支持
-        rxPut("key","内容"); //存数据
-        rxGet("key");       //取数据
+    // web 端不支持
+    rxPut("key","内容"); //存数据
+    rxGet("key");       //取数据
 
 执行请求的两种方式：
 
     1.方式一 ：RxNet.execute(success,failure) 
-      支持缓存策略，先读缓存后请求，先请求失败后读缓存等
+      支持缓存策略
       HttpSuccessCallback 回调中获取最终数据。
       HttpFailureCallback 回调中获取错误信息。
 
@@ -119,7 +119,8 @@
         .setRetryCount(2)  //重试次数
         .setRetryInterval(5000) //毫秒
         .setFailRetry(true)
-        .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
+        //.setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
+        .setJsonConvert(NormalWaterInfoEntity.fromJson)
         .execute<NormalWaterInfoEntity>(
             success: (data, source) {
               content = data.toString();
@@ -137,7 +138,8 @@
         //.addParams(Map)
         .setRestfulUrl(true)
         .setCacheMode(CacheMode.onlyRequest)
-        .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
+       // .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
+        .setJsonConvert(NormalWaterInfoEntity.fromJson)
         // .executeAsync();
         .executeAsync<NormalWaterInfoEntity?>();
 
@@ -153,10 +155,10 @@
 
 
 
-        RxNet.get<String>()
+        RxNet.get()
             .setPath("http://xxxxx/xxxx/testjson.txt")
             .setCacheMode(CacheMode.onlyRequest)
-            .execute(success: (data,sourcesType){
+            .execute<String>(success: (data,sourcesType){
               var source = sourcesType as SourcesType;
               content = data.toString();
               ///数据来源是网络 界面上可以分别处理或提示 来源等
@@ -169,7 +171,7 @@
 
  4.请求数据直接转 Bean对象
 
-      RxNet.get<NormalWaterInfoEntity>()  //这里可以省略 泛型声明
+      RxNet.get()  //这里可以省略 泛型声明
         .setPath("api/weather")
         .setParam("city", "101030100")
         .setRestfulUrl(true) ///Restful
@@ -178,8 +180,8 @@
           //todo 检查网络的实现（非必要）
            return true;
         })
-       .setJsonConvert((data)=>NormalWaterInfoEntity.fromJson(data))
-        .execute(success: (data,sourcesType){
+       .setJsonConvert(NormalWaterInfoEntity.fromJson)
+       .execute<NormalWaterInfoEntity>(success: (data,sourcesType){
           var source = sourcesType as SourcesType;
           if(data is NormalWaterInfoEntity){
             content = data.toString();
@@ -195,7 +197,7 @@
 
  
     注意：如果有全局公共 BaseBean可以如说明 2 中方式转换。如果没有则你的每个数据模型应当建全字段。
-         setJsonConvertAdapter()设置需要转换的模型
+         setJsonConvert()设置需要转换的模型
 
 
  5.上传下载(支持断点上传下载)：(根据业务添加参数 setParam等),注意移动终端的文件读写权限。
