@@ -685,7 +685,8 @@ class BuildRequest<T> {
       } else {
         failure?.call({});
       }
-      completed?.call();
+      ///
+      // completed?.call();
       return;
     }
 
@@ -701,15 +702,21 @@ class BuildRequest<T> {
       Completed? completed,
       dynamic cacheValue,
       ) {
-    if (_jsonTransformation != null) {
-      LogUtil.v("JsonConvert：true");
-      final data = _jsonTransformation?.call(cacheValue);
-      success?.call(data, SourcesType.cache);
-    } else {
-      LogUtil.v("JsonConvert：false");
-      success?.call(cacheValue, SourcesType.cache);
+
+    try {
+      if (_jsonTransformation != null) {
+        LogUtil.v("JsonConvert：true");
+        final data = _jsonTransformation?.call(cacheValue);
+        success?.call(data, SourcesType.cache);
+      } else {
+        LogUtil.v("JsonConvert：false");
+        success?.call(cacheValue, SourcesType.cache);
+      }
+    } catch (e) {
+      LogUtil.v("RxNet：请检查json数据接收实体类是否正确");
+    } finally {
+      completed?.call();
     }
-    completed?.call();
   }
 
   Future<bool> _checkNetWork() async {
