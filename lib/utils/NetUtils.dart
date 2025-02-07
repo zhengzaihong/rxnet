@@ -16,7 +16,8 @@ class NetUtils {
       buffer.write(value);
     });
 
-    return buffer.toString().replaceAll("//", "/");
+    return buffer.toString();
+    // return buffer.toString().replaceAll("//", "/");
   }
 
   static String getCacheKeyFromPath(String? path, Map<String, dynamic> params,List<String> ignoreKeys) {
