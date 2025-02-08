@@ -20,7 +20,7 @@
 ## 依赖：
 
     dependencies:
-       flutter_rxnet_forzzh:0.2.2   #请使用 0.2.2 版本及其以上
+       flutter_rxnet_forzzh:0.2.3   #请使用 0.2.2 版本及其以上
 
 
 ## 常用参数：

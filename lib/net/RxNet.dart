@@ -682,11 +682,10 @@ class BuildRequest<T> {
           return;
         }
         cacheInvalidationCallback?.call();
-      } else {
-        failure?.call({});
+        return;
       }
-      ///
-      // completed?.call();
+      failure?.call({});
+      completed?.call();
       return;
     }
 
@@ -713,6 +712,7 @@ class BuildRequest<T> {
         success?.call(cacheValue, SourcesType.cache);
       }
     } catch (e) {
+      failure?.call({});
       LogUtil.v("RxNet：请检查json数据接收实体类是否正确");
     } finally {
       completed?.call();
@@ -858,6 +858,7 @@ class BuildRequest<T> {
     ProgressCallback? onSendProgress,
     Success? success,
     Failure? failure,
+    Completed? completed,
   }) async {
     if (!(await _checkNetWork())) {
       return;
@@ -901,6 +902,8 @@ class BuildRequest<T> {
       failure?.call(response.data);
     } catch (e, s) {
       _catchError(success, failure, null, e, s);
+    } finally {
+      completed?.call();
     }
   }
 
@@ -913,6 +916,7 @@ class BuildRequest<T> {
     ProgressCallback? onReceiveProgress,
     Success? success,
     Failure? failure,
+    Completed? completed,
   }) async {
     if (!(await _checkNetWork())) {
       return;
@@ -960,6 +964,8 @@ class BuildRequest<T> {
       }
     } catch (e, s) {
       _catchError<T>(success, failure, null, e, s);
+    }finally{
+      completed?.call();
     }
   }
 
@@ -973,6 +979,7 @@ class BuildRequest<T> {
     ProgressCallback? onReceiveProgress,
     Success? success,
     Failure? failure,
+    Completed? completed,
     Function()? cancelCallback,
   }) async {
 
@@ -1072,6 +1079,8 @@ class BuildRequest<T> {
         cancelCallback?.call();
         return;
       }
+    } finally {
+      completed?.call();
     }
   }
 
@@ -1085,6 +1094,7 @@ class BuildRequest<T> {
     ProgressCallback? onSendProgress,
     Success? success,
     Failure? failure,
+    Completed? completed,
     Function()? cancelCallback,
     int? start,
   }) async {
@@ -1164,6 +1174,8 @@ class BuildRequest<T> {
         return;
       }
       failure?.call(error);
+    } finally {
+      completed?.call();
     }
   }
 

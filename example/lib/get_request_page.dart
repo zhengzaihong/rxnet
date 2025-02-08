@@ -27,8 +27,8 @@ class _GetRequestPageState extends State<GetRequestPage> {
           const SizedBox(height: 40),
           TextButton(
             onPressed: () {
-              // request(code: '101030100');
-              request1();
+              request(code: '101030100');
+              // request1();
             },
             style: ButtonStyle(
               backgroundColor: MaterialStateProperty.all(Colors.cyan),
@@ -66,7 +66,6 @@ class _GetRequestPageState extends State<GetRequestPage> {
     // });
     // RxNet().getCancelToken("tag");
 
-    print('------------>${code}');
 
     RxNet.get()
         .setPath('api/weather/')
