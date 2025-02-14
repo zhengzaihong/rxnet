@@ -373,14 +373,14 @@ class BuildRequest<T> {
     return this;
   }
 
-  ///用于文件表单上传( FormData )和有些特殊的请求，无具体key等
-  BuildRequest setFormParams(dynamic param) {
-    _bodyData = param;
-    //禁止将查询参数转换为body
-    setParamsToFormData(false);
-    setParamsToBodyData(true);
-    return this;
-  }
+  // ///用于文件表单上传( FormData )和有些特殊的请求，无具体key等
+  // BuildRequest setFormParams(dynamic param) {
+  //   _bodyData = param;
+  //   //禁止将查询参数转换为body
+  //   setParamsToFormData(false);
+  //   setParamsToBodyData(true);
+  //   return this;
+  // }
 
   BuildRequest setParam(String key, dynamic value) {
     _params[key] = value;
