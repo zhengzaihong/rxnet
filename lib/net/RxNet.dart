@@ -406,7 +406,7 @@ class BuildRequest<T> {
   //       "file": MultipartFile.fromBytes(
   //         imageFileBytes,
   //         filename: "xxx.png",
-  //         contentType: MediaType,
+  //         contentType: MediaType, // dart.dev:http_parser 开发包
   //       ),
   //     };
 
