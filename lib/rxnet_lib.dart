@@ -22,6 +22,6 @@ export 'package:dio/src/dio.dart';
 export 'package:dio/src/options.dart';
 export 'package:dio/src/response.dart';
 export 'package:dio/src/transformer.dart';
-
+export 'package:http_parser/http_parser.dart';
 export 'package:flutter_rxnet_forzzh/logcat/debug_page.dart';
 export 'package:flutter_rxnet_forzzh/logcat/drag_box.dart';

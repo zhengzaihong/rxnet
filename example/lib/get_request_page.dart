@@ -66,7 +66,6 @@ class _GetRequestPageState extends State<GetRequestPage> {
     // });
     // RxNet().getCancelToken("tag");
 
-
     RxNet.get()
         .setPath('api/weather/')
         // .setPath('api/v1/default/getWeather')
@@ -81,6 +80,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
         .setRetryInterval(7000) //毫秒
         .setFailRetry(true)
         .setCacheInvalidationTime(1000*10)  //毫秒
+        // .setRequestIgnoreCacheTime()
         // .execute(
         .execute<NewWeatherInfo>(
             success: (data, source) {

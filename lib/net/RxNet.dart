@@ -109,7 +109,7 @@ class RxNet {
     if (baseOptions != null) {
       _client?.options = baseOptions;
     }
-    /// 已最初baseUrl 为准
+    /// 以最初 baseUrl 为准
     _client?.options.baseUrl = baseUrl;
     if (interceptors != null) {
       _client?.interceptors.addAll(interceptors);
@@ -215,7 +215,6 @@ class RxNet {
   }
 
 
-
   bool get collectLogs => _isCollectLogs;
   void setCollectLogs(bool collect) {
     _isCollectLogs = collect;
@@ -312,8 +311,8 @@ class BuildRequest<T> {
   ///重试次数
   int _retryCount = 0;
 
-  ///请求间隔
-  int _retryInterval = 0;
+  ///请求间隔 默认1秒
+  int _retryInterval = 1000;
 
   ///是否开启循环请求
   bool _isLoop = false;
@@ -373,14 +372,6 @@ class BuildRequest<T> {
     return this;
   }
 
-  // ///用于文件表单上传( FormData )和有些特殊的请求，无具体key等
-  // BuildRequest setFormParams(dynamic param) {
-  //   _bodyData = param;
-  //   //禁止将查询参数转换为body
-  //   setParamsToFormData(false);
-  //   setParamsToBodyData(true);
-  //   return this;
-  // }
 
   BuildRequest setParam(String key, dynamic value) {
     _params[key] = value;
@@ -410,8 +401,25 @@ class BuildRequest<T> {
 
 
   ///用于表单( FormData )。默认 raw json, 其它方式 setOptionConfig自行处理
+  // eg:
+  //     Map<String, dynamic> formData = {
+  //       "file": MultipartFile.fromBytes(
+  //         imageFileBytes,
+  //         filename: "xxx.png",
+  //         contentType: MediaType,
+  //       ),
+  //     };
+
+  // ...
+  // .setParams(formData)
+  // .toFormData();
+
   BuildRequest toFormData() {
     setParamsToFormData(true);
+    return this;
+  }
+  BuildRequest toBodyData() {
+    setParamsToBodyData(true);
     return this;
   }
 
@@ -426,7 +434,6 @@ class BuildRequest<T> {
     _params.removeWhere((key, value) =>  value == null);
     return this;
   }
-
 
   BuildRequest getParams(ParamCallBack callBack) {
     callBack.call(_params);
@@ -484,7 +491,6 @@ class BuildRequest<T> {
   }
 
 
-
   ///设置重试次数
   BuildRequest setRetryCount(int count) {
     _retryCount = count;
@@ -527,8 +533,7 @@ class BuildRequest<T> {
     return _cancelToken;
   }
 
-  /// 响应结果
-  ///提供一个检查网络的方法，外部需要自行实现
+  /// 响应结果 一般情况不会使用
   BuildRequest setResponseCallBack(Function(Response response) responseCallBack) {
     this.onResponse = responseCallBack;
     return this;
@@ -564,6 +569,11 @@ class BuildRequest<T> {
         _bodyData = _params;
       }
 
+      if(_jsonTransformation!=null){
+        LogUtil.v("$url，JsonConvert：true");
+      }else{
+        LogUtil.v("$url，JsonConvert：false");
+      }
       Response<dynamic> response = await _rxNet.client!.request(
           url,
           data: _bodyData,
@@ -573,6 +583,7 @@ class BuildRequest<T> {
 
       onResponse?.call(response);
       var responseData = response.data;
+
       ///成功
       if (response.statusCode == 200) {
         if (_jsonTransformation != null) {
@@ -586,16 +597,16 @@ class BuildRequest<T> {
                 return;
               }
             }
-            LogUtil.v("JsonConvert：true");
             final data = await _jsonTransformation?.call(responseData);
             success?.call(data as T, SourcesType.net);
           }catch(e){
-            LogUtil.v("RxNet：请检查json数据接收实体类是否正确");
+            LogUtil.v("RxNet：请检查json数据接收类是否正确");
             return;
+          } finally {
+            completed?.call();
           }
         }
         else {
-          LogUtil.v("JsonConvert：false");
           success?.call(responseData, SourcesType.net);
         }
         /// 存储数据
@@ -604,7 +615,7 @@ class BuildRequest<T> {
             _ignoreCacheKeys.addAll(_rxNet._baseIgnoreCacheKeys!);
             _ignoreCacheKeys = _ignoreCacheKeys.toSet().toList();
           }
-          String cacheKey = NetUtils.getCacheKeyFromPath("$_path", _params,_ignoreCacheKeys);
+          String cacheKey = NetUtils.getCacheKeyFromPath(_path, _params,_ignoreCacheKeys);
           final map = <String, dynamic>{
             'timestamp': DateTime.now().millisecondsSinceEpoch,
             'data':responseData
@@ -613,13 +624,14 @@ class BuildRequest<T> {
         }
         return;
       }
+
       ///失败
       isFailure = true;
       failure?.call(responseData);
     } catch (e, s) {
       isFailure = true;
       _catchError(success, failure, readCache, e, s);
-    }finally {
+    } finally {
       completed?.call();
       if (_isLoop) {
         Future.delayed(Duration(milliseconds: _retryInterval), () {
@@ -677,10 +689,12 @@ class BuildRequest<T> {
             return;
           }
         }
+        //解析本地缓存
         if(dataValue is Map && dataValue.length>0){
           _parseLocalData<T>(success, failure,completed, dataValue);
           return;
         }
+        // 无缓存内容
         cacheInvalidationCallback?.call();
         return;
       }
@@ -713,7 +727,7 @@ class BuildRequest<T> {
       }
     } catch (e) {
       failure?.call({});
-      LogUtil.v("RxNet：请检查json数据接收实体类是否正确");
+      LogUtil.v("RxNet：请检查json数据接收类是否正确");
     } finally {
       completed?.call();
     }
@@ -735,7 +749,7 @@ class BuildRequest<T> {
   }
 
   ///基于异步回调方式 支持同时请求和缓存策略
-  ///对于外部需要可接收多种状态的数据 建议使用此方式。
+  ///对于外部可接收多种状态的数据 建议使用此方式。
   void execute<T>({Success<T>? success, Failure? failure, Completed? completed}) async {
     if (!(await _checkNetWork())) {
       completed?.call();
@@ -780,6 +794,7 @@ class BuildRequest<T> {
       }
       return _readCache(
           success, (e) {
+             // 缓存读取错误，则发起请求
             _doWorkRequest(
                 success: success,
                 failure: failure,
@@ -789,6 +804,7 @@ class BuildRequest<T> {
           },
           completed,
           cacheInvalidationCallback: () {
+            //无缓存，或者缓存过期，发起请求
             _doWorkRequest(
                 success: success,
                 failure: failure,

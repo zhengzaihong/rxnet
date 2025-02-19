@@ -12,7 +12,7 @@ import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 ///
 class LogUtil {
   LogUtil._();
-  static const String _TAG_DEFAULT = "###日志：";
+  static const String _TAG_DEFAULT = "RxNet日志：";
 
   ///是否 debug
   static bool debug = kDebugMode;
@@ -44,7 +44,7 @@ class LogUtil {
         print("${tag??tagDefault} ${object.toString()}");
         return;
       }
-      _printLog(tag??"", '  v  ', object);
+      _printLog(tag??tagDefault, '', object);
     }
   }
 

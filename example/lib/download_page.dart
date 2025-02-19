@@ -21,6 +21,7 @@ class _DownLoadPageState extends State<DownLoadPage> {
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       body: Column(
         children:  <Widget>[
@@ -28,6 +29,9 @@ class _DownLoadPageState extends State<DownLoadPage> {
 
           TextButton(
             onPressed: (){
+
+              // Downloader.downloadFile(url: 'https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg-');
+
               download();
             },
             style: ButtonStyle(
