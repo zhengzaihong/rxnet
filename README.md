@@ -6,7 +6,7 @@
 * 支持断点上传、下载。
 * 支持失败重试。
 * 支持缓存时效。
-* 支持restful风格请求。
+* 支持RESTful风格请求。
 * 支持循环请求，外部不用维护请求队列或定时执行。
 * 支持json转实体请求。
 * 支持全局拦截器。
@@ -41,7 +41,7 @@
     4.只使用缓存
     onlyCache;
 
-    5.先使用缓存，无缓存或超时效则请求网络(推荐)
+    5.先使用缓存，无缓存或超时效则请求网络
     cacheNoneToRequest;
 
 
@@ -63,8 +63,9 @@
 
     1.方式一 ：RxNet.execute(success,failure) 
       支持缓存策略
-      HttpSuccessCallback 回调中获取最终数据。
-      HttpFailureCallback 回调中获取错误信息。
+      Success 回调中获取最终数据。
+      Failure 回调中获取错误信息。
+      Completed 始终都会执行的回调，取消加载动画，释放资源等
 
 
     2.方式二  await RxNet.executeAsync<xxxx>()
@@ -97,6 +98,7 @@
           //可以添加多个你自己的拦截器
 
           RxNetLogInterceptor(
+            //通常在自定义拦截器内部实现，跳转，参数/结果预处理等 
             handlerRequest: (e,f) {
             },
             handlerResponse: (e,f) {

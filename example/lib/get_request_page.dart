@@ -84,13 +84,18 @@ class _GetRequestPageState extends State<GetRequestPage> {
         // .execute(
         .execute<NewWeatherInfo>(
             success: (data, source) {
-              content = jsonEncode(data);
-              sourcesType = source;
-              setState(() {});
-            },
+              setState(() {
+                content = jsonEncode(data);
+                sourcesType = source;
+              });
+             },
             failure: (e) {
-              content = "";
-              setState(() {});
+              setState(() {
+                content = "";
+              });
+             },
+            completed: (){
+              //请求成功或失败后始终都会执行的回调，用于取消加载动画等
          });
   }
 
