@@ -14,7 +14,7 @@
 * 支持原生习惯的回调方式。
 * 支持全局异常捕获。
 * 支持日志控制台界面展示
-* 支持少量键值对数据存储
+* 支持少量键值对数据存储（危险阈值：20 万条以上或单个记录大小超过 1MB 时）
 
 
 ## 依赖：
@@ -47,9 +47,9 @@
 
 注意：
 
-1.如需要 restful 风格请求：setRestfulUrl(true)，内部自动转化参数链接
+1.如需要 `RESTful` 风格请求：setRestfulUrl(true)，内部自动转化参数链接
 
-2.不设置 setJsonConvert 返回的都是Map类型数据，否则返回定义的实体类型。
+2.不设置 `setJsonConvert` 返回的都是Map类型数据，否则返回定义的实体类型。
 
 需要json 转对象，请设置 setJsonConvert 并在回调中根据后端返回统一格式进行转换。
 
@@ -81,11 +81,11 @@
         baseUrl: "http://t.weather.sojson.com/",
         // cacheDir: "xxx",   ///缓存目录
         // cacheName: "local_cache_app", ///缓存文件
-        isDebug: true,   ///是否调试 打印日志
+        isDebug: true,   ///是否调试 打印日志 。 传入 kDebugMode:正式包自动屏蔽日志输出
         baseCacheMode: CacheMode.requestFailedReadCache,
-        // useSystemPrint: true,
-        baseCheckNet:checkNet, ///全局检查网络
+        baseCheckNet:checkNet, /// 如提供全局检查网络的回调，即每次请求前都会触发
         requestCaptureError: (e){  ///全局抓获 异常
+          //推荐在拦截中处理，不在这里处理过多内容 
           print(">>>${HandleError.dioError(e).message}");
         },
          baseUrlEnv: {  ///支持多环境 baseUrl调试， RxNet().setEnv("test")方式切换;
@@ -96,16 +96,7 @@
         }, 
         interceptors: [  ///拦截器
           //可以添加多个你自己的拦截器
-
-          RxNetLogInterceptor(
-            //通常在自定义拦截器内部实现，跳转，参数/结果预处理等 
-            handlerRequest: (e,f) {
-            },
-            handlerResponse: (e,f) {
-             ///拦截响应预处理些类似错误码跳转等业务。
-             // final status = e.data['status'];
-            }
-          )
+          RxNetLogInterceptor()
         ]);
  
  2.发起网络请求：
@@ -125,11 +116,20 @@
         .setJsonConvert(NormalWaterInfoEntity.fromJson)
         .execute<NormalWaterInfoEntity>(
             success: (data, source) {
-              content = data.toString();
-              sourcesType = source;
-              setState(() {});
-            },
-            failure: (e) {});
+             // 这里的 data 已经是 NormalWaterInfoEntity类型
+              setState(() {
+                content = jsonEncode(data);
+                sourcesType = source;
+              });
+             },
+            failure: (e) {
+              setState(() {
+                content = "";
+              });
+             },
+            completed: (){
+              //请求成功或失败后始终都会执行的回调，用于取消加载动画等
+         });
 
 
     2. await方式：
@@ -142,7 +142,6 @@
         .setCacheMode(CacheMode.onlyRequest)
        // .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
         .setJsonConvert(NormalWaterInfoEntity.fromJson)
-        // .executeAsync();
         .executeAsync<NormalWaterInfoEntity?>();
 
       print("--------->#${data.isError}");
@@ -231,7 +230,7 @@
    
    6.清晰的日志拦截器，拒绝调试抓瞎。
      
-    需要日志信息，初始化配置网络框架时请添加 RxNetLogInterceptor 拦截器
+    需要日志信息，初始化配置网络框架时请添加 RxNetLogInterceptor 拦截器 或者您自定义的
 
       RxNet().init(
        ...xxx
