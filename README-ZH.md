@@ -1,111 +1,109 @@
 # RxNet 
 
-Language: English | [简体中文](README-ZH.md)
+Language: [English](README.md) | 简体中文
+
+一款极简Flutter网络请求工具，该库是对Dio的扩展，使用更加自然，让应用更加丝滑,开屏即有数据等特性。
+
+* 支持多种缓存策略。
+* 支持断点上传、下载。
+* 支持失败重试。
+* 支持缓存时效。
+* 支持RESTful风格请求。
+* 支持循环请求，外部不用维护请求队列或定时执行。
+* 支持json转实体请求。
+* 支持全局拦截器。
+* 支持async/await 方式调用。
+* 支持原生习惯的回调方式。
+* 支持全局异常捕获。
+* 支持日志控制台界面展示
+* 支持少量键值对数据存储（危险阈值：20 万条以上或单个记录大小超过 1MB 时）
 
 
-A minimalist Flutter network request tool. This library is an extension of Dio. It is more natural to use and makes the application smoother. It has data and other features when the screen is opened.
-
-* Supports multiple caching strategies.
-* Support breakpoint upload and download.
-* Failed retry is supported.
-* Support cache aging.
-* Support RESTful style requests.
-* Supports circular requests, and there is no need to maintain request queues or execute them regularly externally.
-* Support json entity transfer requests.
-* Support global interceptors.
-* Supports async/await calls.
-* Callbacks that support native habits.
-* Support global exception capture.
-* Support log console interface display
-* Support small number of key-value pair data storage (danger threshold: more than 200,000 or when a single record size exceeds 1MB)
-
-
-## dependent：
+## 依赖：
 
     dependencies:
        flutter_rxnet_forzzh:0.2.4   #请使用 0.2.2 版本及其以上
 
 
-## common parameters：
+## 常用参数：
 
-Supported request methods: get, post, delete, put, patch,
+支持的请求方式：  get, post, delete, put, patch,
 
-Caching strategy: CacheMode supports the following modes:
+缓存策略：CacheMode 支持如下几种模式：
 
-    1.No caching, only network data
+    1.不做缓存，只网络数据
     onlyRequest,
     
-    2.Request the network first. If the network request fails, the cache is read. If the cache fails, the request fails.
+    2.先请求网络，如果请求网络失败，则读取缓存，如果读取缓存失败，本次请求失败
     requestFailedReadCache,
 
-    3.Use cache first, and still request network regardless of whether it exists or not
+    3.先使用缓存，不管是否存在，仍然请求网络
     firstCacheThenRequest,
 
-    4.Use cache only
+    4.只使用缓存
     onlyCache;
 
-    5.Use cache first, and request network if there is no cache or it is out of time
+    5.先使用缓存，无缓存或超时效则请求网络
     cacheNoneToRequest;
 
 
 注意：
 
-1. If you need a RESTful style request: setRestfulUrl(true), internal automatic conversion parameter link
+1.如需要 `RESTful` 风格请求：setRestfulUrl(true)，内部自动转化参数链接
 
-2. If `setJsonConvert` is not set to return Map type data, otherwise the defined entity type will be returned.
+2.不设置 `setJsonConvert` 返回的都是Map类型数据，否则返回定义的实体类型。
 
-If you need json conversion objects, please set setJsonConvert and convert them in the callback according to the unified format returned by the backend.
+需要json 转对象，请设置 setJsonConvert 并在回调中根据后端返回统一格式进行转换。
 
-Additional features: Small amounts of data support RxNet data storage to replace ShardPreference:
+额外功能：小量数据支持 RxNet 数据存储来替换 ShardPreference使用：
 
-    // Not supported on the web
-    rxPut("key","content"); //data contained within, in connection with
-    rxGet("key");       //fetch data
+    // web 端不支持
+    rxPut("key","内容"); //存数据
+    rxGet("key");       //取数据
 
-Two ways to execute requests：
+执行请求的两种方式：
 
-    1.Usage 1 ：RxNet.execute(success,failure) 
-      Support caching strategies
+    1.方式一 ：RxNet.execute(success,failure) 
+      支持缓存策略
+      Success 回调中获取最终数据。
+      Failure 回调中获取错误信息。
+      Completed 始终都会执行的回调，取消加载动画，释放资源等
 
-      Success: Get final data in callback。
-      Failure: Get error message in callback。
-      Completed: Callbacks that are always executed, unloading animations, releasing resources, etc.
 
+    2.方式二  await RxNet.executeAsync<xxxx>()
+      返回结果或错误信息都在 RxResult 实体中，无需try catch操作。
+      RxResult.value 获取最终结果。
+      RxResult.error 获取错误信息
 
-    2.Usage 2 ： await RxNet.executeAsync<xxxx>()
-      The returned results or error messages are all in the RxResult entity, no try catch operation is needed。
-      RxResult.value ：Get the final result。
-      RxResult.error ：Get error information
-
-## description：
+## 说明：
  
- 1.Initialize the network framework first
+ 1.先初始化网络框架
 
      await RxNet().init(
         baseUrl: "http://t.weather.sojson.com/",
-        // cacheDir: "xxx",   ///Cache directory
-        // cacheName: "local_cache_app", ///Cache files
-        isDebug: true,   ///Whether to debug and print the log. Pass in kDebugMode: Official packages automatically block log output
+        // cacheDir: "xxx",   ///缓存目录
+        // cacheName: "local_cache_app", ///缓存文件
+        isDebug: true,   ///是否调试 打印日志 。 传入 kDebugMode:正式包自动屏蔽日志输出
         baseCacheMode: CacheMode.requestFailedReadCache,
-        baseCheckNet:checkNet, ///If a callback is provided to globally check the network, it will be triggered before each request
-        requestCaptureError: (e){ //Global caught exception
-          //It is recommended to handle it during interception, not to process too much content here 
+        baseCheckNet:checkNet, /// 如提供全局检查网络的回调，即每次请求前都会触发
+        requestCaptureError: (e){  ///全局抓获 异常
+          //推荐在拦截中处理，不在这里处理过多内容 
           print(">>>${HandleError.dioError(e).message}");
         },
-         baseUrlEnv: { ///supports multi-environment baseUrl debugging, and switches between RxNet().setEnv("test");
+         baseUrlEnv: {  ///支持多环境 baseUrl调试， RxNet().setEnv("test")方式切换;
           "test": "http://t.weather.sojson1.com/",
           "debug": "http://t.weather.sojson2.com/",
           "release": "http://t.weather.sojson.com/",
            //xxxxx
         }, 
-        interceptors: [ ///interceptors
-          //You can add multiple interceptors of your own
+        interceptors: [  ///拦截器
+          //可以添加多个你自己的拦截器
           RxNetLogInterceptor()
         ]);
  
- 2.Initiate network request：
+ 2.发起网络请求：
 
-    1.callback mode：
+    1.回调模式：
 
     RxNet.get()  // post, get, delete, put, patch
         .setPath("api/weather")
@@ -136,7 +134,7 @@ Two ways to execute requests：
          });
 
 
-    2. await approach：
+    2. await方式：
 
      var data = await RxNet.get()  // post, get, delete, put, patch
         .setPath("api/weather")
@@ -156,7 +154,8 @@ Two ways to execute requests：
 
 
 
- 3.Request raw data, in some special cases, such as reading network disk resource file data
+ 3.请求原始数据,某些特殊情况，如读取网盘资源文件数据
+
 
 
         RxNet.get()
@@ -165,23 +164,23 @@ Two ways to execute requests：
             .execute<String>(success: (data,sourcesType){
               var source = sourcesType as SourcesType;
               content = data.toString();
-              ///Data sources are sources that can be processed separately or prompted on the network interface
+              ///数据来源是网络 界面上可以分别处理或提示 来源等
               if(source == SourcesType.net){
               }else{
-                /// local database
+                /// 本地数据库
               }
         });
 
 
- 4.Request data to be transferred directly to a Bean object
+ 4.请求数据直接转 Bean对象
 
-      RxNet.get() 
+      RxNet.get()  //这里可以省略 泛型声明
         .setPath("api/weather")
         .setParam("city", "101030100")
         .setRestfulUrl(true) ///Restful
         .setCacheMode(CacheMode.onlyRequest)
         .setCheckNetwork((){
-          //todo Check network implementation (optional)
+          //todo 检查网络的实现（非必要）
            return true;
         })
        .setJsonConvert(NormalWaterInfoEntity.fromJson)
@@ -191,25 +190,25 @@ Two ways to execute requests：
             content = data.toString();
             print("------>${data.message}");
           }
-          ///The data source is the Internet
+          ///数据来源是网络
           if(source == SourcesType.net){
           }else{
-            /// local database
+            /// 本地数据库
           }
           setState(() {});
         });
 
  
-    Note: If there is a global public BaseBean, it can be converted as in Note 2. If not, you should have all fields in each of your data models.
-         setJsonConvert() sets the model that needs to be converted
+    注意：如果有全局公共 BaseBean可以如说明 2 中方式转换。如果没有则你的每个数据模型应当建全字段。
+         setJsonConvert()设置需要转换的模型
 
 
- 5.Upload and download (support breakpoint upload and download):(Add parameters such as setParam according to the service), pay attention to the file read and write permissions of the Mobile device.
+ 5.上传下载(支持断点上传下载)：(根据业务添加参数 setParam等),注意移动终端的文件读写权限。
 
   
     RxNet.get() 
         .setPath("https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg")
-         //breakPointDownload() Breakpoint download
+         //breakPointDownload() 断点下载
         .download(
           savePath:"${appDocPath}/55.jpg",
           onReceiveProgress: (len,total){
@@ -223,7 +222,7 @@ Two ways to execute requests：
   
     RxNet.post()
         .setPath("xxxxx.jpg")
-        // breakPointUploadFile() breakpoint continuous transmission
+        // breakPointUploadFile() 断点续传
         .upload(
             success: (data, sourcesType) {},
             failure: (e) {},
@@ -231,19 +230,19 @@ Two ways to execute requests：
 
 
    
-   6.A clear log interceptor that refuses debugging.
+   6.清晰的日志拦截器，拒绝调试抓瞎。
      
-    Log information is needed. Please add RxNetLogInterceptor interceptor or your customized when initializing and configuring the network framework.
+    需要日志信息，初始化配置网络框架时请添加 RxNetLogInterceptor 拦截器 或者您自定义的
 
       RxNet().init(
-       ... xxx
-          isDebug: true, ///Whether to debug the print log
-          interceptors: [ ///interceptors
-          RxNetLogInterceptor() //You can add your own customization
+       ...xxx
+          isDebug: true, ///是否调试 打印日志
+          interceptors: [  ///拦截器
+          RxNetLogInterceptor() // 可自行添加自定义
       ]);
 
 
-   output format：
+   输出格式：
 
     [log] ###日志：  v  ***************** Request Start *****************
     [log] ###日志：  v  uri: http://t.weather.sojson.com/api/weather/city/101030100
@@ -281,12 +280,12 @@ Two ways to execute requests：
     [log] ###日志：  v  ***************** Response End *****************
     [log] ###日志：  v  useJsonAdapter：true
 
-   7.For online APP interface error messages, you can also view the request log information through RxNet.
+   7.对于线上的APP接口错误信息，也可通过RxNet查看请求日志信息。
      
-    Open the debug log window： RxNet().showDebugWindow(context);
-    Close the debug log window： RxNet().closeDebugWindow();
+    打开调试日志窗口： RxNet().showDebugWindow(context);
+    关闭调试日志窗口： RxNet().closeDebugWindow();
 
 
-## debug window：
+## 调试窗口：
 ![调试窗口](https://github.com/zhengzaihong/rxnet/blob/master/images/app_logcat.jpg) 
    
