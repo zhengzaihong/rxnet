@@ -7,10 +7,7 @@
 
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
-
-import 'package:rxnet_example/main.dart';
+import 'package:flutter/cupertino.dart';
 
 void main() {
   final map = <String, String>{};
@@ -23,5 +20,5 @@ void main() {
 
   map.removeWhere((key, value) => list.contains(key));
 
-  print('-----map:${jsonEncode(map)}');
+  debugPrint('-----map:${jsonEncode(map)}');
 }

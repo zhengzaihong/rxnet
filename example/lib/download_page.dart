@@ -35,7 +35,7 @@ class _DownLoadPageState extends State<DownLoadPage> {
               download();
             },
             style: ButtonStyle(
-              backgroundColor:MaterialStateProperty.all(Colors.cyan),
+              backgroundColor:WidgetStateProperty.all(Colors.cyan),
             ),
             child: const Text("下载",style: TextStyle(color: Colors.black,fontSize: 16)),),
 
@@ -68,7 +68,7 @@ class _DownLoadPageState extends State<DownLoadPage> {
         .download(
         savePath:appDocPath,
         onReceiveProgress: (len,total){
-          print("len:$len,total:$total");
+          debugPrint("len:$len,total:$total");
           if(len ==total){
             setState(() {
               downloadPath = appDocPath;
@@ -87,7 +87,7 @@ class _DownLoadPageState extends State<DownLoadPage> {
 
     for (var element in permissions) {
       element.request().then((value){
-        print("------permissions：${value.name}");
+        debugPrint("------permissions：${value.name}");
       });
     }
   }

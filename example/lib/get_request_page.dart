@@ -14,7 +14,6 @@ class GetRequestPage extends StatefulWidget {
 class _GetRequestPageState extends State<GetRequestPage> {
   SourcesType sourcesType = SourcesType.net;
   String content = "";
-  // 35b3914e389f495d790f30b455004910c318c6743719fca30b4f58094bcc42c1
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -25,16 +24,33 @@ class _GetRequestPageState extends State<GetRequestPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           const SizedBox(height: 40),
-          TextButton(
-            onPressed: () {
-              request(code: '101030100');
-              // request1();
-            },
-            style: ButtonStyle(
-              backgroundColor: MaterialStateProperty.all(Colors.cyan),
-            ),
-            child: const Text("发起get请求",
-                style: TextStyle(color: Colors.black, fontSize: 16)),
+          
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton(
+                onPressed: () {
+                  request(code: '101030100');
+                  // request1();
+                },
+                style: ButtonStyle(
+                  backgroundColor: WidgetStateProperty.all(Colors.cyan),
+                ),
+                child: const Text("发起get请求",
+                    style: TextStyle(color: Colors.black, fontSize: 16)),
+              ),
+
+              TextButton(
+                onPressed: () {
+                  RxNet().showDebugWindow(context);
+                },
+                style: ButtonStyle(
+                  backgroundColor: WidgetStateProperty.all(Colors.cyan),
+                ),
+                child: const Text("打开调试窗口",
+                    style: TextStyle(color: Colors.black, fontSize: 16)),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
           Expanded(
@@ -64,11 +80,9 @@ class _GetRequestPageState extends State<GetRequestPage> {
     //   "Accept-Encoding": "gzip, deflate, br",
     //   "Connection": "keep-alive",
     // });
-    // RxNet().getCancelToken("tag");
 
     RxNet.get()
         .setPath('api/weather/')
-        // .setPath('api/v1/default/getWeather')
         .setParam("city", code??"101030100")
         .setRestfulUrl(true)
          // .setCancelToken(tag)
@@ -81,7 +95,6 @@ class _GetRequestPageState extends State<GetRequestPage> {
         .setFailRetry(true)
         .setCacheInvalidationTime(1000*10)  //毫秒
         // .setRequestIgnoreCacheTime()
-        // .execute(
         .execute<NewWeatherInfo>(
             success: (data, source) {
               setState(() {
@@ -110,11 +123,9 @@ class _GetRequestPageState extends State<GetRequestPage> {
         .setJsonConvert(NewWeatherInfo.fromJson)
         .executeAsync();
 
-      print("--------->#${data.isError}");
-      print("--------->#${data.error}");
+      debugPrint("--------->#${data.isError}");
       var result = data.value;
 
-      // print("--------->#${result}");
       // content = jsonEncode(result);
 
       content = jsonEncode(result?.toJson());

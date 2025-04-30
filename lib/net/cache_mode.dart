@@ -21,5 +21,5 @@ enum CacheMode {
   firstCacheThenRequest,
 
   //先使用缓存，无缓存或超过时效则请求网络
-  cacheNoneToRequest;
+  cacheNoneToRequest
 }

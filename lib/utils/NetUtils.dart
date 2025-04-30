@@ -1,8 +1,5 @@
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 
-import 'MD5Util.dart';
-import 'TextUtil.dart';
-
 class NetUtils {
   NetUtils._();
 

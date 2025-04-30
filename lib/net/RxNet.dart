@@ -17,7 +17,7 @@ import '../utils/RxNetDataBase.dart';
 /// describe: 网络请求工具库，支持多种缓存模式
 ///同一个CancelToken可以用于多个请求，当一个CancelToken取消时，所有使用该CancelToken的请求都会被取消。
 
-class RxNet {
+class RxNet with ChangeNotifier {
 
   Dio? _client;
 
@@ -258,7 +258,7 @@ class RxNet {
         ),
       ),
     );
-    overlayState?.insert(_overlayEntry!);
+    overlayState.insert(_overlayEntry!);
   }
 
   //关闭调试窗口

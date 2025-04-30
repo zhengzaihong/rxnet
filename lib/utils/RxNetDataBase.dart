@@ -79,7 +79,7 @@ class RxNetDataBase {
     }
   }
 
-  FutureOr operator [](dynamic key) async {
+  Future operator [](dynamic key) async {
     return get(key);
   }
 
@@ -94,6 +94,7 @@ class RxNetDataBase {
     } catch (error, stackTrace) {
       LogUtil.v('get $key error: $error\n$stackTrace');
     }
+    return null;
   }
 
   Future put(

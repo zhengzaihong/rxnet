@@ -47,10 +47,6 @@ class HttpError {
 
   String? message;
 
-  dynamic bodyData;
-
-  HttpError._(this.code, this.message,this.bodyData);
-
   HttpError.dioError(DioException error) {
     message = error.message;
     switch (error.type) {

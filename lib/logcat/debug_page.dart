@@ -11,7 +11,7 @@ import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 ///
 class DebugPage extends StatelessWidget {
 
-  const DebugPage({super.key});
+  const DebugPage({Key? key}): super(key: key);
 
   @override
   Widget build(BuildContext context) {
