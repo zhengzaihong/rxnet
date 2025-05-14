@@ -23,7 +23,7 @@ A minimalist Flutter network request tool. This library is an extension of Dio. 
 ## dependent：
 
     dependencies:
-       flutter_rxnet_forzzh:0.2.4   #请使用 0.2.2 版本及其以上
+       flutter_rxnet_forzzh:0.3.0  #请使用 0.2.2 版本及其以上
 
 
 ## common parameters：
@@ -85,7 +85,6 @@ Two ways to execute requests：
         baseUrl: "http://t.weather.sojson.com/",
         // cacheDir: "xxx",   ///Cache directory
         // cacheName: "local_cache_app", ///Cache files
-        isDebug: true,   ///Whether to debug and print the log. Pass in kDebugMode: Official packages automatically block log output
         baseCacheMode: CacheMode.requestFailedReadCache,
         baseCheckNet:checkNet, ///If a callback is provided to globally check the network, it will be triggered before each request
         requestCaptureError: (e){ //Global caught exception
@@ -209,7 +208,7 @@ Two ways to execute requests：
   
     RxNet.get() 
         .setPath("https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg")
-         //breakPointDownload() Breakpoint download
+         /downloadBreakPoint() Breakpoint download
         .download(
           savePath:"${appDocPath}/55.jpg",
           onReceiveProgress: (len,total){
@@ -223,7 +222,7 @@ Two ways to execute requests：
   
     RxNet.post()
         .setPath("xxxxx.jpg")
-        // breakPointUploadFile() breakpoint continuous transmission
+        // uploadFileBreakPoint() breakpoint continuous transmission
         .upload(
             success: (data, sourcesType) {},
             failure: (e) {},

@@ -12,23 +12,19 @@ import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 ///
 class LogUtil {
   LogUtil._();
-  static const String _TAG_DEFAULT = "RxNet日志：";
+  static const String _TAG_DEFAULT = "RxNet：";
 
-  ///是否 debug
-  static bool debug = kDebugMode;
+  ///是否 debug 默认调试为true 正式环境为false
+  static bool _debugMode = kDebugMode;
 
   static String tagDefault = _TAG_DEFAULT;
 
-  static bool isSystemPrint = false;
+  static bool _isSystemPrint = false;
 
   static void init({
-    bool isDebug = false,
-    String? tag,
     bool useSystemPrint = false
    }) {
-    debug = isDebug;
-    tagDefault = tag??_TAG_DEFAULT;
-    isSystemPrint = useSystemPrint;
+    _isSystemPrint = useSystemPrint;
   }
 
   static void e(Object object, {String? tag}) {
@@ -36,16 +32,17 @@ class LogUtil {
   }
 
   static void v(Object object, {String? tag}) {
-    if (debug) {
-      if (isSystemPrint){
-        if(RxNet().collectLogs){
-          RxNet().addLogs("${tag??tagDefault} ${object.toString()}");
-        }
+    if(RxNet().collectLogs){
+      RxNet().addLogs("${tag??tagDefault} ${object.toString()}");
+    }
+    if(_debugMode){
+      if (_isSystemPrint){
         print("${tag??tagDefault} ${object.toString()}");
         return;
       }
       _printLog(tag??tagDefault, '', object);
     }
+
   }
 
   static void _printLog(String tag, String stag, Object object) {

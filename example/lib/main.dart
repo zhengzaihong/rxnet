@@ -3,7 +3,7 @@ import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 import 'package:flutter_uikit_forzzh/uikitlib.dart';
 import 'package:rxnet_example/get_request_page.dart';
 import 'download_page.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
+// import 'package:connectivity_plus/connectivity_plus.dart';
 
 void main() async{
 
@@ -12,7 +12,6 @@ void main() async{
         // baseUrl: "http://10.88.33.195:8001/",
         // cacheDir: "xxx",   ///缓存目录
         // cacheName: "local_cache_app", ///缓存文件
-        isDebug: true,   ///是否调试 打印日志
         baseCacheMode: CacheMode.requestFailedReadCache,
         // useSystemPrint: true,
         baseCheckNet:checkNet, ///全局检查网络
@@ -20,14 +19,7 @@ void main() async{
         //   print(">>>${HttpError.dioError(e).message}");
         // },
         interceptors: [  ///拦截器
-          RxNetLogInterceptor(
-            handlerRequest: (e,f) {
-            },
-            handlerResponse: (e,f) {
-             ///拦截响应预处理些类似错误码跳转等业务。
-             // final status = e.data['status'];
-            }
-          )
+          RxNetLogInterceptor()
         ]);
      //
      // (RxNet().getClient()  as DefaultHttpClientAdapter).onHttpClientCreate = (client) {
@@ -45,11 +37,11 @@ void main() async{
 
 
 Future<bool> checkNet() async{
-  var connectivityResult = await (Connectivity().checkConnectivity());
-  if (connectivityResult == ConnectivityResult.none) {
-    Toast.show( "当前无网络");
-    return true;
-  }
+  // var connectivityResult = await (Connectivity().checkConnectivity());
+  // if (connectivityResult == ConnectivityResult.none) {
+  //   Toast.show( "当前无网络");
+  //   return true;
+  // }
   return Future.value(true);
 }
 

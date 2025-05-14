@@ -81,19 +81,20 @@ class _GetRequestPageState extends State<GetRequestPage> {
     //   "Connection": "keep-alive",
     // });
 
+    //web端注意服务做跨越处理
     RxNet.get()
+        // .setPath("https://mock.jsont.run/lmkrXzYZ07gCjgPhbIWUi")
         .setPath('api/weather/')
         .setParam("city", code??"101030100")
         .setRestfulUrl(true)
          // .setCancelToken(tag)
         ///Restful  http://t.weather.sojson.com/api/weather/city/101030100
         .setCacheMode(CacheMode.cacheNoneToRequest)
-        // .setJsonConvert(NewWeatherInfo.fromJson)
         .setJsonConvert(NewWeatherInfo.fromJson)
         .setRetryCount(2)  //重试次数
         .setRetryInterval(7000) //毫秒
-        .setFailRetry(true)
-        .setCacheInvalidationTime(1000*10)  //毫秒
+        .setFailRetry(false)
+        // .setCacheInvalidationTime(1000*10)  //毫秒
         // .setRequestIgnoreCacheTime()
         .execute<NewWeatherInfo>(
             success: (data, source) {
@@ -104,10 +105,11 @@ class _GetRequestPageState extends State<GetRequestPage> {
              },
             failure: (e) {
               setState(() {
-                content = "";
+                content = "无数据信息";
               });
              },
             completed: (){
+              LogUtil.v("--------->请求完成");
               //请求成功或失败后始终都会执行的回调，用于取消加载动画等
          });
   }

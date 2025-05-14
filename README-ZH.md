@@ -22,7 +22,7 @@ Language: [English](README.md) | 简体中文
 ## 依赖：
 
     dependencies:
-       flutter_rxnet_forzzh:0.2.4   #请使用 0.2.2 版本及其以上
+       flutter_rxnet_forzzh:0.3.0   #请使用 0.2.2 版本及其以上
 
 
 ## 常用参数：
@@ -83,7 +83,6 @@ Language: [English](README.md) | 简体中文
         baseUrl: "http://t.weather.sojson.com/",
         // cacheDir: "xxx",   ///缓存目录
         // cacheName: "local_cache_app", ///缓存文件
-        isDebug: true,   ///是否调试 打印日志 。 传入 kDebugMode:正式包自动屏蔽日志输出
         baseCacheMode: CacheMode.requestFailedReadCache,
         baseCheckNet:checkNet, /// 如提供全局检查网络的回调，即每次请求前都会触发
         requestCaptureError: (e){  ///全局抓获 异常
@@ -208,7 +207,7 @@ Language: [English](README.md) | 简体中文
   
     RxNet.get() 
         .setPath("https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg")
-         //breakPointDownload() 断点下载
+         //downloadBreakPoint() 断点下载
         .download(
           savePath:"${appDocPath}/55.jpg",
           onReceiveProgress: (len,total){
@@ -222,7 +221,7 @@ Language: [English](README.md) | 简体中文
   
     RxNet.post()
         .setPath("xxxxx.jpg")
-        // breakPointUploadFile() 断点续传
+        // uploadFileBreakPoint() 断点续传
         .upload(
             success: (data, sourcesType) {},
             failure: (e) {},

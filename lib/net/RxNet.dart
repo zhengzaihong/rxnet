@@ -15,13 +15,19 @@ import '../utils/RxNetDataBase.dart';
 /// create_date: 2022/8/9
 /// create_time: 18:03
 /// describe: 网络请求工具库，支持多种缓存模式
-///同一个CancelToken可以用于多个请求，当一个CancelToken取消时，所有使用该CancelToken的请求都会被取消。
+///  同一个CancelToken可以用于多个请求，当一个CancelToken取消时，所有使用该CancelToken的请求都会被取消。
+///  日志输出：debug默认会输出日志到控制台， release不会输出日志到控制台
+///
+/// Network request tool library, supporting multiple caching modes
+/// The same CancelToken can be used for multiple requests. When a CancelToken is cancelled, all requests using that CancelToken will be cancelled.
+/// Log output: If debug is the default, log will be output to the console, if release is the default, log will not be output to the console
 
 class RxNet with ChangeNotifier {
 
   Dio? _client;
 
   ///最大重试次数
+  ///maximum number of retries
   static int maxRetryCount = 100000;
   static final RxNet _instance = RxNet._internal();
 
@@ -31,30 +37,39 @@ class RxNet with ChangeNotifier {
   CheckNetWork? _baseCheckNet;
 
   ///请求拦截,可以拦截错误信息,也可以在你外部自定义拦截器中实现
+  ///Request interception, which can intercept error messages, or it can be implemented in your external custom interceptor
   RequestCaptureError? _requestCaptureError;
 
   ///缓存模式
+  ///cache mode
   CacheMode? _baseCacheMode;
 
   ///初始化默认 缓存失效时间（毫秒） 一年
+  ///Initialization default cache expiration time (milliseconds) one year
   int _cacheInvalidationTime = 0;
 
   ///全局请求头
+  ///global request header
   Map<String, dynamic> _globalHeader = {};
 
   ///忽略缓存的校验的key
+  ///Ignore cached check keys
   List<String>? _baseIgnoreCacheKeys;
 
   ///本地缓存数据库
+  ///Local cache database
   RxNetDataBase? _dataBase;
 
   ///是否开启日志收集
+  ///Whether to turn on log collection
   bool _isCollectLogs = false;
 
   ///调试窗口大小
+  ///Debugging window size
   late ValueNotifier<Size> debugWindowSizeNotifier;
 
   ///收集的日志信息，用于界面呈现
+  ///Collected log information for interface presentation
   ValueNotifier<List<String>> logsNotifier = ValueNotifier([]);
 
   /// 支持多环境 baseUrl调试 ,
@@ -75,7 +90,9 @@ class RxNet with ChangeNotifier {
 
   ///初始化公共属性
   /// [baseUrl] 地址前缀
+  /// [baseUrl] address prefix
   /// [interceptors] 基础拦截器
+  /// [interceptors] basic interceptor
   ///
   Future<void> init({
     required String baseUrl,
@@ -83,9 +100,7 @@ class RxNet with ChangeNotifier {
     String cacheName = 'app_local_data',
     List<Interceptor>? interceptors,
     BaseOptions? baseOptions,
-    bool isDebug = false,
     bool useSystemPrint = false,
-    String? printTag,
     CheckNetWork? baseCheckNet,
     List<String>? ignoreCacheKeys,
     RequestCaptureError? requestCaptureError,
@@ -98,7 +113,7 @@ class RxNet with ChangeNotifier {
   }) async{
 
     WidgetsFlutterBinding.ensureInitialized();
-    LogUtil.init(isDebug: isDebug, tag: printTag, useSystemPrint: useSystemPrint);
+    LogUtil.init(useSystemPrint: useSystemPrint);
 
     this._baseCheckNet = baseCheckNet;
     this._baseCacheMode = baseCacheMode;
@@ -147,13 +162,13 @@ class RxNet with ChangeNotifier {
   /// [key] 缓存key
   /// [value] 缓存值
   Future saveCache(String key, dynamic value) async {
-    return getDb()?.put(key,value);
+    return await getDb()?.put(key,value);
   }
 
   /// 读取缓存
   /// [key] 缓存key
   Future readCache(String key) async {
-    return getDb()?.get(key);
+    return await getDb()?.get(key);
   }
 
   RxNetDataBase? getDb(){
@@ -235,7 +250,6 @@ class RxNet with ChangeNotifier {
 
   OverlayEntry? _overlayEntry;
   void showDebugWindow(BuildContext context) {
-    LogUtil.debug = true;
     _isCollectLogs = true;
     closeDebugWindow();
     OverlayState? overlayState = Overlay.of(context);
@@ -569,11 +583,8 @@ class BuildRequest<T> {
         _bodyData = _params;
       }
 
-      if(_jsonTransformation!=null){
-        LogUtil.v("$url，JsonConvert：true");
-      }else{
-        LogUtil.v("$url，JsonConvert：false");
-      }
+      LogUtil.v("$url，JsonConvert：${_jsonTransformation != null}");
+
       Response<dynamic> response = await _rxNet.client!.request(
           url,
           data: _bodyData,
@@ -590,20 +601,14 @@ class BuildRequest<T> {
           try {
             //先判断是不是原始字符串格式Map数据，是则先将字符串转json格式
             if(responseData is String){
-              try{
-                responseData = jsonDecode(responseData);
-              }catch(e){
-                LogUtil.v("JsonConvert：字符串转json失败，非Map格式数据");
-                return;
-              }
+              responseData = jsonDecode(responseData);
             }
             final data = await _jsonTransformation?.call(responseData);
             success?.call(data as T, SourcesType.net);
           }catch(e){
-            LogUtil.v("RxNet：请检查json数据接收类是否正确");
+            LogUtil.v("RxNet：请检查json数据格式是否正确");
+            failure?.call({});
             return;
-          } finally {
-            completed?.call();
           }
         }
         else {
@@ -620,6 +625,7 @@ class BuildRequest<T> {
             'timestamp': DateTime.now().millisecondsSinceEpoch,
             'data':responseData
           };
+          LogUtil.v("-->缓存数据:cacheKey:$cacheKey,${jsonEncode(map)}");
           _rxNet.saveCache(cacheKey, jsonEncode(map));
         }
         return;
@@ -632,7 +638,9 @@ class BuildRequest<T> {
       isFailure = true;
       _catchError(success, failure, readCache, e, s);
     } finally {
-      completed?.call();
+      if(readCache==null){
+        completed?.call();
+      }
       if (_isLoop) {
         Future.delayed(Duration(milliseconds: _retryInterval), () {
           _doWorkRequest(
@@ -674,7 +682,9 @@ class BuildRequest<T> {
         _ignoreCacheKeys.addAll(_rxNet._baseIgnoreCacheKeys!);
         _ignoreCacheKeys = _ignoreCacheKeys.toSet().toList();
       }
+      // 8c49eb992d8e9997347528a3415d568cc318c6743719fca30b4f58094bcc42c1
       final cacheData = await _rxNet.readCache(NetUtils.getCacheKeyFromPath(_path, _params,_ignoreCacheKeys));
+      LogUtil.v("-->缓存数据NetUtils.getCacheKeyFromPath(_path, _params,_ignoreCacheKeys):${NetUtils.getCacheKeyFromPath(_path, _params,_ignoreCacheKeys)}");
       // LogUtil.v("缓存数据:$cacheData");
       if (!TextUtil.isEmpty(cacheData)) {
         final data = jsonDecode(cacheData);
@@ -799,7 +809,10 @@ class BuildRequest<T> {
                 success: success,
                 failure: failure,
                 completed: completed,
-                cache: true
+                cache: true,
+                readCache: () {
+                  _readCache(success, failure,completed);
+                }
             );
           },
           completed,
@@ -990,7 +1003,7 @@ class BuildRequest<T> {
   ///[savePath]  文件保存路径
   ///[cancelCallback]  取消下载时的回调
   ///下载成功 回调[success] 获取文件本身
-  void breakPointDownload({
+  void downloadBreakPoint({
     required String savePath,
     ProgressCallback? onReceiveProgress,
     Success? success,
@@ -1105,7 +1118,7 @@ class BuildRequest<T> {
   ///[filePath]  上传文件的路径
   ///[cancelCallback]  取消下载时的回调
   ///下载成功 回调[success] 获取文件本身
-  void breakPointUploadFile({
+  void uploadFileBreakPoint({
     required String filePath,
     ProgressCallback? onSendProgress,
     Success? success,
