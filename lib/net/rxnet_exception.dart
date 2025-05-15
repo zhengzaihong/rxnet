@@ -1,5 +1,5 @@
 import 'dart:core';
-import 'RxResult.dart';
+import 'rx_result.dart';
 
 ///
 /// create_user: zhengzaihong

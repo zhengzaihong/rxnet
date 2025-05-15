@@ -13,7 +13,7 @@ export 'package:flutter_rxnet_forzzh/utils/RxNetPlatform.dart';
 export 'package:flutter_rxnet_forzzh/utils/downloader.dart';
 export 'package:flutter_rxnet_forzzh/utils/ext.dart';
 export 'package:flutter_rxnet_forzzh/net/interceptor/rxnet_log_interceptor.dart';
-export 'package:flutter_rxnet_forzzh/net/RxResult.dart';
+export 'package:flutter_rxnet_forzzh/net/rx_result.dart';
 export 'package:flutter_rxnet_forzzh/net/rxnet_exception.dart';
 export 'package:dio/dio.dart';
 export 'package:dio/src/adapter.dart';
