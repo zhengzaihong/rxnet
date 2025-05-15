@@ -23,7 +23,7 @@ A minimalist Flutter network request tool. This library is an extension of Dio. 
 ## dependent：
 
     dependencies:
-       flutter_rxnet_forzzh:0.3.1  #请使用 0.2.2 版本及其以上
+       flutter_rxnet_forzzh:0.3.1  
 
 
 ## common parameters：
