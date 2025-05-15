@@ -8,7 +8,6 @@ import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 import 'package:hive/hive.dart';
 import '../utils/RxNetDataBase.dart';
 
-
 ///
 /// create_user: zhengzaihong
 /// email:1096877329@qq.com
@@ -23,7 +22,6 @@ import '../utils/RxNetDataBase.dart';
 /// Log output: If debug is the default, log will be output to the console, if release is the default, log will not be output to the console
 
 class RxNet with ChangeNotifier {
-
   Dio? _client;
 
   ///最大重试次数
@@ -32,6 +30,7 @@ class RxNet with ChangeNotifier {
   static final RxNet _instance = RxNet._internal();
 
   factory RxNet() => _instance;
+
   Dio? get client => _client;
 
   CheckNetWork? _baseCheckNet;
@@ -83,8 +82,7 @@ class RxNet with ChangeNotifier {
   /// 创建 dio 实例对象
   RxNet._internal() {
     final options = BaseOptions(
-        contentType: Headers.jsonContentType,
-        responseType: ResponseType.json);
+        contentType: Headers.jsonContentType, responseType: ResponseType.json);
     _client ??= Dio(options);
   }
 
@@ -94,24 +92,22 @@ class RxNet with ChangeNotifier {
   /// [interceptors] 基础拦截器
   /// [interceptors] basic interceptor
   ///
-  Future<void> init({
-    required String baseUrl,
-    Directory? cacheDir,
-    String cacheName = 'app_local_data',
-    List<Interceptor>? interceptors,
-    BaseOptions? baseOptions,
-    bool useSystemPrint = false,
-    CheckNetWork? baseCheckNet,
-    List<String>? ignoreCacheKeys,
-    RequestCaptureError? requestCaptureError,
-    CacheMode? baseCacheMode,
-    HiveCipher? encryptionCipher,
-    Map<String, dynamic>? baseUrlEnv,
-    int cacheInvalidationTime = 365 * 24 * 60 * 60 * 1000,
-    double debugWindowWidth = 600,
-    double debugWindowHeight = 500
-  }) async{
-
+  Future<void> init(
+      {required String baseUrl,
+      Directory? cacheDir,
+      String cacheName = 'app_local_data',
+      List<Interceptor>? interceptors,
+      BaseOptions? baseOptions,
+      bool useSystemPrint = false,
+      CheckNetWork? baseCheckNet,
+      List<String>? ignoreCacheKeys,
+      RequestCaptureError? requestCaptureError,
+      CacheMode? baseCacheMode,
+      HiveCipher? encryptionCipher,
+      Map<String, dynamic>? baseUrlEnv,
+      int cacheInvalidationTime = 365 * 24 * 60 * 60 * 1000,
+      double debugWindowWidth = 600,
+      double debugWindowHeight = 500}) async {
     WidgetsFlutterBinding.ensureInitialized();
     LogUtil.init(useSystemPrint: useSystemPrint);
 
@@ -124,15 +120,16 @@ class RxNet with ChangeNotifier {
     if (baseOptions != null) {
       _client?.options = baseOptions;
     }
+
     /// 以最初 baseUrl 为准
     _client?.options.baseUrl = baseUrl;
     if (interceptors != null) {
       _client?.interceptors.addAll(interceptors);
     }
-    if(baseUrlEnv!= null && baseUrlEnv.isNotEmpty){
+    if (baseUrlEnv != null && baseUrlEnv.isNotEmpty) {
       _baseUrlEnv.addAll(baseUrlEnv);
     }
-    if(RxNetPlatform.isWeb){
+    if (RxNetPlatform.isWeb) {
       this._baseCacheMode = CacheMode.onlyRequest;
       LogUtil.v("RxNet 不支持缓存的环境：web");
       return;
@@ -143,26 +140,24 @@ class RxNet with ChangeNotifier {
         hiveBoxName: cacheName,
         encryptionCipher: encryptionCipher);
 
-    debugWindowSizeNotifier = ValueNotifier(Size(debugWindowWidth, debugWindowHeight));
+    debugWindowSizeNotifier =
+        ValueNotifier(Size(debugWindowWidth, debugWindowHeight));
   }
 
-
-  Dio? getClient()=>_client;
-
+  Dio? getClient() => _client;
 
   /// 切换环境
   /// [env] 环境名称 key
   /// 例如：debug,test,release
-  void setEnv(String env){
+  void setEnv(String env) {
     _client?.options.baseUrl = _baseUrlEnv[env];
   }
-
 
   /// 缓存
   /// [key] 缓存key
   /// [value] 缓存值
   Future saveCache(String key, dynamic value) async {
-    return await getDb()?.put(key,value);
+    return await getDb()?.put(key, value);
   }
 
   /// 读取缓存
@@ -171,10 +166,9 @@ class RxNet with ChangeNotifier {
     return await getDb()?.get(key);
   }
 
-  RxNetDataBase? getDb(){
+  RxNetDataBase? getDb() {
     return _dataBase;
   }
-
 
   ///这里提供一个收集日字的方法，便于后期排查
   ///文件需要有写的权限，eg:xxx/xxx/log.txt
@@ -229,12 +223,11 @@ class RxNet with ChangeNotifier {
     return _globalHeader;
   }
 
-
   bool get collectLogs => _isCollectLogs;
+
   void setCollectLogs(bool collect) {
     _isCollectLogs = collect;
   }
-
 
   void addLogs(String log) {
     if (collectLogs) {
@@ -242,13 +235,14 @@ class RxNet with ChangeNotifier {
       logsNotifier.notifyListeners();
     }
   }
+
   void clearLogs() {
     logsNotifier.value = [];
     logsNotifier.notifyListeners();
   }
 
-
   OverlayEntry? _overlayEntry;
+
   void showDebugWindow(BuildContext context) {
     _isCollectLogs = true;
     closeDebugWindow();
@@ -259,16 +253,16 @@ class RxNet with ChangeNotifier {
         width: size.width,
         height: size.height,
         child: Center(
-          child: DragBox(child: ValueListenableBuilder<Size>(
-            valueListenable: debugWindowSizeNotifier,
-            builder: (context, value, child) {
-              return SizedBox(
-                width: value.width,
-                height: value.height,
-                child: const DebugPage(),
-              );
-            }
-          )),
+          child: DragBox(
+              child: ValueListenableBuilder<Size>(
+                  valueListenable: debugWindowSizeNotifier,
+                  builder: (context, value, child) {
+                    return SizedBox(
+                      width: value.width,
+                      height: value.height,
+                      child: const DebugPage(),
+                    );
+                  })),
         ),
       ),
     );
@@ -283,7 +277,6 @@ class RxNet with ChangeNotifier {
 }
 
 class BuildRequest<T> {
-
   final HttpType _httpType;
 
   final RxNet _rxNet;
@@ -314,7 +307,6 @@ class BuildRequest<T> {
   JsonTransformation? _jsonTransformation;
 
   Options? _options;
-
 
   ///默认一年
   int? _cacheInvalidationTime;
@@ -365,7 +357,6 @@ class BuildRequest<T> {
     return this;
   }
 
-
   /// 处理 RestfulUrl格式请求
   /// 如：xxxx/xxx/weather?city=101030100
   /// 结果：xxxx/xxx/weather/city/101030100
@@ -385,7 +376,6 @@ class BuildRequest<T> {
     _path = path;
     return this;
   }
-
 
   BuildRequest setParam(String key, dynamic value) {
     _params[key] = value;
@@ -407,12 +397,12 @@ class BuildRequest<T> {
     _toBodyData = false;
     return this;
   }
+
   BuildRequest setParamsToBodyData(bool toBody) {
     _toBodyData = toBody;
     _toFormData = false;
     return this;
   }
-
 
   ///用于表单( FormData )。默认 raw json, 其它方式 setOptionConfig自行处理
   // eg:
@@ -432,6 +422,7 @@ class BuildRequest<T> {
     setParamsToFormData(true);
     return this;
   }
+
   BuildRequest toBodyData() {
     setParamsToBodyData(true);
     return this;
@@ -445,7 +436,7 @@ class BuildRequest<T> {
   }
 
   BuildRequest removeNullValueKeys() {
-    _params.removeWhere((key, value) =>  value == null);
+    _params.removeWhere((key, value) => value == null);
     return this;
   }
 
@@ -465,7 +456,7 @@ class BuildRequest<T> {
   }
 
   BuildRequest setCancelToken(CancelToken cancelToken) {
-    _cancelToken= cancelToken;
+    _cancelToken = cancelToken;
     return this;
   }
 
@@ -476,7 +467,7 @@ class BuildRequest<T> {
 
   BuildRequest setCacheMode(CacheMode cacheMode) {
     _cacheMode = cacheMode;
-    if(RxNetPlatform.isWeb){
+    if (RxNetPlatform.isWeb) {
       _cacheMode = CacheMode.onlyRequest;
     }
     return this;
@@ -504,7 +495,6 @@ class BuildRequest<T> {
     return this;
   }
 
-
   ///设置重试次数
   BuildRequest setRetryCount(int count) {
     _retryCount = count;
@@ -523,7 +513,6 @@ class BuildRequest<T> {
     _failRetry = status;
     return this;
   }
-
 
   ///设置缓存失效时间（毫秒）
   BuildRequest setCacheInvalidationTime(int millisecond) {
@@ -548,7 +537,8 @@ class BuildRequest<T> {
   }
 
   /// 响应结果 一般情况不会使用
-  BuildRequest setResponseCallBack(Function(Response response) responseCallBack) {
+  BuildRequest setResponseCallBack(
+      Function(Response response) responseCallBack) {
     this.onResponse = responseCallBack;
     return this;
   }
@@ -576,19 +566,19 @@ class BuildRequest<T> {
         _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet._globalHeader);
       }
-      if(_toFormData){
+      if (_toFormData) {
         _bodyData = FormData.fromMap(_params);
       }
-      if(_toBodyData){
+      if (_toBodyData) {
         _bodyData = _params;
       }
 
       LogUtil.v("$url，JsonConvert：${_jsonTransformation != null}");
 
-      Response<dynamic> response = await _rxNet.client!.request(
-          url,
+      Response<dynamic> response = await _rxNet.client!.request(url,
           data: _bodyData,
-          queryParameters: (isRestfulUrl() || _toFormData || _toBodyData)? {} : _params,
+          queryParameters:
+              (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
           options: _options,
           cancelToken: _cancelToken);
 
@@ -600,48 +590,58 @@ class BuildRequest<T> {
         if (_jsonTransformation != null) {
           try {
             //先判断是不是原始字符串格式Map数据，是则先将字符串转json格式
-            if(responseData is String){
+            if (responseData is String) {
               responseData = jsonDecode(responseData);
             }
             final data = await _jsonTransformation?.call(responseData);
             success?.call(data as T, SourcesType.net);
-          }catch(e){
+          } catch (e) {
             LogUtil.v("RxNet：请检查json数据格式是否正确");
             failure?.call({});
-            return;
           }
-        }
-        else {
+        } else {
           success?.call(responseData, SourcesType.net);
         }
+
         /// 存储数据
-        if(cache && !RxNetPlatform.isWeb){
-          if(_rxNet._baseIgnoreCacheKeys!=null){
+        if (cache && !RxNetPlatform.isWeb) {
+          if (_rxNet._baseIgnoreCacheKeys != null) {
             _ignoreCacheKeys.addAll(_rxNet._baseIgnoreCacheKeys!);
             _ignoreCacheKeys = _ignoreCacheKeys.toSet().toList();
           }
-          String cacheKey = NetUtils.getCacheKeyFromPath(_path, _params,_ignoreCacheKeys);
+          String cacheKey =
+              NetUtils.getCacheKeyFromPath(_path, _params, _ignoreCacheKeys);
           final map = <String, dynamic>{
             'timestamp': DateTime.now().millisecondsSinceEpoch,
-            'data':responseData
+            'data': responseData
           };
-          LogUtil.v("-->缓存数据:cacheKey:$cacheKey,${jsonEncode(map)}");
           _rxNet.saveCache(cacheKey, jsonEncode(map));
         }
-        return;
+      } else {
+        ///失败
+        isFailure = true;
+        failure?.call(responseData);
       }
 
-      ///失败
-      isFailure = true;
-      failure?.call(responseData);
+      completed?.call();
+
     } catch (e, s) {
       isFailure = true;
       _catchError(success, failure, readCache, e, s);
-    } finally {
-      if(readCache==null){
-        completed?.call();
-      }
-      if (_isLoop) {
+    }
+
+    if (_isLoop) {
+      Future.delayed(Duration(milliseconds: _retryInterval), () {
+        _doWorkRequest(
+            success: success,
+            failure: failure,
+            completed: completed,
+            cache: cache,
+            readCache: readCache);
+      });
+    } else {
+      if (_retryCount > 0 && (isFailure && _failRetry)) {
+        _retryCount--;
         Future.delayed(Duration(milliseconds: _retryInterval), () {
           _doWorkRequest(
               success: success,
@@ -650,41 +650,24 @@ class BuildRequest<T> {
               cache: cache,
               readCache: readCache);
         });
-      } else {
-        if (_retryCount > 0 && (isFailure && _failRetry)) {
-          _retryCount--;
-          Future.delayed(Duration(milliseconds: _retryInterval), () {
-            _doWorkRequest(
-                success: success,
-                failure: failure,
-                completed: completed,
-                cache: cache,
-                readCache: readCache);
-          });
-        }
       }
     }
   }
 
-
   void _readCache<T>(
-      Success<T>? success,
-      Failure<T>? failure,
-      Completed? completed,{
-      CacheInvalidationCallback? cacheInvalidationCallback
-  }) async {
-    if(RxNetPlatform.isWeb){
+      Success<T>? success, Failure<T>? failure, Completed? completed,
+      {CacheInvalidationCallback? cacheInvalidationCallback}) async {
+    if (RxNetPlatform.isWeb) {
       return;
     }
 
-    if(RxNetDataBase.isDatabaseReady){
-      if(_rxNet._baseIgnoreCacheKeys!=null){
+    if (RxNetDataBase.isDatabaseReady) {
+      if (_rxNet._baseIgnoreCacheKeys != null) {
         _ignoreCacheKeys.addAll(_rxNet._baseIgnoreCacheKeys!);
         _ignoreCacheKeys = _ignoreCacheKeys.toSet().toList();
       }
-      // 8c49eb992d8e9997347528a3415d568cc318c6743719fca30b4f58094bcc42c1
-      final cacheData = await _rxNet.readCache(NetUtils.getCacheKeyFromPath(_path, _params,_ignoreCacheKeys));
-      LogUtil.v("-->缓存数据NetUtils.getCacheKeyFromPath(_path, _params,_ignoreCacheKeys):${NetUtils.getCacheKeyFromPath(_path, _params,_ignoreCacheKeys)}");
+      final cacheData = await _rxNet.readCache(
+          NetUtils.getCacheKeyFromPath(_path, _params, _ignoreCacheKeys));
       // LogUtil.v("缓存数据:$cacheData");
       if (!TextUtil.isEmpty(cacheData)) {
         final data = jsonDecode(cacheData);
@@ -693,39 +676,37 @@ class BuildRequest<T> {
         LogUtil.v("-->缓存数据:${jsonEncode(data)}");
         if (timestamp != null) {
           final now = DateTime.now().millisecondsSinceEpoch;
-          if (now - timestamp > (_cacheInvalidationTime??_rxNet._cacheInvalidationTime)) {
+          if (now - timestamp > (_cacheInvalidationTime ?? _rxNet._cacheInvalidationTime)) {
             LogUtil.v("-->缓存数据:超时效");
             cacheInvalidationCallback?.call();
-            return;
           }
         }
         //解析本地缓存
-        if(dataValue is Map && dataValue.length>0){
-          _parseLocalData<T>(success, failure,completed, dataValue);
+        if (dataValue is Map && dataValue.length > 0) {
+          _parseLocalData<T>(success, failure, completed, dataValue);
           return;
+        }else{
+          // 无缓存内容
+          cacheInvalidationCallback?.call();
         }
-        // 无缓存内容
-        cacheInvalidationCallback?.call();
-        return;
       }
       failure?.call({});
       completed?.call();
       return;
     }
 
-    RxNetDataBase.setDataBaseReadListener((isOk){
-      _readCache(success,failure,completed);
+    RxNetDataBase.setDataBaseReadListener((isOk) {
+      _readCache(success, failure, completed);
     });
   }
 
   ///解析本地缓存数据
   void _parseLocalData<T>(
-      Success<T>? success,
-      Failure<T>? failure,
-      Completed? completed,
-      dynamic cacheValue,
-      ) {
-
+    Success<T>? success,
+    Failure<T>? failure,
+    Completed? completed,
+    dynamic cacheValue,
+  ) {
     try {
       if (_jsonTransformation != null) {
         LogUtil.v("JsonConvert：true");
@@ -738,9 +719,9 @@ class BuildRequest<T> {
     } catch (e) {
       failure?.call({});
       LogUtil.v("RxNet：请检查json数据接收类是否正确");
-    } finally {
-      completed?.call();
     }
+
+    completed?.call();
   }
 
   Future<bool> _checkNetWork() async {
@@ -760,7 +741,8 @@ class BuildRequest<T> {
 
   ///基于异步回调方式 支持同时请求和缓存策略
   ///对于外部可接收多种状态的数据 建议使用此方式。
-  void execute<T>({Success<T>? success, Failure? failure, Completed? completed}) async {
+  void execute<T>(
+      {Success<T>? success, Failure? failure, Completed? completed}) async {
     if (!(await _checkNetWork())) {
       completed?.call();
       return;
@@ -768,13 +750,11 @@ class BuildRequest<T> {
     _cacheMode ??= (_rxNet._baseCacheMode ?? CacheMode.onlyRequest);
     if (_cacheMode == CacheMode.onlyRequest) {
       return _doWorkRequest(
-          success: success,
-          failure: failure,
-          completed: completed);
+          success: success, failure: failure, completed: completed);
     }
 
     if (_cacheMode == CacheMode.firstCacheThenRequest) {
-      return _readCache(success, failure,(){
+      return _readCache(success, failure, () {
         _doWorkRequest(
             success: success,
             failure: failure,
@@ -784,13 +764,13 @@ class BuildRequest<T> {
     }
 
     if (_cacheMode == CacheMode.requestFailedReadCache) {
-      return  _doWorkRequest(
+      return _doWorkRequest(
           success: success,
           failure: failure,
           completed: completed,
           cache: true,
           readCache: () {
-            _readCache(success, failure,completed);
+            _readCache(success, failure, completed);
           });
     }
 
@@ -803,17 +783,17 @@ class BuildRequest<T> {
             cache: true);
       }
       return _readCache(
-          success, (e) {
-             // 缓存读取错误，则发起请求
+          success,
+          (e) {
+            // 缓存读取错误，则发起请求
             _doWorkRequest(
                 success: success,
                 failure: failure,
                 completed: completed,
                 cache: true,
                 readCache: () {
-                  _readCache(success, failure,completed);
-                }
-            );
+                  _readCache(success, failure, completed);
+                });
           },
           completed,
           cacheInvalidationCallback: () {
@@ -822,64 +802,64 @@ class BuildRequest<T> {
                 success: success,
                 failure: failure,
                 completed: completed,
-                cache: true
-            );
+                cache: true);
           });
     }
     if (_cacheMode == CacheMode.onlyCache) {
-      return _readCache(success, failure,completed);
+      return _readCache(success, failure, completed);
     }
   }
 
   /// 外部使用 await 方式调用此方法。
   /// 结果从 RxResult 中获取
   /// 此方式不支持 同时请求和读取缓存策略。
-  Future<RxResult<T>> executeAsync<T>() async  {
+  Future<RxResult<T>> executeAsync<T>() async {
     Completer<RxResult<T>> completer = Completer();
     if (!(await _checkNetWork())) {
       return completer.future;
     }
-    _cacheMode??=(_rxNet._baseCacheMode ?? CacheMode.onlyRequest);
-    if(_cacheMode == CacheMode.requestFailedReadCache || _cacheMode == CacheMode.cacheNoneToRequest){
+    _cacheMode ??= (_rxNet._baseCacheMode ?? CacheMode.onlyRequest);
+    if (_cacheMode == CacheMode.requestFailedReadCache ||
+        _cacheMode == CacheMode.cacheNoneToRequest) {
       _cacheMode = CacheMode.onlyRequest;
     }
 
-    if(_cacheMode == CacheMode.firstCacheThenRequest){
+    if (_cacheMode == CacheMode.firstCacheThenRequest) {
       _cacheMode = CacheMode.onlyCache;
     }
 
     if (_cacheMode == CacheMode.onlyRequest) {
-      _doWorkRequest<T>(success: (data,model){
+      _doWorkRequest<T>(success: (data, model) {
         _successHandler<T>(completer, data: data, model: model);
-      }, failure: (e){
-        _errorHandler<T>(completer,model:SourcesType.net, error: e);
+      }, failure: (e) {
+        _errorHandler<T>(completer, model: SourcesType.net, error: e);
       });
     }
 
     if (_cacheMode == CacheMode.onlyCache) {
-      _readCache<T>((data, model){
+      _readCache<T>((data, model) {
         _successHandler<T>(completer, data: data, model: model);
-      }, (e){
-        _errorHandler<T>(completer,model:SourcesType.cache, error: e);
-      },null);
+      }, (e) {
+        _errorHandler<T>(completer, model: SourcesType.cache, error: e);
+      }, null);
     }
     return completer.future;
   }
 
   void _errorHandler<T>(Completer<RxResult<T>> completer,
       {SourcesType model = SourcesType.net,
-        dynamic error,
-        bool isError = true}) {
+      dynamic error,
+      bool isError = true}) {
     completer.complete(RxResult(error: error, isError: isError));
   }
 
   void _successHandler<T>(Completer<RxResult<T>> completer,
       {T? data,
-        SourcesType model = SourcesType.net,
-        dynamic error,
-        bool isError = false}) {
-    completer.complete(RxResult<T>(
-        value: data, model: model, error: error, isError: isError));
+      SourcesType model = SourcesType.net,
+      dynamic error,
+      bool isError = false}) {
+    completer.complete(
+        RxResult<T>(value: data, model: model, error: error, isError: isError));
   }
 
   ///上传文件
@@ -908,39 +888,34 @@ class BuildRequest<T> {
         _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet._globalHeader);
       }
-      if(_toFormData){
+      if (_toFormData) {
         _bodyData = FormData.fromMap(_params);
       }
-      if(_toBodyData){
+      if (_toBodyData) {
         _bodyData = _params;
       }
 
-      Response response = await _rxNet.client!.request(
-          url,
+      Response response = await _rxNet.client!.request(url,
           data: _bodyData,
-          queryParameters: (isRestfulUrl() || _toFormData || _toBodyData)? {} : _params,
+          queryParameters:
+              (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
           options: _options,
           cancelToken: _cancelToken);
-
 
       onResponse?.call(response);
       if (response.statusCode == 200) {
         success?.call(response.data, SourcesType.net);
-        return;
       }
       failure?.call(response.data);
     } catch (e, s) {
       _catchError(success, failure, null, e, s);
-    } finally {
-      completed?.call();
     }
+    completed?.call();
   }
-
-
 
   ///下载文件
   ///[savePath]  文件保存路径
-   void download({
+  void download({
     required String savePath,
     ProgressCallback? onReceiveProgress,
     Success? success,
@@ -956,6 +931,7 @@ class BuildRequest<T> {
     }
     try {
       _options?.method = _httpType.name;
+
       ///局部头优先与全局
       if (_headers.isNotEmpty) {
         _options?.headers = _headers;
@@ -964,40 +940,40 @@ class BuildRequest<T> {
         _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet._globalHeader);
       }
-      if(_toFormData){
+      if (_toFormData) {
         _bodyData = FormData.fromMap(_params);
       }
-      if(_toBodyData){
+      if (_toBodyData) {
         _bodyData = _params;
       }
 
       final response = await _rxNet.client!.download(url, savePath,
           onReceiveProgress: (received, total) {
-            if (total != -1) {
-              onReceiveProgress?.call(received, total);
-            }
-            ///下载完成
-            if(received>=total){
-              success?.call(savePath, SourcesType.net);
-            }
-          },
-          queryParameters: (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
+        if (total != -1) {
+          onReceiveProgress?.call(received, total);
+        }
+
+        ///下载完成
+        if (received >= total) {
+          success?.call(savePath, SourcesType.net);
+        }
+      },
+          queryParameters:
+              (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
           data: _bodyData,
           options: _options,
           cancelToken: _cancelToken);
       onResponse?.call(response);
+
       ///失败
       if (response.statusCode != 200) {
         failure?.call(response.data);
-        return;
       }
     } catch (e, s) {
       _catchError<T>(success, failure, null, e, s);
-    }finally{
-      completed?.call();
     }
+    completed?.call();
   }
-
 
   ///下载文件 支持断点下载
   ///[savePath]  文件保存路径
@@ -1011,14 +987,13 @@ class BuildRequest<T> {
     Completed? completed,
     Function()? cancelCallback,
   }) async {
-
     if (!(await _checkNetWork())) {
       return;
     }
 
     int downloadStart = 0;
     File file = File(savePath);
-    try{
+    try {
       String url = _path.toString();
       if (isRestfulUrl()) {
         url = NetUtils.restfulUrl(_path.toString(), _params);
@@ -1031,10 +1006,12 @@ class BuildRequest<T> {
         }
       }
       _options?.method = _httpType.name;
+
       /// 以流的方式接收响应数据
       _options = _options?.copyWith(
         responseType: ResponseType.stream,
       );
+
       ///局部头优先与全局
       if (_headers.isNotEmpty) {
         _options?.headers?.addAll(_headers);
@@ -1044,75 +1021,69 @@ class BuildRequest<T> {
         _options?.headers?.addAll(_rxNet._globalHeader);
       }
       _options?.headers?.addAll({"Range": "bytes=$downloadStart-"});
-      if(_toFormData){
+      if (_toFormData) {
         _bodyData = FormData.fromMap(_params);
       }
-      if(_toBodyData){
+      if (_toBodyData) {
         _bodyData = _params;
       }
 
-      final response = await  _rxNet.client!.request<ResponseBody>(
+      final response = await _rxNet.client!.request<ResponseBody>(
         url,
         options: _options,
         cancelToken: _cancelToken,
         data: _bodyData,
-        queryParameters: (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
+        queryParameters:
+            (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
       );
       onResponse?.call(response);
       RandomAccessFile raf = file.openSync(mode: FileMode.append);
       Stream<Uint8List> stream = response.data!.stream;
 
-      final content= await getContentLength(response);
-      final total = int.tryParse(content?.split('/').last??"0")??0;
+      final content = await getContentLength(response);
+      final total = int.tryParse(content?.split('/').last ?? "0") ?? 0;
 
-      final subscription =stream.listen((data) {
-          raf.writeFromSync(data);
-          downloadStart = downloadStart+data.length;
-          if(total<downloadStart){
-            onReceiveProgress?.call(total, total);
-            return;
-          }
-          onReceiveProgress?.call(downloadStart, total);
-        },
-        onDone: () async {
-          success?.call(file, SourcesType.net);
-          await raf.close();
-        },
-        onError: (e) async {
-           _collectError(e);
-           failure?.call(e);
-           await raf.close();
-        },
-        cancelOnError: true
-      );
+      final subscription = stream.listen((data) {
+        raf.writeFromSync(data);
+        downloadStart = downloadStart + data.length;
+        if (total < downloadStart) {
+          onReceiveProgress?.call(total, total);
+          return;
+        }
+        onReceiveProgress?.call(downloadStart, total);
+      }, onDone: () async {
+        success?.call(file, SourcesType.net);
+        await raf.close();
+      }, onError: (e) async {
+        _collectError(e);
+        failure?.call(e);
+        await raf.close();
+      }, cancelOnError: true);
 
       _cancelToken?.whenCancel.then((_) async {
         await subscription.cancel();
         await raf.close();
         cancelCallback?.call();
       });
-
-    }on DioException catch (error) {
-      if(error.response!=null){
-        final content= await getContentLength(error.response!);
-        final total = int.tryParse(content?.split('/').last??"0")??0;
-        if(total<=downloadStart){
+    } on DioException catch (error) {
+      if (error.response != null) {
+        final content = await getContentLength(error.response!);
+        final total = int.tryParse(content?.split('/').last ?? "0") ?? 0;
+        if (total <= downloadStart) {
           onReceiveProgress?.call(total, total);
           success?.call(file, SourcesType.net);
-          return;
         }
       }
       _collectError(error);
-      failure?.call(error);
       if (CancelToken.isCancel(error)) {
         cancelCallback?.call();
-        return;
+      } else {
+        failure?.call(error);
       }
-    } finally {
-      completed?.call();
     }
-  }
 
+    completed?.call();
+  }
 
   ///上传文件 支持断点上传
   ///[filePath]  上传文件的路径
@@ -1127,7 +1098,6 @@ class BuildRequest<T> {
     Function()? cancelCallback,
     int? start,
   }) async {
-
     if (!(await _checkNetWork())) {
       return;
     }
@@ -1144,9 +1114,8 @@ class BuildRequest<T> {
         fileSize += chunk.length;
       }
     }
-    var data = file.openRead(progress,fileSize-progress);
+    var data = file.openRead(progress, fileSize - progress);
     try {
-
       _options?.method = _httpType.name;
       if (_headers.isNotEmpty) {
         _options?.headers?.addAll(_headers);
@@ -1155,12 +1124,13 @@ class BuildRequest<T> {
         _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet._globalHeader);
       }
-      _options?.headers?.addAll({'Content-Range': 'bytes $progress-${fileSize - 1}/$fileSize'});
+      _options?.headers?.addAll(
+          {'Content-Range': 'bytes $progress-${fileSize - 1}/$fileSize'});
 
-      if(_toFormData){
+      if (_toFormData) {
         _bodyData = FormData.fromMap(_params);
       }
-      if(_toBodyData){
+      if (_toBodyData) {
         _bodyData = _params;
       }
       final response = await _rxNet.client!.request<ResponseBody>(
@@ -1168,49 +1138,44 @@ class BuildRequest<T> {
         options: _options,
         cancelToken: _cancelToken,
         data: data,
-        queryParameters: (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
+        queryParameters:
+            (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
       );
       onResponse?.call(response);
       Stream<Uint8List> stream = response.data!.stream;
-      final subscription =stream.listen((data) {
-           progress = progress+data.length;
-           onSendProgress?.call(progress, fileSize);
-         },
-          onDone: () async {
-            success?.call(file, SourcesType.net);
-          },
-          onError: (e) async {
-            failure?.call(e);
-            _collectError(e);
-          },
-           cancelOnError: true
-      );
+      final subscription = stream.listen((data) {
+        progress = progress + data.length;
+        onSendProgress?.call(progress, fileSize);
+      }, onDone: () async {
+        success?.call(file, SourcesType.net);
+      }, onError: (e) async {
+        failure?.call(e);
+        _collectError(e);
+      }, cancelOnError: true);
       _cancelToken?.whenCancel.then((_) async {
         await subscription.cancel();
         cancelCallback?.call();
       });
     } on DioException catch (error) {
-      if(error.response!=null){
-        if(progress<=fileSize){
+      if (error.response != null) {
+        if (progress <= fileSize) {
           onSendProgress?.call(progress, fileSize);
           success?.call(file, SourcesType.net);
-          return;
         }
       }
       _collectError(error);
       if (CancelToken.isCancel(error)) {
         cancelCallback?.call();
-        return;
+      } else {
+        failure?.call(error);
       }
-      failure?.call(error);
-    } finally {
-      completed?.call();
     }
+
+    completed?.call();
   }
 
-
   /// 获取下载的文件大小 (0 - max) 文件末尾长度
-   Future<String?> getContentLength(Response<dynamic> response) async {
+  Future<String?> getContentLength(Response<dynamic> response) async {
     try {
       return response.headers.value(HttpHeaders.contentRangeHeader);
     } catch (e) {
@@ -1218,8 +1183,8 @@ class BuildRequest<T> {
     }
   }
 
-  void _catchError<T>(Success<T>? success, Failure<T>? failure,
-      Function? readCache, e, s) {
+  void _catchError<T>(
+      Success<T>? success, Failure<T>? failure, Function? readCache, e, s) {
     _collectError(e);
     LogUtil.v("请求出错：$e\n$s");
     if (readCache != null) {

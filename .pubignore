@@ -4,7 +4,6 @@
 .packages
 .pub/
 images/
-example/
 build/
 ios/.generated/
 ios/Flutter/Generated.xcconfig

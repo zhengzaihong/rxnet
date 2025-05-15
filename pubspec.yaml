@@ -1,6 +1,6 @@
 name: flutter_rxnet_forzzh
-description: A minimalist Flutter network request tool. This library is an extension of Dio. It is more natural to use and makes the application smoother. It has data and other features when the screen is opened.
-version: 0.3.0
+description: Based on Dio's extended network request framework, it supports various caching strategies and is easy to use
+version: 0.3.1
 homepage: https://github.com/zhengzaihong/rxnet
 
 platforms:

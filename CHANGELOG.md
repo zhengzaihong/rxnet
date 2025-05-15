@@ -1,8 +1,12 @@
 
+## 0.3.1
+- Fixed some bugs in the callback pattern
+
+
 ## 0.2.2
-- 代码优化，api简化优化
-- 其它bug修改
+- Code optimization, api simplification optimization
+- Other bug modifications
 - 
 ## 0.2.1
-- 修复post表单参数bug
-- 代码优化，新增api等
+- Fixed post form parameter bug
+- Code optimization, new APIs, etc.

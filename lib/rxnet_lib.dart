@@ -1,4 +1,4 @@
-export 'package:flutter_rxnet_forzzh/net/RxNet.dart';
+export 'package:flutter_rxnet_forzzh/net/rx_net.dart';
 export 'package:flutter_rxnet_forzzh/net/cache_mode.dart';
 export 'package:flutter_rxnet_forzzh/net/fun/fun_apply.dart';
 export 'package:flutter_rxnet_forzzh/net/type/http_type.dart';
