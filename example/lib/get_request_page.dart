@@ -42,7 +42,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
 
               TextButton(
                 onPressed: () {
-                  RxNet().showDebugWindow(context);
+                  RxNet.I.debugManager.showDebugWindow(context);
                 },
                 style: ButtonStyle(
                   backgroundColor: WidgetStateProperty.all(Colors.cyan),
@@ -73,7 +73,8 @@ class _GetRequestPageState extends State<GetRequestPage> {
   }
 
   void request({String? code}) async {
-    // RxNet().setHeaders({
+
+    // RxNet.I.setHeaders({
     //   "User-Agent": "PostmanRuntime-ApipostRuntime/1.1.0",
     //   "Cache-Control": "no-cache",
     //   "Accept": "*",
@@ -94,8 +95,8 @@ class _GetRequestPageState extends State<GetRequestPage> {
         .setRetryCount(2)  //重试次数
         .setRetryInterval(7000) //毫秒
         .setFailRetry(false)
-        // .setCacheInvalidationTime(1000*10)  //毫秒
-        // .setRequestIgnoreCacheTime()
+        .setCacheInvalidationTime(1000*10)  //毫秒
+        // .setRequestIgnoreCacheTime(true)
         .execute<NewWeatherInfo>(
             success: (data, source) {
               setState(() {
@@ -116,16 +117,25 @@ class _GetRequestPageState extends State<GetRequestPage> {
 
   void request1() async {
 
+      // 为这个实例进行独立的初始化配置
+      // final apiService = RxNet.create();
+      // await apiService.init(baseUrl: "https://api.yourdomain.com");
+      // final response = await apiService.getRequest()
+      //     .setPath("/users/1")
+      //     .setJsonConvert(NewWeatherInfo.fromJson)
+      //     .request();
+      // final weatherInfo = response.value;
+
+
     final data = await RxNet.get()
         .setPath("api/weather")
         .setParam("city", "101030100")
         .setRestfulUrl(true)
         .setCacheMode(CacheMode.onlyRequest)
-        // .setJsonConvert((data) => NewWeatherInfo.fromJson(data))
         .setJsonConvert(NewWeatherInfo.fromJson)
-        .executeAsync();
+        .request();
 
-      debugPrint("--------->#${data.isError}");
+      debugPrint("--------->#${data}");
       var result = data.value;
 
       // content = jsonEncode(result);

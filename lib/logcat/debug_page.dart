@@ -15,8 +15,8 @@ class DebugPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final notifier = RxNet().debugWindowSizeNotifier;
-    final logNotifier = RxNet().logsNotifier;
+    final notifier = RxNet.I.debugWindowSizeNotifier;
+    final logNotifier =RxNet.I.logsNotifier;
     return Scaffold(
       appBar: AppBar(
         elevation: 2,
@@ -56,7 +56,7 @@ class DebugPage extends StatelessWidget {
 
           ElevatedButton(
             onPressed: () {
-              RxNet().closeDebugWindow();
+              RxNet.I.debugManager.closeDebugWindow();
             },
             child: const Text('关闭调试'),
           ),
@@ -69,9 +69,9 @@ class DebugPage extends StatelessWidget {
               valueListenable: logNotifier,
               builder: (context, logs, widget) {
                 return ListView.builder(
-                  itemCount: RxNet().logsNotifier.value.length,
+                  itemCount: RxNet.I.logsNotifier.value.length,
                   itemBuilder: (context, index) {
-                    return Text(RxNet().logsNotifier.value[index],style: TextStyle(fontSize: 12),);
+                    return Text(RxNet.I.logsNotifier.value[index],style: TextStyle(fontSize: 12),);
                   },
                 );
               },
@@ -82,14 +82,14 @@ class DebugPage extends StatelessWidget {
             children: [
               ElevatedButton(
                 onPressed: () {
-                  RxNet().clearLogs();
+                  RxNet.I.logManager.clearLogs();
                 },
                 child: const Text('清除日志'),
               ),
               ElevatedButton(
                 onPressed: () {
                   StringBuffer buffer = StringBuffer();
-                  final logs = RxNet().logsNotifier.value;
+                  final logs = RxNet.I.logManager.logsNotifier.value;
                   for (int i = 0; i < logs.length; i++) {
                     buffer.write(logs[i]);
                     buffer.write("\r\n");

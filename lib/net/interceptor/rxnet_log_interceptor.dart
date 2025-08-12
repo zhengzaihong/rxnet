@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
-import 'package:flutter_rxnet_forzzh/utils/LogUtil.dart';
 
+import '../../utils/log_util.dart';
 import '../fun/fun_apply.dart';
 
 ///
@@ -11,6 +11,7 @@ import '../fun/fun_apply.dart';
 /// create_date: 2021/6/9
 /// create_time: 16:16
 /// describe: 自定义日志拦截器   适配dio 4.0
+/// 提供一个更加清晰的日志输出
 ///
 
 void log2Console(Object object) {

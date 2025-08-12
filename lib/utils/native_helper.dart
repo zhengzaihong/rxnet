@@ -1,7 +1,6 @@
-import '../net/rx_result.dart';
-import '../net/rxnet_exception.dart';
+import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 
 void download({required String? url}){
-   throw RxNetException(code: "800", resultEntity: RxResult(isError: true,value: "非Web端请使用 RxNet.download"));
+   throw WebException("非Web端请使用 RxNet的download/");
 }
 

@@ -10,12 +10,6 @@ import 'package:flutter_rxnet_forzzh/net/type/sources_type.dart';
 class RxResult<T> {
   T? value;
   SourcesType model;
-  dynamic error;
-  bool isError;
 
-  RxResult(
-      {this.value,
-      this.model = SourcesType.net,
-      this.error,
-      this.isError = false});
+  RxResult({this.value, this.model = SourcesType.net});
 }

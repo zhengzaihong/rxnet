@@ -23,10 +23,6 @@ typedef ParamCallBack = void Function(Map<String, dynamic> params);
 ///检查网络的方法 是否有网络
 typedef CheckNetWork = Future<bool> Function();
 
-
-///全局捕获异常
-typedef RequestCaptureError = void Function(dynamic error);
-
 typedef OptionConfig = void Function(Options options);
 
 typedef HandlerResponse = void Function(Response response, ResponseInterceptorHandler handler);

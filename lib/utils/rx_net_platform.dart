@@ -1,10 +1,19 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 
+///
+/// create_user: zhengzaihong
+/// email:1096877329@qq.com
+/// create_date: 2025-08-12
+/// create_time: 16:02
+/// describe: 平台判断
+///
 class RxNetPlatform {
+
   RxNetPlatform._();
+
   static bool _isWeb() {
-    return kIsWeb == true;
+    return kIsWeb;
   }
 
   static bool _isAndroid() {

@@ -1,27 +1,32 @@
+// Core RxNet functionality
 export 'package:flutter_rxnet_forzzh/net/rx_net.dart';
-export 'package:flutter_rxnet_forzzh/net/cache_mode.dart';
-export 'package:flutter_rxnet_forzzh/net/fun/fun_apply.dart';
+
+// Public data models and enums
+export 'package:flutter_rxnet_forzzh/net/mode/cache_mode.dart';
 export 'package:flutter_rxnet_forzzh/net/type/http_type.dart';
 export 'package:flutter_rxnet_forzzh/net/type/sources_type.dart';
-export 'package:flutter_rxnet_forzzh/utils/DatabaseUtil.dart';
-export 'package:flutter_rxnet_forzzh/utils/HttpError.dart';
-export 'package:flutter_rxnet_forzzh/utils/LogUtil.dart';
-export 'package:flutter_rxnet_forzzh/utils/NetUtils.dart';
-export 'package:flutter_rxnet_forzzh/utils/MD5Util.dart';
-export 'package:flutter_rxnet_forzzh/utils/TextUtil.dart';
-export 'package:flutter_rxnet_forzzh/utils/RxNetPlatform.dart';
-export 'package:flutter_rxnet_forzzh/utils/downloader.dart';
-export 'package:flutter_rxnet_forzzh/utils/ext.dart';
+export 'package:flutter_rxnet_forzzh/net/result/rx_result.dart';
+
+// Custom error types
+export 'package:flutter_rxnet_forzzh/src/error/rx_error.dart';
+
+// Log interceptor
 export 'package:flutter_rxnet_forzzh/net/interceptor/rxnet_log_interceptor.dart';
-export 'package:flutter_rxnet_forzzh/net/rx_result.dart';
-export 'package:flutter_rxnet_forzzh/net/rxnet_exception.dart';
+
+// Request building and configuration
+export 'package:flutter_rxnet_forzzh/src/request/build_request.dart';
+export 'package:flutter_rxnet_forzzh/net/fun/fun_apply.dart';
+
+// Dio
 export 'package:dio/dio.dart';
-export 'package:dio/src/adapter.dart';
-export 'package:dio/src/adapters/io_adapter.dart';
-export 'package:dio/src/dio.dart';
-export 'package:dio/src/options.dart';
-export 'package:dio/src/response.dart';
-export 'package:dio/src/transformer.dart';
-// export 'package:http_parser/http_parser.dart';
-export 'package:flutter_rxnet_forzzh/logcat/debug_page.dart';
-export 'package:flutter_rxnet_forzzh/logcat/drag_box.dart';
+
+// utils
+export 'package:flutter_rxnet_forzzh/utils/database_util.dart';
+export 'package:flutter_rxnet_forzzh/utils/downloader.dart';
+export 'package:flutter_rxnet_forzzh/utils/http_error.dart';
+export 'package:flutter_rxnet_forzzh/utils/log_util.dart';
+export 'package:flutter_rxnet_forzzh/utils/md5_util.dart';
+export 'package:flutter_rxnet_forzzh/utils/text_util.dart';
+export 'package:flutter_rxnet_forzzh/utils/rx_net_platform.dart';
+
+

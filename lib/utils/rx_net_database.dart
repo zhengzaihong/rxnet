@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter_rxnet_forzzh/utils/LogUtil.dart';
+import 'package:flutter_rxnet_forzzh/utils/rx_net_platform.dart';
 import 'package:hive/hive.dart';
 import 'package:path/path.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-import 'RxNetPlatform.dart';
+import 'log_util.dart';
+
 
 ///
 /// create_user: zhengzaihong

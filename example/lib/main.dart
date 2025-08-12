@@ -7,7 +7,7 @@ import 'download_page.dart';
 
 void main() async{
 
-     await RxNet().init(
+     RxNet.I.init(
         baseUrl: "http://t.weather.sojson.com/",
         // baseUrl: "http://10.88.33.195:8001/",
         // cacheDir: "xxx",   ///缓存目录
@@ -18,7 +18,8 @@ void main() async{
         // requestCaptureError: (e){  ///全局抓获 异常 建议在拦截器中处理
         //   print(">>>${HttpError.dioError(e).message}");
         // },
-        interceptors: [  ///拦截器
+        interceptors: [
+          ///拦截器
           RxNetLogInterceptor()
         ]);
      //

@@ -1,6 +1,6 @@
 import 'dart:html';
+import 'package:flutter_rxnet_forzzh/utils/rx_net_platform.dart';
 
-import 'RxNetPlatform.dart';
 
 
 ///下载文件 Web端
