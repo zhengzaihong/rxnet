@@ -30,7 +30,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
             children: [
               TextButton(
                 onPressed: () {
-                  request(code: '101030100');
+                  request();
                   // request1();
                 },
                 style: ButtonStyle(
@@ -72,8 +72,9 @@ class _GetRequestPageState extends State<GetRequestPage> {
     );
   }
 
-  void request({String? code}) async {
+  void request()  {
 
+    //// 公共请求头 public request header
     // RxNet.I.setHeaders({
     //   "User-Agent": "PostmanRuntime-ApipostRuntime/1.1.0",
     //   "Cache-Control": "no-cache",
@@ -81,15 +82,12 @@ class _GetRequestPageState extends State<GetRequestPage> {
     //   "Accept-Encoding": "gzip, deflate, br",
     //   "Connection": "keep-alive",
     // });
-
-    //web端注意服务做跨越处理
     RxNet.get()
-        // .setPath("https://mock.jsont.run/lmkrXzYZ07gCjgPhbIWUi")
         .setPath('api/weather/')
-        .setParam("city", code??"101030100")
+        .setParam("city", "101030100")
+        ///Restful  http://t.weather.sojson.com/api/weather/city/101030100
         .setRestfulUrl(true)
          // .setCancelToken(tag)
-        ///Restful  http://t.weather.sojson.com/api/weather/city/101030100
         .setCacheMode(CacheMode.cacheNoneToRequest)
         .setJsonConvert(NewWeatherInfo.fromJson)
         .setRetryCount(2)  //重试次数
@@ -106,43 +104,40 @@ class _GetRequestPageState extends State<GetRequestPage> {
              },
             failure: (e) {
               setState(() {
-                content = "无数据信息";
+                content = "empty data";
               });
              },
             completed: (){
-              LogUtil.v("--------->请求完成");
+              //Callback that is always executed after a request succeeds or fails, used to cancel loading animations, etc.
               //请求成功或失败后始终都会执行的回调，用于取消加载动画等
          });
   }
 
-  void request1() async {
-
-      // 为这个实例进行独立的初始化配置
-      // final apiService = RxNet.create();
-      // await apiService.init(baseUrl: "https://api.yourdomain.com");
-      // final response = await apiService.getRequest()
-      //     .setPath("/users/1")
-      //     .setJsonConvert(NewWeatherInfo.fromJson)
-      //     .request();
-      // final weatherInfo = response.value;
-
-
+  void requestData() async {
     final data = await RxNet.get()
         .setPath("api/weather")
         .setParam("city", "101030100")
         .setRestfulUrl(true)
-        .setCacheMode(CacheMode.onlyRequest)
+        .setCacheMode(CacheMode.cacheNoneToRequest)
         .setJsonConvert(NewWeatherInfo.fromJson)
         .request();
 
-      debugPrint("--------->#${data}");
-      var result = data.value;
+      setState(() {
+        var result = data.value;
+        content = jsonEncode(result?.toJson());
+        sourcesType = data.model;
+      });
+    }
 
-      // content = jsonEncode(result);
+    void newInstanceRequest() async {
+      // 为这个实例进行独立的初始化配置
+      final apiService = RxNet.create();
+      await apiService.init(baseUrl: "https://api.yourdomain.com");
+      final response = await apiService.getRequest()
+          .setPath("/users/1")
+          .setJsonConvert(NewWeatherInfo.fromJson)
+          .request();
 
-      content = jsonEncode(result?.toJson());
-      sourcesType = data.model;
-
-      setState(() {});
+      final weatherInfo = response.value;
     }
 }

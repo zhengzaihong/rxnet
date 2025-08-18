@@ -24,7 +24,65 @@ import '../utils/rx_net_platform.dart';
 /// RxNet has been optimized as a whole: 1. The async/await method supports caching policy requests, 2. The callback method remains unchanged, and the internal implementation method has been optimized
 ///
 ///
-// 1.示例：async/await
+// 1.example：async/await
+
+// void requestData() async {
+//   final data = await RxNet.get()
+//       .setPath("api/weather")
+//       .setParam("city", "101030100")
+//       .setRestfulUrl(true)
+//       .setCacheMode(CacheMode.cacheNoneToRequest)
+//       .setJsonConvert(NewWeatherInfo.fromJson)
+//       .request();
+//
+//   setState(() {
+//     var result = data.value;
+//     content = jsonEncode(result?.toJson());
+//     sourcesType = data.model;
+//   });
+// }
+
+// 2.example：callback
+
+// void request()  {
+//   // 公共请求头 public request header
+//   // RxNet.I.setHeaders({
+//   //   "User-Agent": "PostmanRuntime-ApipostRuntime/1.1.0",
+//   //   "Cache-Control": "no-cache",
+//   //   "Accept": "*",
+//   //   "Accept-Encoding": "gzip, deflate, br",
+//   //   "Connection": "keep-alive",
+//   // });
+
+//   RxNet.get()
+//       .setPath('api/weather/')
+//       .setParam("city", "101030100")
+//       .setRestfulUrl(true) // http://t.weather.sojson.com/api/weather/city/101030100
+//   //  .setCancelToken(tag)
+//       .setCacheMode(CacheMode.cacheNoneToRequest)
+//       .setJsonConvert(NewWeatherInfo.fromJson)
+//       .setRetryCount(2)  //重试次数
+//       .setRetryInterval(7000) //毫秒
+//       .setFailRetry(false)
+//       .setCacheInvalidationTime(1000*10)  //毫秒
+//   //  .setRequestIgnoreCacheTime(true) //忽略缓存时效直接请求
+//       .execute<NewWeatherInfo>(
+//        success: (data, source) {
+//         setState(() {
+//           content = jsonEncode(data);
+//           sourcesType = source;
+//         });
+//       },
+//       failure: (e) {
+//         setState(() {
+//           content = "empty data";
+//         });
+//       },
+//       completed: (){
+//         //Callback that is always executed after a request succeeds or fails, used to cancel loading animations, etc.
+//         //请求成功或失败后始终都会执行的回调，用于取消加载动画等
+//       });
+// }
 
 //多实例情况： 创建一个新的 RxNet 实例--为这个实例进行独立的初始化配置
 //Multi-instance scenario: Create a new instance of RxNet-perform independent initialization configuration for this instance
@@ -39,9 +97,10 @@ import '../utils/rx_net_platform.dart';
 // final weatherInfo = response.value;
 
 class RxNet with ChangeNotifier {
-  static final RxNet I = RxNet._internal();
-  Dio? _client;
 
+  static final RxNet I = RxNet._internal();
+
+  Dio? _client;
   Dio? get client => _client;
 
   CheckNetWork? _baseCheckNet;
@@ -186,6 +245,26 @@ class RxNet with ChangeNotifier {
   static BuildRequest patch<T>() {
     return I.patchRequest<T>();
   }
+
+  // static BuildRequest get<T>(String url) {
+  //   return I.getRequest<T>().setPath(url);
+  // }
+  //
+  // static BuildRequest post<T>() {
+  //   return I.postRequest<T>().toBodyData();
+  // }
+  //
+  // static BuildRequest delete<T>() {
+  //   return I.deleteRequest<T>();
+  // }
+  //
+  // static BuildRequest put<T>() {
+  //   return I.putRequest<T>();
+  // }
+  //
+  // static BuildRequest patch<T>() {
+  //   return I.patchRequest<T>();
+  // }
 
   //多实例情况：请使用实例对象:await newRxNet.xxxRequest() 方式请求
   //Multi-instance situation: Please use the instance object:await apiService.xxxRequest() method to request

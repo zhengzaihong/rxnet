@@ -54,7 +54,6 @@ class RxNetLogInterceptor extends Interceptor {
 
   /// 外部实现了这几个方法 ，请勿调用 super.xxx方法
   HandlerResponse? handlerResponse;
-
   HandlerError? handlerError;
   HandlerRequest? handlerRequest;
 
