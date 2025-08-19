@@ -30,8 +30,8 @@ class _GetRequestPageState extends State<GetRequestPage> {
             children: [
               TextButton(
                 onPressed: () {
-                  request();
-                  // request1();
+                  // request();
+                  requestData();
                 },
                 style: ButtonStyle(
                   backgroundColor: WidgetStateProperty.all(Colors.cyan),
@@ -118,7 +118,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
         .setPath("api/weather")
         .setParam("city", "101030100")
         .setRestfulUrl(true)
-        .setCacheMode(CacheMode.cacheNoneToRequest)
+        .setCacheMode(CacheMode.firstCacheThenRequest)
         .setJsonConvert(NewWeatherInfo.fromJson)
         .request();
 

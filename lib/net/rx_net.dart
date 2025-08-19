@@ -226,45 +226,26 @@ class RxNet with ChangeNotifier {
 
   // ---- 提供的静态实例，用于全局使用，非多实例使用 ----
   // ---- Static methods for Singleton instance ----
-  static BuildRequest get<T>() {
-    return I.getRequest<T>();
+  static BuildRequest get<T>({String path = ""}) {
+    return I.getRequest<T>().setPath(path);
   }
 
-  static BuildRequest post<T>() {
-    return I.postRequest<T>().toBodyData();
+  static BuildRequest post<T>({String path = ""}) {
+    return I.postRequest<T>().setPath(path).toBodyData();
   }
 
-  static BuildRequest delete<T>() {
-    return I.deleteRequest<T>();
+  static BuildRequest delete<T>({String path = ""}) {
+    return I.deleteRequest<T>().setPath(path);
   }
 
-  static BuildRequest put<T>() {
-    return I.putRequest<T>();
+  static BuildRequest put<T>({String path = ""}) {
+    return I.putRequest<T>().setPath(path);
   }
 
-  static BuildRequest patch<T>() {
-    return I.patchRequest<T>();
+  static BuildRequest patch<T>({String path = ""}) {
+    return I.patchRequest<T>().setPath(path);
   }
 
-  // static BuildRequest get<T>(String url) {
-  //   return I.getRequest<T>().setPath(url);
-  // }
-  //
-  // static BuildRequest post<T>() {
-  //   return I.postRequest<T>().toBodyData();
-  // }
-  //
-  // static BuildRequest delete<T>() {
-  //   return I.deleteRequest<T>();
-  // }
-  //
-  // static BuildRequest put<T>() {
-  //   return I.putRequest<T>();
-  // }
-  //
-  // static BuildRequest patch<T>() {
-  //   return I.patchRequest<T>();
-  // }
 
   //多实例情况：请使用实例对象:await newRxNet.xxxRequest() 方式请求
   //Multi-instance situation: Please use the instance object:await apiService.xxxRequest() method to request

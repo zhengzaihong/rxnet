@@ -13,7 +13,7 @@ import 'md5_util.dart';
 class NetUtils {
   NetUtils._();
 
-  ///restful处理
+  // restful处理
   static String restfulUrl(String url, Map<String, dynamic> params) {
     StringBuffer buffer = StringBuffer(url);
     params.forEach((key, value) {
@@ -22,9 +22,16 @@ class NetUtils {
       buffer.write("/");
       buffer.write(value);
     });
+    return buffer.toString().replaceAll(RegExp(r'/+'), '/');
+    // return normalizeUrl(buffer.toString());
+  }
 
-    return buffer.toString();
-    // return buffer.toString().replaceAll("//", "/");
+  //处理url，去掉多余的斜杠
+  static String normalizeUrl(String url) {
+    // 只处理路径部分，保留协议和域名
+    Uri uri = Uri.parse(url);
+    String cleanedPath = uri.path.replaceAll(RegExp(r'/+'), '/');
+    return '${uri.scheme}://${uri.host}$cleanedPath';
   }
 
   static String getCacheKeyFromPath(String? path, Map<String, dynamic> params,List<String> ignoreKeys) {

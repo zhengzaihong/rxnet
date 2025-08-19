@@ -3,11 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
-
-import '../../utils/log_util.dart';
 import '../../utils/net_utils.dart';
 import '../../utils/rx_net_database.dart';
-import '../../utils/rx_net_platform.dart';
 
 ///
 /// create_user: zhengzaihong
@@ -38,7 +35,7 @@ class BuildRequest<T> {
   int _retryInterval = 1000;
   bool _isLoop = false;
   bool _failRetry = true;
-  bool _enableRestfulUrl = false;
+  bool _RESETFulUrl = false;
   CheckNetWork? checkNetWork;
   Function(Response response)? onResponse;
 
@@ -68,18 +65,15 @@ class BuildRequest<T> {
   }
 
   BuildRequest setRestfulUrl(bool restful) {
-    _enableRestfulUrl = restful;
+    _RESETFulUrl = restful;
     return this;
   }
 
   bool isRestfulUrl() {
-    return _enableRestfulUrl;
+    return _RESETFulUrl;
   }
 
   BuildRequest setPath(String path) {
-    if (TextUtil.isEmpty(path)) {
-      throw Exception("请求路径不能为空 path:$_path");
-    }
     _path = path;
     return this;
   }
@@ -235,7 +229,7 @@ class BuildRequest<T> {
     if (isRestfulUrl()) {
       url = NetUtils.restfulUrl(_path.toString(), tempParams);
       // After building the restful URL, remaining params should be query parameters
-      queryParameters.addAll(tempParams);
+      // queryParameters.addAll(tempParams);
     } else {
       queryParameters.addAll(tempParams);
     }
@@ -398,7 +392,8 @@ class BuildRequest<T> {
     return true;
   }
 
-  //
+  //使用回调的方式
+  //How to use callbacks
   void execute<T>({Success<T>? success, Failure? failure, Completed? completed}) {
     executeStream().listen((result) {
       success?.call(result.value as T, result.model);
@@ -407,7 +402,8 @@ class BuildRequest<T> {
     }, onDone: completed);
   }
 
-  //
+  //更加现代化的 async/await 方式
+  //A more modern async/await approach
   Future<RxResult<T>> request() async {
     final stream = executeStream();
     return await stream.last;
@@ -415,7 +411,9 @@ class BuildRequest<T> {
 
   Stream<RxResult<T>> executeStream() {
     late StreamController<RxResult<T>> controller;
-
+    if (TextUtil.isEmpty(_path)) {
+      throw Exception("请求路径不能为空 path:$_path");
+    }
     void start() async {
       if (!(await _checkNetWork())) {
          controller.addError(NetworkException("Network not available"));
