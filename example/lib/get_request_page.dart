@@ -93,7 +93,6 @@ class _GetRequestPageState extends State<GetRequestPage> {
         .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
         // .setRetryCount(2)  //重试次数
         // .setRetryInterval(7000) //毫秒
-        // .setFailRetry(false) //请求失败重试
         .setLoop(true)
         // .setCacheInvalidationTime(1000*10)  //毫秒
         // .setRequestIgnoreCacheTime(true)
@@ -115,6 +114,19 @@ class _GetRequestPageState extends State<GetRequestPage> {
               //Callback that is always executed after a request succeeds or fails, used to cancel loading animations, etc.
               //请求成功或失败后始终都会执行的回调，用于取消加载动画等
          });
+
+
+    var _pollingSubscription = RxNet.get()
+        .setPath("your/api")
+        .setLoop(true, interval: Duration(seconds: 7))
+        .executeStream() // 直接使用 executeStream
+        .listen((result) {
+      if (result.isSuccess) {
+        print("Polling success: ${result.value}");
+      } else {
+        print("Polling attempt failed: ${result.error}");
+      }
+    });
   }
 
   void requestData() async {
@@ -126,7 +138,6 @@ class _GetRequestPageState extends State<GetRequestPage> {
         .setLoop(true) //
         .setRetryCount(2)  //重试次数
         .setRetryInterval(7000) //毫秒
-        // .setFailRetry(true) //请求失败重试
         .setCacheMode(CacheMode.ONLY_REQUEST)
         .setJsonConvert(NewWeatherInfo.fromJson)
         .request();

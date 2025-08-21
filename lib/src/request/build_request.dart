@@ -34,7 +34,7 @@ class BuildRequest<T> {
   int _retryCount = 0;
   int _retryInterval = 1000;
   bool _isLoop = false;
-  bool _failRetry = false;
+  Duration _loopInterval = const Duration(seconds: 5);
   bool _RESTFul = false;
   CheckNetWork? checkNetWork;
   Function(Response response)? onResponse;
@@ -174,8 +174,11 @@ class BuildRequest<T> {
     return this;
   }
 
-  BuildRequest setLoop(bool loop) {
+  BuildRequest setLoop(bool loop, {Duration? interval}) {
     _isLoop = loop;
+    if (interval != null) {
+      _loopInterval = interval;
+    }
     return this;
   }
 
@@ -186,11 +189,6 @@ class BuildRequest<T> {
 
   BuildRequest setRetryInterval(int interval) {
     _retryInterval = interval;
-    return this;
-  }
-
-  BuildRequest setFailRetry(bool status) {
-    _failRetry = status;
     return this;
   }
 
@@ -378,123 +376,124 @@ class BuildRequest<T> {
   }
 
   //使用回调的方式
-  //How to use callbacks
+  //use callbacks
   void execute<T>({Success<T>? success, Failure? failure, Completed? completed}) {
     executeStream().listen((result) {
-      success?.call(result.value as T, result.model);
+      if (result.isSuccess) {
+        success?.call(result.value as T, result.model);
+      } else {
+        failure?.call(result.error as Object);
+      }
     }, onError: (e) {
       failure?.call(e);
     }, onDone: completed);
   }
 
-  //更加现代化的 async/await 方式
-  //A more modern async/await approach
+  // async/await
   Future<RxResult<T>> request() async {
-    final stream = executeStream();
-    return await stream.last;
+    //重要：当轮询启用时，这将返回首次的结果,底层流将被取消。要获得所有响应结果，
+    //你必须使用execute（）或者直接监听executeStream（）。
+    // IMPORTANT: When polling is enabled, this will return the *first* result
+    // and the underlying stream will be cancelled. To get all polling results,
+    // you must use execute() or listen to executeStream() directly.
+    return await executeStream().first;
   }
 
-  Stream<RxResult<T>> executeStream() {
-    late StreamController<RxResult<T>> controller;
+  Stream<RxResult<T>> _networkRequestStream({required bool shouldCache}) async* {
+    int attempt = 0;
+    bool success = false;
+    do {
+      attempt++;
+      try {
+        final result = await _doWorkRequest<T>(cache: shouldCache);
+        yield result;
+        success = true;
+        break;
+      } catch (e) {
+        yield RxResult.error(e);
+        if (attempt <= _retryCount) {
+          await Future.delayed(Duration(milliseconds: _retryInterval));
+        }
+      }
+    } while (attempt <= _retryCount && !success);
+  }
+
+  Stream<RxResult<T>> executeStream() async* {
     if (TextUtil.isEmpty(_path)) {
-      throw Exception("请求路径不能为空 path:$_path");
-    }
-    void start() async {
-      _reallyStart(controller);
-    }
-    controller = StreamController<RxResult<T>>(onListen: start);
-    return controller.stream;
-  }
-
-  void _reallyStart(StreamController controller) async {
-    if (!(await _checkNetWork())) {
-      controller.addError(NetworkException("Network not available"));
-      await controller.close();
+      yield RxResult.error(Exception("请求路径不能为空 path:$_path"));
       return;
     }
+
+    if (!(await _checkNetWork())) {
+      yield RxResult.error(NetworkException("Network not available"));
+      return;
+    }
+
     _cacheMode ??= (_rxNet.getBaseCacheMode() ?? CacheMode.ONLY_REQUEST);
 
-    switch (_cacheMode!) {
-      case CacheMode.ONLY_REQUEST:
-        try {
-          final result = await _doWorkRequest<T>(cache: false);
-          controller.add(result);
-        } catch (e) {
-          controller.addError(e);
-        } finally {
-          await controller.close();
-        }
-        break;
-      case CacheMode.FIRST_USE_CACHE_THEN_REQUEST:
-        try {
-          final cacheResult = await _readCache<T>();
-          controller.add(cacheResult);
-        } catch (e) {
-          // In this mode, cache errors are ignored, and we proceed to the network request.
-        }
-        try {
-          final netResult = await _doWorkRequest<T>(cache: true);
-          controller.add(netResult);
-        } catch (e) {
-          controller.addError(e);
-        } finally {
-          await controller.close();
-        }
-        break;
-      case CacheMode.REQUEST_FAILED_READ_CACHE:
-        try {
-          final netResult = await _doWorkRequest<T>(cache: true);
-          controller.add(netResult);
-        } catch (e) {
+    bool keepLooping;
+    do {
+      keepLooping = _isLoop;
+      switch (_cacheMode!) {
+        case CacheMode.ONLY_REQUEST:
+          yield* _networkRequestStream(shouldCache: false);
+          break;
+        case CacheMode.FIRST_USE_CACHE_THEN_REQUEST:
           try {
             final cacheResult = await _readCache<T>();
-            controller.add(cacheResult);
-          } catch (cacheError) {
-            // Report the original network error
-            controller.addError(e);
-          }
-        } finally {
-          await controller.close();
-        }
-        break;
-      case CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST:
-        if (_requestIgnoreCacheTime) {
-          try {
-            final result = await _doWorkRequest<T>(cache: true);
-            controller.add(result);
+            yield cacheResult;
           } catch (e) {
-            controller.addError(e);
-          } finally {
-            await controller.close();
+            // Cache errors are ignored, proceed to network.
           }
-          return;
-        }
-        try {
-          final cacheResult = await _readCache<T>();
-          controller.add(cacheResult);
-          await controller.close();
-        } catch (e) {
+          yield* _networkRequestStream(shouldCache: true);
+          break;
+        case CacheMode.REQUEST_FAILED_READ_CACHE:
+          bool networkSucceeded = false;
+          await for (final netResult
+              in _networkRequestStream(shouldCache: true)) {
+            if (netResult.isSuccess) {
+              networkSucceeded = true;
+            }
+            yield netResult;
+          }
+          if (!networkSucceeded) {
+            try {
+              final cacheResult = await _readCache<T>();
+              yield cacheResult;
+            } catch (e) {
+              // If cache also fails, the last network error is already emitted.
+            }
+          }
+          break;
+        case CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST:
+          bool yieldedFromCache = false;
+          if (!_requestIgnoreCacheTime) {
+            try {
+              final cacheResult = await _readCache<T>();
+              yield cacheResult;
+              yieldedFromCache = true;
+            } catch (e) {
+              // Cache failed, proceed to network.
+            }
+          }
+          if (!yieldedFromCache) {
+            yield* _networkRequestStream(shouldCache: true);
+          }
+          break;
+        case CacheMode.ONLY_CACHE:
           try {
-            final netResult = await _doWorkRequest<T>(cache: true);
-            controller.add(netResult);
-          } catch (netError) {
-            controller.addError(netError);
-          } finally {
-            await controller.close();
+            final cacheResult = await _readCache<T>();
+            yield cacheResult;
+          } catch (e) {
+            yield RxResult.error(e);
           }
-        }
-        break;
-      case CacheMode.ONLY_CACHE:
-        try {
-          final cacheResult = await _readCache<T>();
-          controller.add(cacheResult);
-        } catch (e) {
-          controller.addError(e);
-        } finally {
-          await controller.close();
-        }
-        break;
-    }
+          break;
+      }
+
+      if (keepLooping) {
+        await Future.delayed(_loopInterval);
+      }
+    } while (keepLooping);
   }
 
   void upload({
