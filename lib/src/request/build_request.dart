@@ -34,8 +34,8 @@ class BuildRequest<T> {
   int _retryCount = 0;
   int _retryInterval = 1000;
   bool _isLoop = false;
-  bool _failRetry = true;
-  bool _RESETFulUrl = false;
+  bool _failRetry = false;
+  bool _RESTFul = false;
   CheckNetWork? checkNetWork;
   Function(Response response)? onResponse;
 
@@ -65,12 +65,12 @@ class BuildRequest<T> {
   }
 
   BuildRequest setRestfulUrl(bool restful) {
-    _RESETFulUrl = restful;
+    _RESTFul = restful;
     return this;
   }
 
   bool isRestfulUrl() {
-    return _RESETFulUrl;
+    return _RESTFul;
   }
 
   BuildRequest setPath(String path) {
@@ -154,7 +154,7 @@ class BuildRequest<T> {
   BuildRequest setCacheMode(CacheMode cacheMode) {
     _cacheMode = cacheMode;
     if (RxNetPlatform.isWeb) {
-      _cacheMode = CacheMode.onlyRequest;
+      _cacheMode = CacheMode.ONLY_REQUEST;
     }
     return this;
   }
@@ -247,83 +247,69 @@ class BuildRequest<T> {
       queryParameters = {}; // Body data sends params in the body
     }
 
-
-    int currentRetryCount = 0;
-
-    while (currentRetryCount <= _retryCount) {
-      try {
-        _options?.method = _httpType.name;
-        if (_headers.isNotEmpty) {
-          _options?.headers = _headers;
-        }
-        if (_enableGlobalHeader) {
-          _options?.headers ??= {};
-          _options?.headers?.addAll(_rxNet.getHeaders());
-        }
-
-
-        LogUtil.v("$url，JsonConvert：${_jsonTransformation != null}");
-
-        Response<dynamic> response = await _rxNet.client!.request(url,
-            data: requestBody,
-            queryParameters: queryParameters,
-            options: _options,
-            cancelToken: _cancelToken);
-
-        onResponse?.call(response);
-        var responseData = response.data;
-
-        if (response.statusCode == 200) {
-          T data;
-          try {
-            if (_jsonTransformation != null) {
-              if (responseData is String) {
-                responseData = jsonDecode(responseData);
-              }
-              data = await _jsonTransformation?.call(responseData) as T;
-            } else {
-              data = responseData as T;
-            }
-          } catch (e) {
-            throw ParsingException("Data parsing failed", e);
-          }
-
-          if (cache && !RxNetPlatform.isWeb) {
-            if (_rxNet.getIgnoreCacheKeys() != null) {
-              _ignoreCacheKeys.addAll(_rxNet.getIgnoreCacheKeys()!);
-              _ignoreCacheKeys = _ignoreCacheKeys.toSet().toList();
-            }
-            String cacheKey =
-                NetUtils.getCacheKeyFromPath(_path, _params, _ignoreCacheKeys);
-            final map = <String, dynamic>{
-              'timestamp': DateTime.now().millisecondsSinceEpoch,
-              'data': responseData
-            };
-            _rxNet.cacheManager.saveCache(cacheKey, jsonEncode(map));
-          }
-          return RxResult(value: data, model: SourcesType.net);
-        } else {
-          throw NetworkException("Request failed with status code ${response.statusCode}", response);
-        }
-      } catch (e, s) {
-        LogUtil.v("请求出错：$e\n$s");
-        if (e is DioException && CancelToken.isCancel(e)) {
-          throw CancellationException("Request was cancelled", e);
-        }
-        if (e is RxError) {
-           throw e;
-        }
-        if (!_failRetry || currentRetryCount >= _retryCount) {
-           throw NetworkException("Request failed after retries", e);
-        }
+    try {
+      _options?.method = _httpType.name;
+      if (_headers.isNotEmpty) {
+        _options?.headers = _headers;
       }
-      currentRetryCount++;
-      if (_isLoop) {
-        currentRetryCount = 0;
+      if (_enableGlobalHeader) {
+        _options?.headers ??= {};
+        _options?.headers?.addAll(_rxNet.getHeaders());
       }
-      await Future.delayed(Duration(milliseconds: _retryInterval));
+
+      LogUtil.v("$url，JsonConvert：${_jsonTransformation != null}");
+
+      Response<dynamic> response = await _rxNet.client!.request(url,
+          data: requestBody,
+          queryParameters: queryParameters,
+          options: _options,
+          cancelToken: _cancelToken);
+
+      onResponse?.call(response);
+      var responseData = response.data;
+
+      if (response.statusCode == 200) {
+        T data;
+        try {
+          if (_jsonTransformation != null) {
+            if (responseData is String) {
+              responseData = jsonDecode(responseData);
+            }
+            data = await _jsonTransformation?.call(responseData) as T;
+          } else {
+            data = responseData as T;
+          }
+        } catch (e) {
+          throw ParsingException("Data parsing failed", e);
+        }
+
+        if (cache && !RxNetPlatform.isWeb) {
+          if (_rxNet.getIgnoreCacheKeys() != null) {
+            _ignoreCacheKeys.addAll(_rxNet.getIgnoreCacheKeys()!);
+            _ignoreCacheKeys = _ignoreCacheKeys.toSet().toList();
+          }
+          String cacheKey =
+          NetUtils.getCacheKeyFromPath(_path, _params, _ignoreCacheKeys);
+          final map = <String, dynamic>{
+            'timestamp': DateTime.now().millisecondsSinceEpoch,
+            'data': responseData
+          };
+          _rxNet.cacheManager.saveCache(cacheKey, jsonEncode(map));
+        }
+        return RxResult(value: data, model: SourcesType.net);
+      } else {
+        throw NetworkException("Request failed with status code ${response.statusCode}", response);
+      }
+    } catch (e, s) {
+      LogUtil.v("请求出错：$e\n$s");
+      if (e is DioException && CancelToken.isCancel(e)) {
+        throw CancellationException("Request was cancelled", e);
+      }
+      if (e is RxError) {
+        throw e;
+      }
     }
-     throw NetworkException("Request failed");
+    throw NetworkException("Request failed",null);
   }
 
   Future<RxResult<T>> _readCache<T>() async {
@@ -353,7 +339,6 @@ class BuildRequest<T> {
     final timestamp = data['timestamp'];
     final dataValue = data['data'];
     LogUtil.v("-->缓存数据:${jsonEncode(data)}");
-
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now - timestamp > (_cacheInvalidationTime ?? _rxNet.getCacheInvalidationTime())) {
       LogUtil.v("-->缓存数据:超时效");
@@ -415,15 +400,65 @@ class BuildRequest<T> {
       throw Exception("请求路径不能为空 path:$_path");
     }
     void start() async {
-      if (!(await _checkNetWork())) {
-         controller.addError(NetworkException("Network not available"));
-         await controller.close();
-        return;
-      }
-      _cacheMode ??= (_rxNet.getBaseCacheMode() ?? CacheMode.onlyRequest);
+      _reallyStart(controller);
+    }
+    controller = StreamController<RxResult<T>>(onListen: start);
+    return controller.stream;
+  }
 
-      switch (_cacheMode!) {
-        case CacheMode.onlyRequest:
+  void _reallyStart(StreamController controller) async {
+    if (!(await _checkNetWork())) {
+      controller.addError(NetworkException("Network not available"));
+      await controller.close();
+      return;
+    }
+    _cacheMode ??= (_rxNet.getBaseCacheMode() ?? CacheMode.ONLY_REQUEST);
+
+    switch (_cacheMode!) {
+      case CacheMode.ONLY_REQUEST:
+        try {
+          final result = await _doWorkRequest<T>(cache: false);
+          controller.add(result);
+        } catch (e) {
+          controller.addError(e);
+        } finally {
+          await controller.close();
+        }
+        break;
+      case CacheMode.FIRST_USE_CACHE_THEN_REQUEST:
+        try {
+          final cacheResult = await _readCache<T>();
+          controller.add(cacheResult);
+        } catch (e) {
+          // In this mode, cache errors are ignored, and we proceed to the network request.
+        }
+        try {
+          final netResult = await _doWorkRequest<T>(cache: true);
+          controller.add(netResult);
+        } catch (e) {
+          controller.addError(e);
+        } finally {
+          await controller.close();
+        }
+        break;
+      case CacheMode.REQUEST_FAILED_READ_CACHE:
+        try {
+          final netResult = await _doWorkRequest<T>(cache: true);
+          controller.add(netResult);
+        } catch (e) {
+          try {
+            final cacheResult = await _readCache<T>();
+            controller.add(cacheResult);
+          } catch (cacheError) {
+            // Report the original network error
+            controller.addError(e);
+          }
+        } finally {
+          await controller.close();
+        }
+        break;
+      case CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST:
+        if (_requestIgnoreCacheTime) {
           try {
             final result = await _doWorkRequest<T>(cache: true);
             controller.add(result);
@@ -432,81 +467,34 @@ class BuildRequest<T> {
           } finally {
             await controller.close();
           }
-          break;
-        case CacheMode.firstCacheThenRequest:
-          try {
-            final cacheResult = await _readCache<T>();
-            controller.add(cacheResult);
-          } catch (e) {
-            // In this mode, cache errors are ignored, and we proceed to the network request.
-          }
-          try {
-            final netResult = await _doWorkRequest<T>(cache: true);
-            controller.add(netResult);
-          } catch (e) {
-            controller.addError(e);
-          } finally {
-             await controller.close();
-          }
-          break;
-        case CacheMode.requestFailedReadCache:
+          return;
+        }
+        try {
+          final cacheResult = await _readCache<T>();
+          controller.add(cacheResult);
+          await controller.close();
+        } catch (e) {
           try {
             final netResult = await _doWorkRequest<T>(cache: true);
             controller.add(netResult);
-          } catch (e) {
-             try {
-               final cacheResult = await _readCache<T>();
-               controller.add(cacheResult);
-             } catch (cacheError) {
-               // Report the original network error
-               controller.addError(e);
-             }
+          } catch (netError) {
+            controller.addError(netError);
           } finally {
             await controller.close();
           }
-          break;
-        case CacheMode.cacheNoneToRequest:
-          if (_requestIgnoreCacheTime) {
-            try {
-              final result = await _doWorkRequest<T>(cache: true);
-              controller.add(result);
-            } catch (e) {
-              controller.addError(e);
-            } finally {
-              await controller.close();
-            }
-            return;
-          }
-          try {
-            final cacheResult = await _readCache<T>();
-            controller.add(cacheResult);
-             await controller.close();
-          } catch (e) {
-            try {
-              final netResult = await _doWorkRequest<T>(cache: true);
-              controller.add(netResult);
-            } catch (netError) {
-              controller.addError(netError);
-            } finally {
-               await controller.close();
-            }
-          }
-          break;
-        case CacheMode.onlyCache:
-          try {
-            final cacheResult = await _readCache<T>();
-            controller.add(cacheResult);
-          } catch (e) {
-            controller.addError(e);
-          } finally {
-            await controller.close();
-          }
-          break;
-      }
+        }
+        break;
+      case CacheMode.ONLY_CACHE:
+        try {
+          final cacheResult = await _readCache<T>();
+          controller.add(cacheResult);
+        } catch (e) {
+          controller.addError(e);
+        } finally {
+          await controller.close();
+        }
+        break;
     }
-
-    controller = StreamController<RxResult<T>>(onListen: start);
-    return controller.stream;
   }
 
   void upload({

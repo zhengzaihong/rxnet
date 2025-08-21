@@ -30,8 +30,8 @@ class _GetRequestPageState extends State<GetRequestPage> {
             children: [
               TextButton(
                 onPressed: () {
-                  // request();
-                  requestData();
+                  request();
+                  // requestData();
                 },
                 style: ButtonStyle(
                   backgroundColor: WidgetStateProperty.all(Colors.cyan),
@@ -42,7 +42,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
 
               TextButton(
                 onPressed: () {
-                  RxNet.I.debugManager.showDebugWindow(context);
+                  RxNet.showDebugWindow(context);
                 },
                 style: ButtonStyle(
                   backgroundColor: WidgetStateProperty.all(Colors.cyan),
@@ -63,14 +63,15 @@ class _GetRequestPageState extends State<GetRequestPage> {
               Expanded(
                   flex: 2,
                   child: Text(content,
-                      style:
-                          const TextStyle(color: Colors.black, fontSize: 12))),
+                      style: const TextStyle(color: Colors.black, fontSize: 12))),
             ],
           ))
         ],
       ),
     );
   }
+
+  var count = 1;
 
   void request()  {
 
@@ -85,20 +86,23 @@ class _GetRequestPageState extends State<GetRequestPage> {
     RxNet.get()
         .setPath('api/weather/')
         .setParam("city", "101030100")
+        // .setParam("area", "9000")
         ///Restful  http://t.weather.sojson.com/api/weather/city/101030100
         .setRestfulUrl(true)
          // .setCancelToken(tag)
-        .setCacheMode(CacheMode.cacheNoneToRequest)
-        .setJsonConvert(NewWeatherInfo.fromJson)
-        .setRetryCount(2)  //重试次数
-        .setRetryInterval(7000) //毫秒
-        .setFailRetry(false)
-        .setCacheInvalidationTime(1000*10)  //毫秒
+        .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
+        // .setRetryCount(2)  //重试次数
+        // .setRetryInterval(7000) //毫秒
+        // .setFailRetry(false) //请求失败重试
+        .setLoop(true)
+        // .setCacheInvalidationTime(1000*10)  //毫秒
         // .setRequestIgnoreCacheTime(true)
+        .setJsonConvert(NewWeatherInfo.fromJson)
         .execute<NewWeatherInfo>(
             success: (data, source) {
+              count++;
               setState(() {
-                content = jsonEncode(data);
+                content =count.toString() +" : "+ jsonEncode(data);
                 sourcesType = source;
               });
              },
@@ -117,10 +121,16 @@ class _GetRequestPageState extends State<GetRequestPage> {
     final data = await RxNet.get()
         .setPath("api/weather")
         .setParam("city", "101030100")
+        // .setParam("area", "9000")
         .setRestfulUrl(true)
-        .setCacheMode(CacheMode.firstCacheThenRequest)
+        .setLoop(true) //
+        .setRetryCount(2)  //重试次数
+        .setRetryInterval(7000) //毫秒
+        // .setFailRetry(true) //请求失败重试
+        .setCacheMode(CacheMode.ONLY_REQUEST)
         .setJsonConvert(NewWeatherInfo.fromJson)
         .request();
+
 
       setState(() {
         var result = data.value;
@@ -132,7 +142,8 @@ class _GetRequestPageState extends State<GetRequestPage> {
     void newInstanceRequest() async {
       // 为这个实例进行独立的初始化配置
       final apiService = RxNet.create();
-      await apiService.init(baseUrl: "https://api.yourdomain.com");
+      await apiService.initNet(baseUrl: "https://api.yourdomain.com");
+      // apiService.setHeaders(xxx)
       final response = await apiService.getRequest()
           .setPath("/users/1")
           .setJsonConvert(NewWeatherInfo.fromJson)

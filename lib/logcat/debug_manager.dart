@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rxnet_forzzh/logcat/debug_page.dart';
 import 'package:flutter_rxnet_forzzh/logcat/drag_box.dart';
 import 'package:flutter_rxnet_forzzh/net/rx_net.dart';
+import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 
 import '../net/rx_net.dart';
 
@@ -32,7 +33,7 @@ class DebugManager {
         child: Center(
           child: DragBox(
               child: ValueListenableBuilder<Size>(
-                  valueListenable: RxNet.I.debugWindowSizeNotifier,
+                  valueListenable: RxNet.debugWindow,
                   builder: (context, value, child) {
                     return SizedBox(
                       width: value.width,

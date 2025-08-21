@@ -6,8 +6,6 @@ import 'package:hive/hive.dart';
 import '../logcat/debug_manager.dart';
 import '../src/cache/cache_manager.dart';
 import '../src/logging/log_manager.dart';
-import '../utils/log_util.dart';
-import '../utils/rx_net_platform.dart';
 
 ///
 /// create_user: zhengzaihong
@@ -31,7 +29,7 @@ import '../utils/rx_net_platform.dart';
 //       .setPath("api/weather")
 //       .setParam("city", "101030100")
 //       .setRestfulUrl(true)
-//       .setCacheMode(CacheMode.cacheNoneToRequest)
+//       .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
 //       .setJsonConvert(NewWeatherInfo.fromJson)
 //       .request();
 //
@@ -59,7 +57,7 @@ import '../utils/rx_net_platform.dart';
 //       .setParam("city", "101030100")
 //       .setRestfulUrl(true) // http://t.weather.sojson.com/api/weather/city/101030100
 //   //  .setCancelToken(tag)
-//       .setCacheMode(CacheMode.cacheNoneToRequest)
+//       .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
 //       .setJsonConvert(NewWeatherInfo.fromJson)
 //       .setRetryCount(2)  //重试次数
 //       .setRetryInterval(7000) //毫秒
@@ -88,7 +86,7 @@ import '../utils/rx_net_platform.dart';
 //Multi-instance scenario: Create a new instance of RxNet-perform independent initialization configuration for this instance
 
 // final apiService = RxNet.create();
-// await apiService.init(baseUrl: "https://api.yourdomain.com");
+// await apiService.initNet(baseUrl: "https://api.yourdomain.com");
 // final response = await apiService.getRequest()
 //     .setPath("/users/1")
 //     .setParam("xx","xxx")
@@ -96,23 +94,41 @@ import '../utils/rx_net_platform.dart';
 //     .request();
 // final weatherInfo = response.value;
 
-class RxNet with ChangeNotifier {
+class RxNet {
 
+  //单实例 -- 通常一个项目一个 RxNet 实例即可
+  //Single instance-usually one RxNet instance per project is enough
   static final RxNet I = RxNet._internal();
 
   Dio? _client;
   Dio? get client => _client;
 
+  //网络检测到回调-外部自行实现
+  //The network detects a callback-external implementation
   CheckNetWork? _baseCheckNet;
+  //缓存策略
+  //cache policy
   CacheMode? _baseCacheMode;
+
+  //缓存时效，初始化默认一年
+  //Cache aging, initialization default one year
   int _cacheInvalidationTime = 0;
+  //全局请求头
+  //global request header
   Map<String, dynamic> _globalHeader = {};
+
+  //生成缓存的参数中需要忽略的关键key
+  //Key keys that need to be ignored among the parameters of the generated cache
   List<String>? _baseIgnoreCacheKeys;
+
+  //多环境的基础服务地址
+  //Basic service addresses for multiple environments
   Map<String, dynamic> _baseUrlEnv = {};
 
   late final CacheManager cacheManager;
   late final LogManager logManager;
   late final DebugManager debugManager;
+
 
   RxNet._internal() {
     final options = BaseOptions(
@@ -161,11 +177,11 @@ class RxNet with ChangeNotifier {
       debugWindowHeight: The debugging window defaults to high
    */
 
-  Future<void> init(
+  static void init(
       {required String baseUrl,
       Directory? cacheDir,
       String cacheName = 'app_local_data',
-      CacheMode baseCacheMode = CacheMode.onlyRequest,
+      CacheMode baseCacheMode = CacheMode.ONLY_REQUEST,
       List<Interceptor>? interceptors,
       BaseOptions? baseOptions,
       bool systemLog = false,
@@ -174,15 +190,50 @@ class RxNet with ChangeNotifier {
       HiveCipher? encryptionCipher,
       Map<String, dynamic>? baseUrlEnv,
       int cacheInvalidationTime = 365 * 24 * 60 * 60 * 1000,
-      double debugWindowWidth = 600,
-      double debugWindowHeight = 500}) async {
-    WidgetsFlutterBinding.ensureInitialized();
+      double debugWindowWidth = 800,
+      double debugWindowHeight = 600}) async {
+      WidgetsFlutterBinding.ensureInitialized();
+      I.initNet(
+        baseUrl: baseUrl,
+        cacheDir: cacheDir,
+        cacheName: cacheName,
+        baseCacheMode: baseCacheMode,
+        interceptors: interceptors,
+        baseOptions: baseOptions,
+        systemLog: systemLog,
+        baseCheckNet: baseCheckNet,
+        ignoreCacheKeys: ignoreCacheKeys,
+        encryptionCipher: encryptionCipher,
+        baseUrlEnv: baseUrlEnv,
+        cacheInvalidationTime: cacheInvalidationTime,
+        debugWindowWidth: debugWindowWidth,
+        debugWindowHeight: debugWindowHeight
+      );
+  }
+
+  Future<void> initNet({
+    required String baseUrl,
+    Directory? cacheDir,
+    String cacheName = 'app_local_data',
+    CacheMode baseCacheMode = CacheMode.ONLY_REQUEST,
+    List<Interceptor>? interceptors,
+    BaseOptions? baseOptions,
+    bool systemLog = false,
+    CheckNetWork? baseCheckNet,
+    List<String>? ignoreCacheKeys,
+    HiveCipher? encryptionCipher,
+    Map<String, dynamic>? baseUrlEnv,
+    int cacheInvalidationTime = 365 * 24 * 60 * 60 * 1000,
+    double debugWindowWidth = 800,
+    double debugWindowHeight = 600
+}) async {
     LogUtil.init(systemLog: systemLog);
 
     this._baseCheckNet = baseCheckNet;
     this._baseCacheMode = baseCacheMode;
     this._cacheInvalidationTime = cacheInvalidationTime;
     this._baseIgnoreCacheKeys = ignoreCacheKeys;
+    debugWindow = ValueNotifier(Size(debugWindowWidth, debugWindowHeight));
 
     if (baseOptions != null) {
       _client?.options = baseOptions;
@@ -196,7 +247,7 @@ class RxNet with ChangeNotifier {
       _baseUrlEnv.addAll(baseUrlEnv);
     }
     if (RxNetPlatform.isWeb) {
-      this._baseCacheMode = CacheMode.onlyRequest;
+      this._baseCacheMode = CacheMode.ONLY_REQUEST;
       LogUtil.v("RxNet does not support caching environments: web");
       LogUtil.v("RxNet 不支持缓存的环境：web");
       return;
@@ -247,6 +298,7 @@ class RxNet with ChangeNotifier {
   }
 
 
+
   //多实例情况：请使用实例对象:await newRxNet.xxxRequest() 方式请求
   //Multi-instance situation: Please use the instance object:await apiService.xxxRequest() method to request
   BuildRequest<T> getRequest<T>() {
@@ -284,6 +336,18 @@ class RxNet with ChangeNotifier {
     );
   }
 
+  //键值对存储数据
+  //Key-value pairs store data
+  static void saveCache(String key, dynamic value) {
+    I.cacheManager.saveCache(key, value);
+  }
+
+  //通过key获取缓存数据
+  //Get cached data through key
+  static Future<dynamic> readCache(String key) {
+    return I.cacheManager.readCache(key);
+  }
+
   //全局请求头，你也可以在拦截器中进行处理
   //Global request headers, you can also process them in interceptors
   void setHeaders(Map<String, dynamic> header) {
@@ -316,6 +380,9 @@ class RxNet with ChangeNotifier {
 
   ValueNotifier<List<String>> get logsNotifier => logManager.logsNotifier;
 
-  ValueNotifier<Size> get debugWindowSizeNotifier =>
-      ValueNotifier(const Size(600, 500));
+  static void showDebugWindow(BuildContext context){
+    I.debugManager.showDebugWindow(context);
+  }
+
+  static ValueNotifier<Size> debugWindow = ValueNotifier(const Size(800, 600));
 }

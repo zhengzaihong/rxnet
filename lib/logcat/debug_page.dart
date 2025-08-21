@@ -15,14 +15,13 @@ class DebugPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final notifier = RxNet.I.debugWindowSizeNotifier;
+    final notifier = RxNet.debugWindow;
     final logNotifier =RxNet.I.logsNotifier;
     return Scaffold(
       appBar: AppBar(
         elevation: 2,
         title: const Text('调试界面'),
         actions: [
-
           ElevatedButton(
             onPressed: () {
               final size = notifier.value;

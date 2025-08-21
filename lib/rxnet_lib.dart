@@ -19,6 +19,7 @@ export 'package:flutter_rxnet_forzzh/net/fun/fun_apply.dart';
 
 // Dio
 export 'package:dio/dio.dart';
+export 'package:dio/io.dart';
 
 // utils
 export 'package:flutter_rxnet_forzzh/utils/database_util.dart';
