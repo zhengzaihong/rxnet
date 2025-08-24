@@ -59,12 +59,22 @@ class BuildRequest<T> {
     );
   }
 
-  BuildRequest setJsonConvert(JsonTransformation convert) {
+  BuildRequest<T> setJsonConvert(JsonTransformation convert) {
     _jsonTransformation = convert;
     return this;
   }
+  BuildRequest<T> setResponseType(ResponseType type) {
+    _options?.responseType = type;
+    return this;
+  }
 
-  BuildRequest setRestfulUrl(bool restful) {
+  //ContentTypes
+  BuildRequest<T> setContentType(String type) {
+    _options?.contentType = type;
+    return this;
+  }
+
+  BuildRequest<T> setRestfulUrl(bool restful) {
     _RESTFul = restful;
     return this;
   }
@@ -73,85 +83,85 @@ class BuildRequest<T> {
     return _RESTFul;
   }
 
-  BuildRequest setPath(String path) {
+  BuildRequest<T> setPath(String path) {
     _path = path;
     return this;
   }
 
-  BuildRequest setParam(String key, dynamic value) {
+  BuildRequest<T> setParam(String key, dynamic value) {
     _params[key] = value;
     return this;
   }
 
-  BuildRequest setParams(Map<String, dynamic> params) {
+  BuildRequest<T> setParams(Map<String, dynamic> params) {
     _params = params;
     return this;
   }
 
-  BuildRequest addParams(Map<String, dynamic> params) {
+  BuildRequest<T> addParams(Map<String, dynamic> params) {
     _params.addAll(params);
     return this;
   }
 
-  BuildRequest setParamsToFormData(bool toFormData) {
+  BuildRequest<T> setParamsToFormData(bool toFormData) {
     _toFormData = toFormData;
     _toBodyData = false;
     return this;
   }
 
-  BuildRequest setParamsToBodyData(bool toBody) {
+  BuildRequest<T> setParamsToBodyData(bool toBody) {
     _toBodyData = toBody;
     _toFormData = false;
     return this;
   }
 
-  BuildRequest toFormData() {
+  BuildRequest<T> toFormData() {
     setParamsToFormData(true);
     return this;
   }
 
-  BuildRequest toBodyData() {
+  BuildRequest<T> toBodyData() {
     setParamsToBodyData(true);
     return this;
   }
 
-  BuildRequest toUrlEncoded() {
+  BuildRequest<T> toUrlEncoded() {
     setParamsToFormData(true);
     _options?.contentType = Headers.formUrlEncodedContentType;
     return this;
   }
 
-  BuildRequest removeNullValueKeys() {
+  BuildRequest<T> removeNullValueKeys() {
     _params.removeWhere((key, value) => value == null);
     return this;
   }
 
-  BuildRequest getParams(ParamCallBack callBack) {
+  BuildRequest<T> getParams(ParamCallBack callBack) {
     callBack.call(_params);
     return this;
   }
 
-  BuildRequest addHeaders(Map<String, dynamic> headers) {
+  BuildRequest<T> addHeaders(Map<String, dynamic> headers) {
     _headers = headers;
     return this;
   }
 
-  BuildRequest setHeader(String key, dynamic value) {
+  BuildRequest<T> setHeader(String key, dynamic value) {
     _headers[key] = value;
     return this;
   }
 
-  BuildRequest setCancelToken(CancelToken cancelToken) {
+  BuildRequest<T> setCancelToken(CancelToken cancelToken) {
     _cancelToken = cancelToken;
     return this;
   }
 
-  BuildRequest setEnableGlobalHeader(bool enable) {
+  BuildRequest<T> setEnableGlobalHeader(bool enable) {
     _enableGlobalHeader = enable;
     return this;
   }
 
-  BuildRequest setCacheMode(CacheMode cacheMode) {
+  BuildRequest<T> setCacheMode(CacheMode cacheMode) {
     _cacheMode = cacheMode;
     if (RxNetPlatform.isWeb) {
       _cacheMode = CacheMode.ONLY_REQUEST;
@@ -159,22 +169,22 @@ class BuildRequest<T> {
     return this;
   }
 
-  BuildRequest setRequestIgnoreCacheTime(bool ignoreCache) {
+  BuildRequest<T> setRequestIgnoreCacheTime(bool ignoreCache) {
     _requestIgnoreCacheTime = ignoreCache;
     return this;
   }
 
-  BuildRequest setIgnoreCacheKeys(List<String> keys) {
+  BuildRequest<T> setIgnoreCacheKeys(List<String> keys) {
     _ignoreCacheKeys.addAll(keys);
     return this;
   }
 
-  BuildRequest setIgnoreCacheKey(String key) {
+  BuildRequest<T> setIgnoreCacheKey(String key) {
     _ignoreCacheKeys.add(key);
     return this;
   }
 
-  BuildRequest setLoop(bool loop, {Duration? interval}) {
+  BuildRequest<T> setLoop(bool loop, {Duration? interval}) {
     _isLoop = loop;
     if (interval != null) {
       _loopInterval = interval;
@@ -182,27 +192,27 @@ class BuildRequest<T> {
     return this;
   }
 
-  BuildRequest setRetryCount(int count) {
+  BuildRequest<T> setRetryCount(int count) {
     _retryCount = count;
     return this;
   }
 
-  BuildRequest setRetryInterval(int interval) {
+  BuildRequest<T> setRetryInterval(int interval) {
     _retryInterval = interval;
     return this;
   }
 
-  BuildRequest setCacheInvalidationTime(int millisecond) {
+  BuildRequest<T> setCacheInvalidationTime(int millisecond) {
     _cacheInvalidationTime = millisecond;
     return this;
   }
 
-  BuildRequest setOptionConfig(OptionConfig callBack) {
+  BuildRequest<T> setOptionConfig(OptionConfig callBack) {
     callBack.call(_options!);
     return this;
   }
 
-  BuildRequest setCheckNetwork(CheckNetWork checkNetWork) {
+  BuildRequest<T> setCheckNetwork(CheckNetWork checkNetWork) {
     this.checkNetWork = checkNetWork;
     return this;
   }
@@ -211,7 +221,7 @@ class BuildRequest<T> {
     return _cancelToken;
   }
 
-  BuildRequest setResponseCallBack(
+  BuildRequest<T> setResponseCallBack(
       Function(Response response) responseCallBack) {
     this.onResponse = responseCallBack;
     return this;
@@ -391,8 +401,8 @@ class BuildRequest<T> {
 
   // async/await
   Future<RxResult<T>> request() async {
-    //重要：当轮询启用时，这将返回首次的结果,底层流将被取消。要获得所有响应结果，
-    //你必须使用execute（）或者直接监听executeStream（）。
+    //重要：当轮询启用时，这将返回首次的结果,底层流将被取消。
+    //要获得所有响应结果，你必须使用execute（）或者直接监听executeStream（）。
     // IMPORTANT: When polling is enabled, this will return the *first* result
     // and the underlying stream will be cancelled. To get all polling results,
     // you must use execute() or listen to executeStream() directly.

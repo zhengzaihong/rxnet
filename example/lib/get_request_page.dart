@@ -30,8 +30,9 @@ class _GetRequestPageState extends State<GetRequestPage> {
             children: [
               TextButton(
                 onPressed: () {
-                  request();
-                  // requestData();
+                  // test();
+                  // request();
+                  requestData();
                 },
                 style: ButtonStyle(
                   backgroundColor: WidgetStateProperty.all(Colors.cyan),
@@ -76,13 +77,14 @@ class _GetRequestPageState extends State<GetRequestPage> {
   void request()  {
 
     //// 公共请求头 public request header
-    // RxNet.I.setHeaders({
-    //   "User-Agent": "PostmanRuntime-ApipostRuntime/1.1.0",
-    //   "Cache-Control": "no-cache",
-    //   "Accept": "*",
-    //   "Accept-Encoding": "gzip, deflate, br",
-    //   "Connection": "keep-alive",
-    // });
+    RxNet.setGlobalHeaders({
+      "User-Agent": "PostmanRuntime-ApipostRuntime/1.1.0",
+      "Cache-Control": "no-cache",
+      "Accept": "*",
+      "Accept-Encoding": "gzip, deflate, br",
+      "Connection": "keep-alive",
+    });
+
     RxNet.get()
         .setPath('api/weather/')
         .setParam("city", "101030100")
@@ -91,9 +93,10 @@ class _GetRequestPageState extends State<GetRequestPage> {
         .setRestfulUrl(true)
          // .setCancelToken(tag)
         .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
-        // .setRetryCount(2)  //重试次数
-        // .setRetryInterval(7000) //毫秒
-        .setLoop(true)
+        .setRetryCount(2)  //重试次数
+        .setRetryInterval(7000) //毫秒
+        // .setLoop(true)
+        .setContentType(ContentTypes.json) //application/json
         // .setCacheInvalidationTime(1000*10)  //毫秒
         // .setRequestIgnoreCacheTime(true)
         .setJsonConvert(NewWeatherInfo.fromJson)
@@ -101,7 +104,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
             success: (data, source) {
               count++;
               setState(() {
-                content =count.toString() +" : "+ jsonEncode(data);
+                content ="$count : ${jsonEncode(data)}";
                 sourcesType = source;
               });
              },
@@ -114,18 +117,39 @@ class _GetRequestPageState extends State<GetRequestPage> {
               //Callback that is always executed after a request succeeds or fails, used to cancel loading animations, etc.
               //请求成功或失败后始终都会执行的回调，用于取消加载动画等
          });
+  }
 
-
-    var _pollingSubscription = RxNet.get()
-        .setPath("your/api")
-        .setLoop(true, interval: Duration(seconds: 7))
-        .executeStream() // 直接使用 executeStream
-        .listen((result) {
-      if (result.isSuccess) {
-        print("Polling success: ${result.value}");
-      } else {
-        print("Polling attempt failed: ${result.error}");
-      }
+  Stream<RxResult>? _pollingSubscription;
+  void test(){
+    _pollingSubscription = RxNet.get()
+        .setPath("api/weather")
+        .setParam("city", "101030100")
+        .setRestfulUrl(true)
+        .setLoop(true, interval: const Duration(seconds: 7))
+        .executeStream(); // 直接使用 executeStream
+    //     .listen((data) {
+    //       setState(() {
+    //         count++;
+    //         if (data.isSuccess) {
+    //           var result = data.value;
+    //           content =count.toString() +" : "+ jsonEncode(result);
+    //           sourcesType = data.model;
+    //         } else {
+    //           content = jsonEncode(data.error);
+    //         }
+    //       });
+    // });
+    _pollingSubscription?.listen((data){
+            setState(() {
+              count++;
+              if (data.isSuccess) {
+                var result = data.value;
+                content ="$count : ${jsonEncode(result)}";
+                sourcesType = data.model;
+              } else {
+                content = jsonEncode(data.error);
+              }
+            });
     });
   }
 
@@ -136,16 +160,16 @@ class _GetRequestPageState extends State<GetRequestPage> {
         // .setParam("area", "9000")
         .setRestfulUrl(true)
         .setLoop(true) //
-        .setRetryCount(2)  //重试次数
-        .setRetryInterval(7000) //毫秒
+        // .setRetryCount(2)  //重试次数
+        // .setRetryInterval(7000) //毫秒
         .setCacheMode(CacheMode.ONLY_REQUEST)
         .setJsonConvert(NewWeatherInfo.fromJson)
         .request();
 
-
       setState(() {
+        count++;
         var result = data.value;
-        content = jsonEncode(result?.toJson());
+        content ="$count : ${jsonEncode(result)}";
         sourcesType = data.model;
       });
     }

@@ -348,7 +348,16 @@ class RxNet {
     return I.cacheManager.readCache(key);
   }
 
-  //全局请求头，你也可以在拦截器中进行处理
+  //默认实列的全局请求头，你也可以在拦截器中进行处理
+  static void setGlobalHeaders(Map<String, dynamic> header) {
+     I._globalHeader = header;
+  }
+
+  static Map<String, dynamic> getGlobalHeaders() {
+    return I._globalHeader;
+  }
+
+  //多实例的全局请求头，你也可以在拦截器中进行处理
   //Global request headers, you can also process them in interceptors
   void setHeaders(Map<String, dynamic> header) {
     _globalHeader = header;

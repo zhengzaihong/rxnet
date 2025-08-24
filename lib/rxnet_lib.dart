@@ -5,6 +5,7 @@ export 'package:flutter_rxnet_forzzh/net/rx_net.dart';
 export 'package:flutter_rxnet_forzzh/net/mode/cache_mode.dart';
 export 'package:flutter_rxnet_forzzh/net/type/http_type.dart';
 export 'package:flutter_rxnet_forzzh/net/type/sources_type.dart';
+export 'package:flutter_rxnet_forzzh/net/type/content_types.dart';
 export 'package:flutter_rxnet_forzzh/net/result/rx_result.dart';
 
 // Custom error types
