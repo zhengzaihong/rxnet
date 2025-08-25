@@ -1,214 +1,235 @@
-# RxNet 
+# RxNet
 
 Language: English | [简体中文](README-ZH.md)
 
+A minimalist Flutter network request tool. This library is an extension of Dio, making it more natural to use, enabling smoother app experiences, and features like having data available as soon as the screen opens.
 
-A minimalist Flutter network request tool. This library is an extension of Dio. It is more natural to use and makes the application smoother. It has data and other features when the screen is opened.
+*   Supports multiple caching strategies.
+*   Supports resumable uploads and downloads.
+*   Supports retry on failure.
+*   Supports cache expiration.
+*   Supports RESTful style requests.
+*   Supports polling requests.
+*   Supports JSON to entity request.
+*   Supports global interceptors.
+*   Supports async/await style.
+*   Supports response data callback style.
+*   Supports streaming data responses.
+*   Supports log console UI display.
+*   Supports storage for small amounts of key-value data.
 
-* Supports multiple caching strategies.
-* Support breakpoint upload and download.
-* Failed retry is supported.
-* Support cache aging.
-* Support RESTful style requests.
-* Supports circular requests, and there is no need to maintain request queues or execute them regularly externally.
-* Support json entity transfer requests.
-* Support global interceptors.
-* Supports async/await calls.
-* Callbacks that support native habits.
-* Support global exception capture.
-* Support log console interface display
-* Support small number of key-value pair data storage (danger threshold: more than 200,000 or when a single record size exceeds 1MB)
-
-
-## dependent：
+## Dependency:
 
     dependencies:
-       flutter_rxnet_forzzh:0.3.1  
+       flutter_rxnet_forzzh:0.4.0
 
+## Common Parameters:
 
-## common parameters：
+Supported request methods: `get, post, delete, put, patch`,
 
-Supported request methods: get, post, delete, put, patch,
+Cache strategies: CacheMode supports the following modes:
 
-Caching strategy: CacheMode supports the following modes:
-
-    1.No caching, only network data
-    onlyRequest,
+    enum CacheMode {
     
-    2.Request the network first. If the network request fails, the cache is read. If the cache fails, the request fails.
-    requestFailedReadCache,
+        // No caching, always initiates a request
+        ONLY_REQUEST,
+        
+        // Uses only cache, typically for preloading data and displaying it in an offline environment
+        ONLY_CACHE,
+        
+        // Requests network first, if network request fails, reads cache; if reading cache fails, the current request fails
+        REQUEST_FAILED_READ_CACHE,
+        
+        // Uses cache for display first, regardless of existence, still requests network, new data replaces cached data, and triggers refresh of previous data
+        FIRST_USE_CACHE_THEN_REQUEST,
+        
+        // Uses cache first, if cache is empty or expired, then requests network, otherwise network request is not made
+        CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST,
+    }
 
-    3.Use cache first, and still request network regardless of whether it exists or not
-    firstCacheThenRequest,
+Note:
 
-    4.Use cache only
-    onlyCache;
+1.  For `RESTful` style requests: Please set `setRestfulUrl(true)`, parameters will be automatically converted in the URL.
+2.  If `setJsonConvert` is not set, raw type data is returned, otherwise the defined entity type is returned.
 
-    5.Use cache first, and request network if there is no cache or it is out of time
-    cacheNoneToRequest;
+To convert JSON to an object, please set `setJsonConvert` and perform the conversion in the callback according to the backend's unified format.
 
+#### Additional Feature: RxNet supports storing small amounts of data more efficiently:
 
-注意：
+    // Store data key-value
+    RxNet.saveCache("name", "John Doe");
 
-1. If you need a RESTful style request: setRestfulUrl(true), internal automatic conversion parameter link
+    // Read data
+    RxNet.readCache("name").then((value) {
+      LogUtil.v(value);  // Output: John Doe
+    });
 
-2. If `setJsonConvert` is not set to return Map type data, otherwise the defined entity type will be returned.
+    // Or
+    Future.delayed(const Duration(seconds: 5),() async{
+      final result = await RxNet.readCache("name");
+      LogUtil.v(result);  // Output: John Doe
+    });
 
-If you need json conversion objects, please set setJsonConvert and convert them in the callback according to the unified format returned by the backend.
+#### Note: Additional data storage is not supported on the Web platform.
 
-Additional features: Small amounts of data support RxNet data storage to replace ShardPreference:
+#### Several ways to execute requests, please use according to the scenario:
 
-    // Not supported on the web
-    rxPut("key","content"); //data contained within, in connection with
-    rxGet("key");       //fetch data
+    1. Method One: RxNet.execute(success,failure,completed)
+      Get final data in the Success callback.
+      Get error information in the Failure callback.
+      Completed is a callback that will always be executed, for canceling loading animations, releasing resources, etc.
 
-Two ways to execute requests：
+    2. Method Two: await RxNet.request()
+      Results or error information are in the RxResult entity, no try-catch operation needed.
+      RxResult.value gets the final result.
+      RxResult.error gets error information.
 
-    1.Usage 1 ：RxNet.execute(success,failure) 
-      Support caching strategies
+    3. Method Three: await RxNet.executeStream()
+      Results or error information are in the RxResult entity.
+      RxResult.value gets the final result.
+      RxResult.error gets error information.
 
-      Success: Get final data in callback。
-      Failure: Get error message in callback。
-      Completed: Callbacks that are always executed, unloading animations, releasing resources, etc.
+## Usage Instructions:
 
+### Initialize the Network Framework
 
-    2.Usage 2 ： await RxNet.executeAsync<xxxx>()
-      The returned results or error messages are all in the RxResult entity, no try catch operation is needed。
-      RxResult.value ：Get the final result。
-      RxResult.error ：Get error information
-
-## description：
- 
- 1.Initialize the network framework first
-
-     await RxNet().init(
+     await RxNet.init(
         baseUrl: "http://t.weather.sojson.com/",
-        // cacheDir: "xxx",   ///Cache directory
-        // cacheName: "local_cache_app", ///Cache files
-        baseCacheMode: CacheMode.requestFailedReadCache,
-        baseCheckNet:checkNet, ///If a callback is provided to globally check the network, it will be triggered before each request
-        requestCaptureError: (e){ //Global caught exception
-          //It is recommended to handle it during interception, not to process too much content here 
-          print(">>>${HandleError.dioError(e).message}");
-        },
-         baseUrlEnv: { ///supports multi-environment baseUrl debugging, and switches between RxNet().setEnv("test");
-          "test": "http://t.weather.sojson1.com/",
-          "debug": "http://t.weather.sojson2.com/",
-          "release": "http://t.weather.sojson.com/",
-           //xxxxx
-        }, 
-        interceptors: [ ///interceptors
-          //You can add multiple interceptors of your own
-          RxNetLogInterceptor()
+        // cacheDir: "xxx",   /// Cache directory
+        // cacheName: "local_cache", /// Cache file name
+        baseCacheMode: CacheMode.REQUEST_FAILED_READ_CACHE, // Read cache data on request failure
+        baseCheckNet:checkNet, // Global network check, all requests go through this method
+        cacheInvalidationTime: 24 * 60 * 60 * 1000, // Cache expiration time in milliseconds
+        // baseUrlEnv: {  /// Supports multi-environment baseUrl debugging, switch with RxNet.setDefaultEnv("test");
+        //   "test": "http://t.weather.sojson1.com/",
+        //   "debug": "http://t.weather.sojson2.com/",
+        //   "release": "http://t.weather.sojson.com/",
+        // },
+        interceptors: [
+          // TokenInterceptor // Token interceptor, customize for more features
+          // Log interceptor
+           RxNetLogInterceptor()
+          //ResponseInterceptor() // Custom response interceptor, preprocess results, etc.
         ]);
- 
- 2.Initiate network request：
 
-    1.callback mode：
+### Initiate Network Request (post, get, delete, put, patch are similar) - GET example:
 
-    RxNet.get()  // post, get, delete, put, patch
-        .setPath("api/weather")
-        .setParam("city", "101030100")
-        //.addParams(Map)  
-        .setRestfulUrl(true) //Restful 
-        .setCacheMode(CacheMode.onlyRequest)
-        .setRetryCount(2)  //重试次数
-        .setRetryInterval(5000) //毫秒
-        .setFailRetry(true)
-        //.setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
-        .setJsonConvert(NormalWaterInfoEntity.fromJson)
-        .execute<NormalWaterInfoEntity>(
+###    1. Callback Mode:
+
+    RxNet.get()
+        .setPath('api/weather/') // Address
+        .setParam("city", "101030100") // Parameter
+        .setRestfulUrl(true) // http://t.weather.sojson.com/api/weather/city/101030100
+        .setCancelToken(pageRequestToken) // CancelToken for canceling the request
+        .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
+        //.setRetryCount(2, interval: const Duration(seconds: 7))  // Retry on failure, 2 retries, 7-second interval
+        //.setLoop(true, interval: const Duration(seconds: 5)) // Timed request
+        //.setContentType(ContentTypes.json) //application/json
+        //.setResponseType(ResponseType.json) //json
+        //.setCacheInvalidationTime(1000*10)  // Cache invalidation time for this request - milliseconds
+        //.setRequestIgnoreCacheTime(true)  // Whether to directly ignore cache invalidation time
+        .setJsonConvert(NewWeatherInfo.fromJson) // Parse into NewWeatherInfo object
+        .execute<NewWeatherInfo>(
             success: (data, source) {
-             // 这里的 data 已经是 NormalWaterInfoEntity类型
+              // Refresh UI
+              count++;
               setState(() {
-                content = jsonEncode(data);
+                content ="$count : ${jsonEncode(data)}";
                 sourcesType = source;
               });
              },
             failure: (e) {
               setState(() {
-                content = "";
+                content = "empty data";
               });
              },
             completed: (){
-              //请求成功或失败后始终都会执行的回调，用于取消加载动画等
+              // Callback always executed after request success or failure, for canceling loading animations, etc.
          });
 
+###   2. async/await Style:
 
-    2. await approach：
-
-     var data = await RxNet.get()  // post, get, delete, put, patch
+     var data = await RxNet.get()
         .setPath("api/weather")
         .setParam("city", "101030100")
-        //.addParams(Map)
-        .setRestfulUrl(true)
-        .setCacheMode(CacheMode.onlyRequest)
-       // .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
+        //.addParams(Map) // Add multiple parameters at once
+        .setRestfulUrl(true) //RESTFul
+        //.setRetryCount(2)  // Number of retries
+        //.setRetryInterval(7000) // Milliseconds
+        .setCacheMode(CacheMode.ONLY_REQUEST)
+        //.setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data)) // Parse into NormalWaterInfoEntity object
         .setJsonConvert(NormalWaterInfoEntity.fromJson)
-        .executeAsync<NormalWaterInfoEntity?>();
+        .request();
 
-      print("--------->#${data.isError}");
       print("--------->#${data.error}");
       var result = data.value;
       content = result.toString();
       sourcesType = data.model;
 
+###   3. Stream Style:
 
+    // Handle for cancellation
+    StreamSubscription? _subscription;
 
- 3.Request raw data, in some special cases, such as reading network disk resource file data
+    void testStreamRequest(){
 
+      final pollingSubscription = RxNet.get()
+           .setPath("api/weather")
+           .setParam("city", "101030100")
+           .setRestfulUrl(true)
+           .setLoop(true, interval: const Duration(seconds: 7))
+           .executeStream(); // Directly use executeStream
+       //     .listen((data) {
+       //       setState(() {
+       //         count++;
+       //         if (data.isSuccess) {
+       //           var result = data.value;
+       //           content =count.toString() +" : "+ jsonEncode(result);
+       //           sourcesType = data.model;
+       //         } else {
+       //           content = data.error.toString();
+       //         }
+       //       });
+       // });
+       // Or use the following method:
+      _subscription = pollingSubscription.listen((data){
+               setState(() {
+                 count++;
+                 if (data.isSuccess) {
+                   var result = data.value;
+                   content ="$count : ${jsonEncode(result)}";
+                   sourcesType = data.model;
+                 } else {
+                   content = data.error.toString();
+                 }
+               });
+       });
+    }
 
-        RxNet.get()
-            .setPath("http://xxxxx/xxxx/testjson.txt")
-            .setCacheMode(CacheMode.onlyRequest)
-            .execute<String>(success: (data,sourcesType){
-              var source = sourcesType as SourcesType;
-              content = data.toString();
-              ///Data sources are sources that can be processed separately or prompted on the network interface
-              if(source == SourcesType.net){
-              }else{
-                /// local database
-              }
-        });
+Note: When using Method Three, unsubscribe in time when not in use:
 
+    @override
+    void dispose() {
+     _subscription?.cancel();
+     _cancelToken?.cancel();
+      super.dispose();
+    }
 
- 4.Request data to be transferred directly to a Bean object
+Special Note:
 
-      RxNet.get() 
-        .setPath("api/weather")
-        .setParam("city", "101030100")
-        .setRestfulUrl(true) ///Restful
-        .setCacheMode(CacheMode.onlyRequest)
-        .setCheckNetwork((){
-          //todo Check network implementation (optional)
-           return true;
-        })
-       .setJsonConvert(NormalWaterInfoEntity.fromJson)
-       .execute<NormalWaterInfoEntity>(success: (data,sourcesType){
-          var source = sourcesType as SourcesType;
-          if(data is NormalWaterInfoEntity){
-            content = data.toString();
-            print("------>${data.message}");
-          }
-          ///The data source is the Internet
-          if(source == SourcesType.net){
-          }else{
-            /// local database
-          }
-          setState(() {});
-        });
+Regardless of the request method used, it is essentially a Stream. When polling is enabled, async/await only returns the first result, and the underlying stream will be canceled.
+To get all response results, you must use execute() or listen directly to executeStream().
 
- 
-    Note: If there is a global public BaseBean, it can be converted as in Note 2. If not, you should have all fields in each of your data models.
-         setJsonConvert() sets the model that needs to be converted
+1. The second parameter of `success` in Method 1 and `Model` in RxResult indicate the data source: network/cache.
+2. When using Method Three, unsubscribe in time when not needed: `_subscription?.cancel()`
+3. When the page needs to exit, or the request result is no longer relevant, the request can be canceled through the set CancelToken.
 
+### Upload/Download (supports resumable upload/download): Note file read/write permissions on mobile terminals.
 
- 5.Upload and download (support breakpoint upload and download):(Add parameters such as setParam according to the service), pay attention to the file read and write permissions of the Mobile device.
-
-  
-    RxNet.get() 
+    RxNet.get()
         .setPath("https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg")
-         /downloadBreakPoint() Breakpoint download
+        .setParam(xx,xx) // Replace xx,xx with actual parameters
+         //breakPointDownload() Resumable download
         .download(
           savePath:"${appDocPath}/55.jpg",
           onReceiveProgress: (len,total){
@@ -218,74 +239,172 @@ Two ways to execute requests：
             }
           });
 
-   
-  
     RxNet.post()
-        .setPath("xxxxx.jpg")
-        // uploadFileBreakPoint() breakpoint continuous transmission
+        .setPath("xxxxx/xxx.jpg") // Replace with actual path
+        // breakPointUpload() Resumable upload
         .upload(
             success: (data, sourcesType) {},
             failure: (e) {},
             onSendProgress: (len, total) {});
 
+### Configuring Global Request Headers
 
-   
-   6.A clear log interceptor that refuses debugging.
-     
-    Log information is needed. Please add RxNetLogInterceptor interceptor or your customized when initializing and configuring the network framework.
+1. `setGlobalHeaders(Map<String, dynamic> headers)` method:
 
-      RxNet().init(
-       ... xxx
-          isDebug: true, ///Whether to debug the print log
-          interceptors: [ ///interceptors
-          RxNetLogInterceptor() //You can add your own customization
-      ]);
+        RxNet.setGlobalHeaders({
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        });
+
+2. Add a custom request interceptor `xxxInterceptor()` e.g:
 
 
-   output format：
+      class TokenInterceptors extends Interceptor {
+           @override
+           onRequest(
+           RequestOptions options,
+           RequestInterceptorHandler handler,
+           ) async {
+               Map<String, dynamic> header = {};
+               header["token"] = "xxxxx";
+               header["version"] = "1.0";
+               options.headers.addAll(header);
+               handler.next(options);
+           }
+      }
 
-    [log] ###日志：  v  ***************** Request Start *****************
-    [log] ###日志：  v  uri: http://t.weather.sojson.com/api/weather/city/101030100
-    [log] ###日志：  v  method: GET
-    [log] ###日志：  v  responseType: ResponseType.json
-    [log] ###日志：  v  followRedirects: true
-    [log] ###日志：  v  connectTimeout:
-    [log] ###日志：  v  receiveTimeout:
-    [log] ###日志：  v  extra: {}
-    [log] ###日志：  v  Request Headers:
-    [log] ###日志：  v  {"content-type":"application/json"}
-    [log] ###日志：  v  data:
-    [log] ###日志：  v  null
-    [log] ###日志：  v  ***************** Request End *****************
-    [log] ###日志：  v  ***************** Response Start *****************
-    [log] ###日志：  v  statusCode: 200
-    [log] ###日志：  v  Response Headers:
-    [log] ###日志：  v   connection: keep-alive
-    [log] ###日志：  v   cache-control: max-age=3000
-    [log] ###日志：  v   transfer-encoding: chunked
-    [log] ###日志：  v   date: Wed, 07 Feb 2024 13:09:47 GMT
-    [log] ###日志：  v   vary: Accept-Encoding
-    [log] ###日志：  v   content-encoding: gzip
-    [log] ###日志：  v   age: 2404
-    [log] ###日志：  v   content-type: application/json;charset=UTF-8
-    [log] ###日志：  v   x-source: C/200
-    [log] ###日志：  v   server: marco/2.20
-    [log] ###日志：  v   x-request-id: c58182a21ddcaed97d76dbb49f4771d8; 32238019a67857706c0e40b6dd0e1238
-    [log] ###日志：  v   via: S.mix-hz-fdi1-213, T.213.H, V.mix-hz-fdi1-217, T.194.H, M.cun-he-sjw8-194
-    [log] ###日志：  v   expires: Wed, 07 Feb 2024 13:19:43 GMT
-    [log] ###日志：  v  Response Text:
-    [log] ###日志：  v  {"message":"success感谢又拍云(upyun.com)提供CDN赞助","status":200,"date":"20241230","time":"2024-12-30 16:40:54","cityInfo":{"city":"天津市","citykey":"101030100","parent":"天津","updateTime":"15:13"},"data":{"shidu":"16%","pm25":11.0,"pm10":61.0,"quality":"良","wendu":"1.7","ganmao":"极少数敏感人群应减少户外活动","forecast":[{"date":"30","high":"高温 8℃","low":"低温 -6℃","ymd":"2024-12-30","week":"星期一","sunrise":"07:29","sunset":"16:57","aqi":46,"fx":"西北风","fl":"3级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"31","high":"高温 5℃","low":"低温 -3℃","ymd":"2024-12-31","week":"星期二","sunrise":"07:30","sunset":"16:58","aqi":54,"fx":"西风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"01","high":"高温 5℃","low":"低温 -4℃","ymd":"2025-01-01","week":"星期三","sunrise":"07:30","sunset":"16:59","aqi":59,"fx":"东北风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"02","high":"高温 2℃","low":"低温 -2℃","ymd":"2025-01-02","week":"星期四","sunrise":"07:30","sunset":"17:00","aqi":50,"fx":"东北风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"03","high":"高温 4℃","low":"低温 -5℃","ymd":"2025-01-03","week":"星期五","sunrise":"07:30","sunset":"17:00","aqi":65,"fx":"西风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"04","high":"高温 5℃","low":"低温 -5℃","ymd":"2025-01-04","week":"星期六","sunrise":"07:30","sunset":"17:01","aqi":86,"fx":"西南风","fl":"1级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"05","high":"高温 7℃","low":"低温 -2℃","ymd":"2025-01-05","week":"星期日","sunrise":"07:30","sunset":"17:02","aqi":75,"fx":"东北风","fl":"2级","type":"小雪","notice":"小雪虽美，赏雪别着凉"},{"date":"06","high":"高温 7℃","low":"低温 -2℃","ymd":"2025-01-06","week":"星期一","sunrise":"07:30","sunset":"17:03","aqi":31,"fx":"西北风","fl":"3级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"07","high":"高温 6℃","low":"低温 -2℃","ymd":"2025-01-07","week":"星期二","sunrise":"07:30","sunset":"17:04","aqi":32,"fx":"西北风","fl":"3级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"08","high":"高温 3℃","low":"低温 -4℃","ymd":"2025-01-08","week":"星期三","sunrise":"07:30","sunset":"17:05","aqi":52,"fx":"西北风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"09","high":"高温 3℃","low":"低温 -4℃","ymd":"2025-01-09","week":"星期四","sunrise":"07:30","sunset":"17:06","aqi":87,"fx":"西南风","fl":"2级","type":"阴","notice":"不要被阴云遮挡住好心情"},{"date":"10","high":"高温 3℃","low":"低温 -4℃","ymd":"2025-01-10","week":"星期五","sunrise":"07:29","sunset":"17:07","aqi":49,"fx":"西北风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"11","high":"高温 4℃","low":"低温 -2℃","ymd":"2025-01-11","week":"星期六","sunrise":"07:29","sunset":"17:08","aqi":46,"fx":"西北风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"12","high":"高温 3℃","low":"低温 -3℃","ymd":"2025-01-12","week":"星期日","sunrise":"07:29","sunset":"17:09","aqi":40,"fx":"西北风","fl":"3级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"13","high":"高温 3℃","low":"低温 -5℃","ymd":"2025-01-13","week":"星期一","sunrise":"07:29","sunset":"17:10","aqi":68,"fx":"南风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"}],"yesterday":{"date":"29","high":"高温 6℃","low":"低温 -5℃","ymd":"2024-12-29","week":"星期日","sunrise":"07:29","sunset":"16:56","aqi":100,"fx":"西南风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"}}}
-    [log] ###日志：  v  useTime:0分:0秒:215毫秒
-    [log] ###日志：  v  Response url :http://t.weather.sojson.com/api/weather/city/101030100
-    [log] ###日志：  v  ***************** Response End *****************
-    [log] ###日志：  v  useJsonAdapter：true
+### If your business or project requires multiple network request instances, you can manually create multiple request objects:
 
-   7.For online APP interface error messages, you can also view the request log information through RxNet.
-     
-    Open the debug log window： RxNet().showDebugWindow(context);
-    Close the debug log window： RxNet().closeDebugWindow();
+    void newInstanceRequest() async {
+      // Perform independent initialization configuration for this instance, request policies, interceptors, etc.
+      final apiService = RxNet.create();
+      await apiService.initNet(baseUrl: "https://api.yourdomain.com");
+      // apiService.setHeaders(xxx)
+      final response = await apiService.getRequest()
+          .setPath("/users/1")
+          .setJsonConvert(NewWeatherInfo.fromJson)
+          .request();
 
+      final weatherInfo = response.value;
+    }
 
-## debug window：
-![调试窗口](https://github.com/zhengzaihong/rxnet/blob/master/images/app_logcat.jpg) 
-   
+### Network Detection Before Request:
+
+     // Whether it's the default request instance or a manually created multiple instance,
+     // if baseCheckNet is configured, network detection will be performed for every request.
+    await RxNet.init(
+        baseUrl: "xxxx",
+        baseCacheMode: CacheMode.REQUEST_FAILED_READ_CACHE, // Read cache data on request failure
+        baseCheckNet:checkNet, // Global network check, all requests go through this method
+       );
+
+    For example:
+
+    Future<bool> checkNet() async{
+      // You need to implement network detection yourself or use a third-party library
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      if (connectivityResult == ConnectivityResult.none) {
+        Toast.show( "Currently no network");
+        return false;
+      }
+      return Future.value(true);
+    }
+
+### Certificate Validation:
+
+    RxNet.getDefaultClient()?.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () {
+        final client = HttpClient();
+        // Perform custom configurations here, such as certificate validation:
+        // Set to false to reject all invalid certificates by default
+        client.badCertificateCallback = (X509Certificate cert, String host, int port) {
+          // You can add more complex validation logic here, such as checking certificate fingerprints or issuers
+          // Your file might be xx.pem, read it out and then validate
+          const trustedFingerprint = 'AB:CD:EF:12:34:56:78:90:AB:CD:EF:12:34:56:78:90:AB:CD:EF:12';
+          final certFingerprint = cert.sha1.toString().toUpperCase();
+          final isTrusted = certFingerprint == trustedFingerprint;
+          // Allow request only if the certificate is trusted
+          return isTrusted;
+        };
+        return client;
+      },
+    );
+
+### Clear Log Interceptor, Avoid Debugging Blindly.
+
+    If you need log information, please add the RxNetLogInterceptor or your custom interceptor when initializing the network framework.
+
+     await RxNet.init(
+        // xxxxxx
+        interceptors: [
+          //TokenInterceptor // Token interceptor, customize for more features
+          ///Log interceptor
+           RxNetLogInterceptor()
+           //ResponseInterceptor() // Response interceptor, preprocess results
+        ]);
+
+Output Format:
+
+    [log] ###Log:  v  ***************** Request Start *****************
+    [log] ###Log:  v  uri: http://t.weather.sojson.com/api/weather/city/101030100
+    [log] ###Log:  v  method: GET
+    [log] ###Log:  v  responseType: ResponseType.json
+    [log] ###Log:  v  followRedirects: true
+    [log] ###Log:  v  connectTimeout:
+    [log] ###Log:  v  receiveTimeout:
+    [log] ###Log:  v  extra: {}
+    [log] ###Log:  v  Request Headers:
+    [log] ###Log:  v  {"content-type":"application/json"}
+    [log] ###Log:  v  data:
+    [log] ###Log:  v  null
+    [log] ###Log:  v  ***************** Request End *****************
+    [log] ###Log:  v  ***************** Response Start *****************
+    [log] ###Log:  v  statusCode: 200
+    [log] ###Log:  v  Response Headers:
+    [log] ###Log:  v   connection: keep-alive
+    [log] ###Log:  v   cache-control: max-age=3000
+    [log] ###Log:  v   transfer-encoding: chunked
+    [log] ###Log:  v   date: Wed, 07 Feb 2024 13:09:47 GMT
+    [log] ###Log:  v   vary: Accept-Encoding
+    [log] ###Log:  v   content-encoding: gzip
+    [log] ###Log:  v   age: 2404
+    [log] ###Log:  v   content-type: application/json;charset=UTF-8
+    [log] ###Log:  v   x-source: C/200
+    [log] ###Log:  v   server: marco/2.20
+    [log] ###Log:  v   x-request-id: c58182a21ddcaed97d76dbb49f4771d8; 32238019a67857706c0e40b6dd0e1238
+    [log] ###Log:  v   via: S.mix-hz-fdi1-213, T.213.H, V.mix-hz-fdi1-217, T.194.H, M.cun-he-sjw8-194
+    [log] ###Log:  v   expires: Wed, 07 Feb 2024 13:19:43 GMT
+    [log] ###Log:  v  Response Text:
+    [log] ###Log:  v  {"message":"success感谢又拍云(upyun.com)提供CDN赞助","status":200,"date":"20241230","time":"2024-12-30 16:40:54","cityInfo":{"city":"天津市","citykey":"101030100","parent":"天津","updateTime":"15:13"},"data":{"shidu":"16%","pm25":11.0,"pm10":61.0,"quality":"良","wendu":"1.7","ganmao":"极少数敏感人群应减少户外活动","forecast":[{"date":"30","high":"高温 8℃","low":"低温 -6℃","ymd":"2024-12-30","week":"星期一","sunrise":"07:29","sunset":"16:57","aqi":46,"fx":"西北风","fl":"3级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"31","high":"高温 5℃","low":"低温 -3℃","ymd":"2024-12-31","week":"星期二","sunrise":"07:30","sunset":"16:58","aqi":54,"fx":"西风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"01","high":"高温 5℃","low":"低温 -4℃","ymd":"2025-01-01","week":"星期三","sunrise":"07:30","sunset":"16:59","aqi":59,"fx":"东北风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"02","high":"高温 2℃","low":"低温 -2℃","ymd":"2025-01-02","week":"星期四","sunrise":"07:30","sunset":"17:00","aqi":50,"fx":"东北风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"03","high":"高温 4℃","low":"低温 -5℃","ymd":"2025-01-03","week":"星期五","sunrise":"07:30","sunset":"17:00","aqi":65,"fx":"西风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"04","high":"高温 5℃","low":"低温 -5℃","ymd":"2025-01-04","week":"星期六","sunrise":"07:30","sunset":"17:01","aqi":86,"fx":"西南风","fl":"1级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"05","high":"高温 7℃","low":"低温 -2℃","ymd":"2025-01-05","week":"星期日","sunrise":"07:30","sunset":"17:02","aqi":75,"fx":"东北风","fl":"2级","type":"小雪","notice":"小雪虽美，赏雪别着凉"},{"date":"06","high":"高温 7℃","low":"低温 -2℃","ymd":"2025-01-06","week":"星期一","sunrise":"07:30","sunset":"17:03","aqi":31,"fx":"西北风","fl":"3级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"07","high":"高温 6℃","low":"低温 -2℃","ymd":"2025-01-07","week":"星期二","sunrise":"07:30","sunset":"17:04","aqi":32,"fx":"西北风","fl":"3级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"08","high":"高温 3℃","low":"低温 -4℃","ymd":"2025-01-08","week":"星期三","sunrise":"07:30","sunset":"17:05","aqi":52,"fx":"西北风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"09","high":"高温 3℃","low":"低温 -4℃","ymd":"2025-01-09","week":"星期四","sunrise":"07:30","sunset":"17:06","aqi":87,"fx":"西南风","fl":"2级","type":"阴","notice":"不要被阴云遮挡住好心情"},{"date":"10","high":"高温 3℃","low":"低温 -4℃","ymd":"2025-01-10","week":"星期五","sunrise":"07:29","sunset":"17:07","aqi":49,"fx":"西北风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"11","high":"高温 4℃","low":"低温 -2℃","ymd":"2025-01-11","week":"星期六","sunrise":"07:29","sunset":"17:08","aqi":46,"fx":"西北风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"12","high":"高温 3℃","low":"低温 -3℃","ymd":"2025-01-12","week":"星期日","sunrise":"07:29","sunset":"17:09","aqi":40,"fx":"西北风","fl":"3级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"13","high":"高温 3℃","low":"低温 -5℃","ymd":"2025-01-13","week":"星期一","sunrise":"07:29","sunset":"17:10","aqi":68,"fx":"南风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"}],"yesterday":{"date":"29","high":"高温 6℃","low":"低温 -5℃","ymd":"2024-12-29","week":"星期日","sunrise":"07:29","sunset":"16:56","aqi":100,"fx":"西南风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"}}}
+    [log] ###Log:  v  useTime:0分:0秒:215毫秒
+    [log] ###Log:  v  Response url :http://t.weather.sojson.com/api/weather/city/101030100
+    [log] ###Log:  v  ***************** Response End *****************
+    [log] ###Log:  v  useJsonAdapter：true
+
+### For online APP interface information, you can also view request log information through RxNet's built-in tools.
+
+    Open debug log window: RxNet.showDebugWindow(context);
+    Close debug log window: RxNet.closeDebugWindow();
+
+## Debug Window:
+![Debug Window](https://github.com/zhengzaihong/rxnet/blob/master/images/app_logcat.jpg)
+
+    Copyright (c) 2018 zhengzaihong
+    
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+    
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+    
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
