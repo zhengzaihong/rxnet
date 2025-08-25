@@ -3,7 +3,7 @@
 Language: English | [简体中文](README-ZH.md)
 
 🚀 RxNet: A Lightweight, Powerful, and Native-Styled Network Toolkit for Flutter
-RxNet is a minimalist yet feature-rich network communication framework for Flutter, built on top of Dio. Designed to feel natural for native developers, it offers a silky-smooth experience with zero learning curve. Whether you're building a weather app or a complex enterprise-grade system, RxNet helps you write clean, maintainable, and scalable network code.
+RxNet is a minimalist yet feature-rich network communication framework for Flutter, built on top of Dio. Designed to feel natural for native developers, it offers a silky-smooth experience with zero learning curve.  RxNet helps you write clean, maintainable, and scalable network code.
 
 🧩 Key Features：
 
