@@ -504,52 +504,7 @@ class BuildRequest<T> {
     } while (keepLooping);
   }
 
-  void upload({
-    ProgressCallback? onSendProgress,
-    Success? success,
-    Failure? failure,
-    Completed? completed,
-  }) async {
-    if (!(await _checkNetWork())) {
-      return;
-    }
 
-    String url = _path.toString();
-    if (isRestfulUrl()) {
-      url = NetUtils.restfulUrl(_path.toString(), _params);
-    }
-    try {
-      _options?.method = _httpType.name;
-      if (_headers.isNotEmpty) {
-        _options?.headers = _headers;
-      }
-      if (_enableGlobalHeader) {
-        _options?.headers ??= {};
-        _options?.headers?.addAll(_rxNet.getHeaders());
-      }
-      if (_toFormData) {
-        _bodyData = FormData.fromMap(_params);
-      }
-      if (_toBodyData) {
-        _bodyData = _params;
-      }
-
-      Response response = await _rxNet.client!.request(url,
-          data: _bodyData,
-          queryParameters:
-              (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
-          options: _options,
-          cancelToken: _cancelToken);
-
-      onResponse?.call(response);
-      if (response.statusCode == 200) {
-        success?.call(response.data, SourcesType.net);
-      }
-    } catch (e) {
-      failure?.call(e);
-    }
-    completed?.call();
-  }
 
   void download({
     required String savePath,
@@ -604,7 +559,10 @@ class BuildRequest<T> {
     completed?.call();
   }
 
-  void downloadBreakPoint({
+
+  //断点下载
+  //Breakpoint download
+  void breakPointDownload({
     required String savePath,
     ProgressCallback? onReceiveProgress,
     Success? success,
@@ -705,7 +663,56 @@ class BuildRequest<T> {
     completed?.call();
   }
 
-  void uploadFileBreakPoint({
+  void upload({
+    ProgressCallback? onSendProgress,
+    Success? success,
+    Failure? failure,
+    Completed? completed,
+  }) async {
+    if (!(await _checkNetWork())) {
+      return;
+    }
+
+    String url = _path.toString();
+    if (isRestfulUrl()) {
+      url = NetUtils.restfulUrl(_path.toString(), _params);
+    }
+    try {
+      _options?.method = _httpType.name;
+      if (_headers.isNotEmpty) {
+        _options?.headers = _headers;
+      }
+      if (_enableGlobalHeader) {
+        _options?.headers ??= {};
+        _options?.headers?.addAll(_rxNet.getHeaders());
+      }
+      if (_toFormData) {
+        _bodyData = FormData.fromMap(_params);
+      }
+      if (_toBodyData) {
+        _bodyData = _params;
+      }
+
+      Response response = await _rxNet.client!.request(url,
+          data: _bodyData,
+          queryParameters:
+          (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
+          options: _options,
+          cancelToken: _cancelToken);
+
+      onResponse?.call(response);
+      if (response.statusCode == 200) {
+        success?.call(response.data, SourcesType.net);
+      }
+    } catch (e) {
+      failure?.call(e);
+    }
+    completed?.call();
+  }
+
+  //断点上传
+  //Breakpoint upload
+  void breakPointUpload({
     required String filePath,
     ProgressCallback? onSendProgress,
     Success? success,

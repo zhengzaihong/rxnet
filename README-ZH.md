@@ -9,123 +9,145 @@ Language: [English](README.md) | 简体中文
 * 支持失败重试。
 * 支持缓存时效。
 * 支持RESTful风格请求。
-* 支持循环请求，外部不用维护请求队列或定时执行。
+* 支持循环请求。
 * 支持json转实体请求。
 * 支持全局拦截器。
-* 支持async/await 方式调用。
-* 支持原生习惯的回调方式。
-* 支持全局异常捕获。
-* 支持日志控制台界面展示
-* 支持少量键值对数据存储（危险阈值：20 万条以上或单个记录大小超过 1MB 时）
+* 支持async/await 方式。
+* 支持响应数据回调方式。
+* 支持流式数据响应。
+* 支持日志控制台界面展示。
+* 支持少量键值对数据存储。
 
 
 ## 依赖：
 
     dependencies:
-       flutter_rxnet_forzzh:0.3.1 
+       flutter_rxnet_forzzh:0.4.0
 
 
 ## 常用参数：
 
-支持的请求方式：  get, post, delete, put, patch,
+支持的请求方式：`get, post, delete, put, patch`,
 
 缓存策略：CacheMode 支持如下几种模式：
 
-    1.不做缓存，只网络数据
-    onlyRequest,
+    enum CacheMode {
     
-    2.先请求网络，如果请求网络失败，则读取缓存，如果读取缓存失败，本次请求失败
-    requestFailedReadCache,
+        //不做缓存，每次都发起请求
+        ONLY_REQUEST,
+        
+        //只使用缓存，通常用于先预加载数据，切换到无网环境做数据显示
+        ONLY_CACHE,
+        
+        //先请求网络，如果请求网络失败，则读取缓存，如果读取缓存失败，本次请求失败
+        REQUEST_FAILED_READ_CACHE,
+        
+        //先使用缓存显示，不管是否存在，仍然请求网络，新数据替换缓存数据，并触发上次数据刷新
+        FIRST_USE_CACHE_THEN_REQUEST,
+        
+        //先使用缓存，无缓存或缓存过期后再请求网络，否则不会请求网络
+        CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST,
+    }
 
-    3.先使用缓存，不管是否存在，仍然请求网络
-    firstCacheThenRequest,
-
-    4.只使用缓存
-    onlyCache;
-
-    5.先使用缓存，无缓存或超时效则请求网络
-    cacheNoneToRequest;
 
 
 注意：
 
-1.如需要 `RESTful` 风格请求：setRestfulUrl(true)，内部自动转化参数链接
+1.如需要 `RESTful` 风格请求：请设置setRestfulUrl(true)，内部自动转化参数链接。
 
-2.不设置 `setJsonConvert` 返回的都是Map类型数据，否则返回定义的实体类型。
+2.不设置 `setJsonConvert` 返回的都原始类型数据，否则返回定义的实体类型。
 
 需要json 转对象，请设置 setJsonConvert 并在回调中根据后端返回统一格式进行转换。
 
-额外功能：小量数据支持 RxNet 数据存储来替换 ShardPreference使用：
+#### 额外功能：小量数据支持 RxNet 数据来存储,效率更高效：
 
-    // web 端不支持
-    rxPut("key","内容"); //存数据
-    rxGet("key");       //取数据
+  
+    //存储数据 key-value
+    RxNet.saveCache("name", "张三");
 
-执行请求的两种方式：
+    //读取数据
+    RxNet.readCache("name").then((value) {
+      LogUtil.v(value);  //输出：张三
+    });
 
-    1.方式一 ：RxNet.execute(success,failure) 
-      支持缓存策略
+    //或者
+    Future.delayed(const Duration(seconds: 5),() async{
+      final result = await RxNet.readCache("name");
+      LogUtil.v(result);  //输出：张三
+    });
+
+#### 注意：Web端不支持额外数据存储。
+
+#### 执行请求的几种方式，请结合场景使用：
+
+    1.方式一 ：RxNet.execute(success,failure,completed)
       Success 回调中获取最终数据。
       Failure 回调中获取错误信息。
       Completed 始终都会执行的回调，取消加载动画，释放资源等
 
 
-    2.方式二  await RxNet.executeAsync<xxxx>()
+    2.方式二  await RxNet.request()
       返回结果或错误信息都在 RxResult 实体中，无需try catch操作。
       RxResult.value 获取最终结果。
       RxResult.error 获取错误信息
 
-## 说明：
- 
- 1.先初始化网络框架
+    3.方式三  await RxNet.executeStream()
+      返回结果或错误信息都在 RxResult 实体中。
+      RxResult.value 获取最终结果。
+      RxResult.error 获取错误信息
 
-     await RxNet().init(
+## 服用说明：
+ 
+ ### 初始化网络框架
+
+     await RxNet.init(
         baseUrl: "http://t.weather.sojson.com/",
         // cacheDir: "xxx",   ///缓存目录
-        // cacheName: "local_cache_app", ///缓存文件
-        baseCacheMode: CacheMode.requestFailedReadCache,
-        baseCheckNet:checkNet, /// 如提供全局检查网络的回调，即每次请求前都会触发
-        requestCaptureError: (e){  ///全局抓获 异常
-          //推荐在拦截中处理，不在这里处理过多内容 
-          print(">>>${HandleError.dioError(e).message}");
-        },
-         baseUrlEnv: {  ///支持多环境 baseUrl调试， RxNet().setEnv("test")方式切换;
-          "test": "http://t.weather.sojson1.com/",
-          "debug": "http://t.weather.sojson2.com/",
-          "release": "http://t.weather.sojson.com/",
-           //xxxxx
-        }, 
-        interceptors: [  ///拦截器
-          //可以添加多个你自己的拦截器
-          RxNetLogInterceptor()
+        // cacheName: "local_cache", ///缓存文件
+        baseCacheMode: CacheMode.REQUEST_FAILED_READ_CACHE, //请求失败读取缓存数据
+        baseCheckNet:checkNet, //全局检查网络，所有的请求都走这个方法
+        cacheInvalidationTime: 24 * 60 * 60 * 1000, //缓存时效毫秒
+        // baseUrlEnv: {  ///支持多环境 baseUrl调试，RxNet.setDefaultEnv("test") 方式切换;
+        //   "test": "http://t.weather.sojson1.com/",
+        //   "debug": "http://t.weather.sojson2.com/",
+        //   "release": "http://t.weather.sojson.com/",
+        // },
+        interceptors: [
+          // TokenInterceptor // token拦截器，更多功能请自定义拦截器
+          //日志拦截器
+           RxNetLogInterceptor()
+          //ResponseInterceptor() //自定义响应拦截器，预处理结果等
         ]);
  
- 2.发起网络请求：
+ ### 发起网络请求（ post, get, delete, put, patch等同理）这里get举例：
 
-    1.回调模式：
+###    1.回调模式：
 
-    RxNet.get()  // post, get, delete, put, patch
-        .setPath("api/weather")
-        .setParam("city", "101030100")
-        //.addParams(Map)  
-        .setRestfulUrl(true) //Restful 
-        .setCacheMode(CacheMode.onlyRequest)
-        .setRetryCount(2)  //重试次数
-        .setRetryInterval(5000) //毫秒
-        .setFailRetry(true)
-        //.setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
-        .setJsonConvert(NormalWaterInfoEntity.fromJson)
-        .execute<NormalWaterInfoEntity>(
+    RxNet.get()
+        .setPath('api/weather/') //地址
+        .setParam("city", "101030100") //参数
+        .setRestfulUrl(true) // http://t.weather.sojson.com/api/weather/city/101030100
+        .setCancelToken(pageRequestToken) //取消请求的CancelToken
+        .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
+        //.setRetryCount(2, interval: const Duration(seconds: 7))  //失败重试，重试2次,每次间隔7秒
+        //.setLoop(true, interval: const Duration(seconds: 5)) // 定时请求
+        //.setContentType(ContentTypes.json) //application/json
+        //.setResponseType(ResponseType.json) //json
+        //.setCacheInvalidationTime(1000*10)  //本次请求的缓存失效时间-毫秒
+        //.setRequestIgnoreCacheTime(true)  //是否直接忽略缓存失效时间
+        .setJsonConvert(NewWeatherInfo.fromJson) //解析成NewWeatherInfo对象
+        .execute<NewWeatherInfo>(
             success: (data, source) {
-             // 这里的 data 已经是 NormalWaterInfoEntity类型
+              //刷新UI
+              count++;
               setState(() {
-                content = jsonEncode(data);
+                content ="$count : ${jsonEncode(data)}";
                 sourcesType = source;
               });
              },
             failure: (e) {
               setState(() {
-                content = "";
+                content = "empty data";
               });
              },
             completed: (){
@@ -133,81 +155,91 @@ Language: [English](README.md) | 简体中文
          });
 
 
-    2. await方式：
+###   2. async/await方式：
 
-     var data = await RxNet.get()  // post, get, delete, put, patch
+     var data = await RxNet.get()  
         .setPath("api/weather")
         .setParam("city", "101030100")
-        //.addParams(Map)
-        .setRestfulUrl(true)
-        .setCacheMode(CacheMode.onlyRequest)
-       // .setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data))
+        //.addParams(Map) //一次添加多个参数
+        .setRestfulUrl(true) //RESTFul 
+        //.setRetryCount(2)  //重试次数
+        //.setRetryInterval(7000) //毫秒
+        .setCacheMode(CacheMode.ONLY_REQUEST)
+        //.setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data)) //解析成NormalWaterInfoEntity对象
         .setJsonConvert(NormalWaterInfoEntity.fromJson)
-        .executeAsync<NormalWaterInfoEntity?>();
+        .request();
 
-      print("--------->#${data.isError}");
       print("--------->#${data.error}");
       var result = data.value;
       content = result.toString();
       sourcesType = data.model;
 
+###   3. Stream 流方式：
+
+    //用于取消的句柄
+    StreamSubscription? _subscription;
+
+    void testStreamRequest(){
+
+      final pollingSubscription = RxNet.get()
+           .setPath("api/weather")
+           .setParam("city", "101030100")
+           .setRestfulUrl(true)
+           .setLoop(true, interval: const Duration(seconds: 7))
+           .executeStream(); // 直接使用 executeStream
+       //     .listen((data) {
+       //       setState(() {
+       //         count++;
+       //         if (data.isSuccess) {
+       //           var result = data.value;
+       //           content =count.toString() +" : "+ jsonEncode(result);
+       //           sourcesType = data.model;
+       //         } else {
+       //           content = data.error.toString();
+       //         }
+       //       });
+       // });
+       // 或者使用如下方式：
+      _subscription = pollingSubscription.listen((data){
+               setState(() {
+                 count++;
+                 if (data.isSuccess) {
+                   var result = data.value;
+                   content ="$count : ${jsonEncode(result)}";
+                   sourcesType = data.model;
+                 } else {
+                   content = data.error.toString();
+                 }
+               });
+       });
+
+    }
+
+ 注意：在使用方式三中，需要再不使用时，及时取消订阅：
+
+    @override
+    void dispose() {
+     _subscription?.cancel();
+     _cancelToken?.cancel();
+      super.dispose();
+    }
+
+特别说明：
+ 无论使用那种请求方式，本质上都是 Stream,当轮询启用时，async/await 只返回首次的结果,底层流将被取消。
+ 如要获得所有响应结果，你必须使用execute（）或者直接监听executeStream（）。
+
+ 1.方式1中的success第二个参数和RxResult中的Model说明了数据来源：网络/缓存
+ 2.使用方式三时，在不需需要时，及时关闭订阅：_subscription?.cancel();
+ 3.当页面需要退出时，或者不在关系请求结果时，可通过设置的CancelToken取消请求。
 
 
- 3.请求原始数据,某些特殊情况，如读取网盘资源文件数据
-
-
-
-        RxNet.get()
-            .setPath("http://xxxxx/xxxx/testjson.txt")
-            .setCacheMode(CacheMode.onlyRequest)
-            .execute<String>(success: (data,sourcesType){
-              var source = sourcesType as SourcesType;
-              content = data.toString();
-              ///数据来源是网络 界面上可以分别处理或提示 来源等
-              if(source == SourcesType.net){
-              }else{
-                /// 本地数据库
-              }
-        });
-
-
- 4.请求数据直接转 Bean对象
-
-      RxNet.get()  //这里可以省略 泛型声明
-        .setPath("api/weather")
-        .setParam("city", "101030100")
-        .setRestfulUrl(true) ///Restful
-        .setCacheMode(CacheMode.onlyRequest)
-        .setCheckNetwork((){
-          //todo 检查网络的实现（非必要）
-           return true;
-        })
-       .setJsonConvert(NormalWaterInfoEntity.fromJson)
-       .execute<NormalWaterInfoEntity>(success: (data,sourcesType){
-          var source = sourcesType as SourcesType;
-          if(data is NormalWaterInfoEntity){
-            content = data.toString();
-            print("------>${data.message}");
-          }
-          ///数据来源是网络
-          if(source == SourcesType.net){
-          }else{
-            /// 本地数据库
-          }
-          setState(() {});
-        });
-
- 
-    注意：如果有全局公共 BaseBean可以如说明 2 中方式转换。如果没有则你的每个数据模型应当建全字段。
-         setJsonConvert()设置需要转换的模型
-
-
- 5.上传下载(支持断点上传下载)：(根据业务添加参数 setParam等),注意移动终端的文件读写权限。
+ ### 上传下载(支持断点上传下载)：注意移动终端的文件读写权限。
 
   
     RxNet.get() 
         .setPath("https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg")
-         //downloadBreakPoint() 断点下载
+        .setParam(xx,xx)
+         //breakPointDownload() 断点下载
         .download(
           savePath:"${appDocPath}/55.jpg",
           onReceiveProgress: (len,total){
@@ -220,26 +252,107 @@ Language: [English](README.md) | 简体中文
    
   
     RxNet.post()
-        .setPath("xxxxx.jpg")
-        // uploadFileBreakPoint() 断点续传
+        .setPath("xxxxx/xxx.jpg")
+        // breakPointUpload() 断点续传
         .upload(
             success: (data, sourcesType) {},
             failure: (e) {},
             onSendProgress: (len, total) {});
 
 
+### 配置全局请求头的方式
+
+ 1.setGlobalHeaders(Map<String, dynamic> headers) 方式:
+
+    RxNet.setGlobalHeaders({
+     "Accept-Encoding": "gzip, deflate, br",
+     "Connection": "keep-alive",
+    });     
+
+ 2.添加自定义请求拦截器 xxxInterceptor() 如：
+
+    class TokenInterceptors extends Interceptor {
+      @override
+      onRequest(
+        RequestOptions options,
+        RequestInterceptorHandler handler,
+      ) async {
+        Map<String, dynamic> header = {};
+        header["token"] = "xxxxx";
+        header["version"] = "1.0";
+        options.headers.addAll(header);
+        handler.next(options);
+      }
+    }
+
+### 如果你的业务或项目中需要多个网络请求实例可手动创建多个请求对象：
+
+    void newInstanceRequest() async {
+      // 为这个实例进行独立的初始化配置，请求策略，拦截器等等
+      final apiService = RxNet.create();
+      await apiService.initNet(baseUrl: "https://api.yourdomain.com");
+      // apiService.setHeaders(xxx)
+      final response = await apiService.getRequest()
+          .setPath("/users/1")
+          .setJsonConvert(NewWeatherInfo.fromJson)
+          .request();
+
+      final weatherInfo = response.value;
+    }
+
+### 请求前的网络检测：  
+
+     //无论是默认的请求实例，还是手动创建的多实例 配置了 baseCheckNet，则每次请求都会网络检测
+    await RxNet.init(
+        baseUrl: "xxxx",
+        baseCacheMode: CacheMode.REQUEST_FAILED_READ_CACHE, //请求失败读取缓存数据
+        baseCheckNet:checkNet, //全局检查网络，所有的请求都走这个方法
+       );
    
-   6.清晰的日志拦截器，拒绝调试抓瞎。
+    例如：
+
+    Future<bool> checkNet() async{
+      //需自行实现网络检测，或使用三方库
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      if (connectivityResult == ConnectivityResult.none) {
+        Toast.show( "当前无网络");
+        return false;
+      }
+      return Future.value(true);
+    }
+
+### 证书校验：
+
+    RxNet.getDefaultClient()?.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () {
+        final client = HttpClient();
+        // 在这里进行自定义配置，例如证书校验等：
+        // 设置为 false，表示默认拒绝所有无效证书
+        client.badCertificateCallback = (X509Certificate cert, String host, int port) {
+          // 你可以在这里添加更复杂的校验逻辑，例如校验证书指纹或颁发机构
+          // 你的可能是xx.pem 等文件，读取出来再校验
+          const trustedFingerprint = 'AB:CD:EF:12:34:56:78:90:AB:CD:EF:12:34:56:78:90:AB:CD:EF:12';
+          final certFingerprint = cert.sha1.toString().toUpperCase();
+          final isTrusted = certFingerprint == trustedFingerprint;
+          // 只有当证书可信时才允许请求
+          return isTrusted;
+        };
+        return client;
+      },
+    );
+
+### 清晰的日志拦截器，拒绝调试抓瞎。
      
     需要日志信息，初始化配置网络框架时请添加 RxNetLogInterceptor 拦截器 或者您自定义的
 
-      RxNet().init(
-       ...xxx
-          isDebug: true, ///是否调试 打印日志
-          interceptors: [  ///拦截器
-          RxNetLogInterceptor() // 可自行添加自定义
-      ]);
-
+     await RxNet.init(
+        // xxxxxx
+        interceptors: [
+          //TokenInterceptor // token拦截器，更多功能请自定义拦截器
+          ///日志拦截器
+           RxNetLogInterceptor()
+           //ResponseInterceptor() //响应拦截器，预处理结果
+        ]);
 
    输出格式：
 
@@ -279,10 +392,10 @@ Language: [English](README.md) | 简体中文
     [log] ###日志：  v  ***************** Response End *****************
     [log] ###日志：  v  useJsonAdapter：true
 
-   7.对于线上的APP接口错误信息，也可通过RxNet查看请求日志信息。
+ ### 对于线上的APP接口信息，也可通过埋点的RxNet查看请求日志信息。
      
-    打开调试日志窗口： RxNet().showDebugWindow(context);
-    关闭调试日志窗口： RxNet().closeDebugWindow();
+    打开调试日志窗口： RxNet.showDebugWindow(context);
+    关闭调试日志窗口： RxNet.closeDebugWindow();
 
 
 ## 调试窗口：

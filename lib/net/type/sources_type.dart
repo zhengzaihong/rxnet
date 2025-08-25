@@ -8,7 +8,9 @@
 ///
 enum SourcesType {
 
+  //缓存
   cache,
 
+  //网络
   net,
 }

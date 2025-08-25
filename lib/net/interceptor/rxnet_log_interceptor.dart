@@ -132,7 +132,7 @@ class RxNetLogInterceptor extends Interceptor {
     DateTime oldTime = _requestMaps[response?.requestOptions.uri.toString()] ?? DateTime.now();
     DateTime responseTime = DateTime.now();
     Duration duration = responseTime.difference(oldTime);
-    logPrint('useTime:${duration.inMinutes}分:${duration.inSeconds}秒:${duration.inMilliseconds}毫秒');
+    logPrint('useTime:${duration.inMinutes}分 | ${duration.inSeconds}秒 | ${duration.inMilliseconds}毫秒');
     logPrint('Response url :${response?.requestOptions.uri}');
 
     logPrint("***************** Response End *****************");

@@ -21,7 +21,7 @@ enum CacheMode {
   //Request the network first. If the network request fails, the cache is read. If the cache fails, the request fails.
   REQUEST_FAILED_READ_CACHE,
 
-  //先使用缓存显示，不管是否存在，仍然请求网络，新数据替换缓存数据，再次触发页面刷新
+  //先使用缓存显示，不管是否存在，仍然请求网络，新数据替换缓存数据，并触发上次数据刷新
   //Use cache display first, no matter whether it exists or not, still request the network, replace the cached data with new data, and trigger page refresh again
   FIRST_USE_CACHE_THEN_REQUEST,
 

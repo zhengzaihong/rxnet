@@ -60,8 +60,6 @@ import '../src/logging/log_manager.dart';
 //       .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
 //       .setJsonConvert(NewWeatherInfo.fromJson)
 //       .setRetryCount(2)  //重试次数
-//       .setRetryInterval(7000) //毫秒
-//       .setFailRetry(false)
 //       .setCacheInvalidationTime(1000*10)  //毫秒
 //   //  .setRequestIgnoreCacheTime(true) //忽略缓存时效直接请求
 //       .execute<NewWeatherInfo>(
@@ -177,7 +175,7 @@ class RxNet {
       debugWindowHeight: The debugging window defaults to high
    */
 
-  static void init(
+  static Future<void> init(
       {required String baseUrl,
       Directory? cacheDir,
       String cacheName = 'app_local_data',
@@ -193,7 +191,7 @@ class RxNet {
       double debugWindowWidth = 800,
       double debugWindowHeight = 600}) async {
       WidgetsFlutterBinding.ensureInitialized();
-      I.initNet(
+     await I.initNet(
         baseUrl: baseUrl,
         cacheDir: cacheDir,
         cacheName: cacheName,
@@ -257,13 +255,18 @@ class RxNet {
 
   Dio? getClient() => _client;
 
+  static Dio? getDefaultClient() => I._client;
+
   // baseUrlEnv: {
   // "test": "http://t.weather.sojson1.com/",
   // "debug": "http://t.weather.sojson2.com/",
   // "release": "http://t.weather.sojson.com/",
   // }
   //支持多环境 baseUrl调试， RxNet.I.setEnv("test")方式切换;
-  //Support multi-environment baseUrl debugging and switch between RxNet.I.setEnv("test") methods;
+  //Support multi-environment baseUrl debugging and switch between RxNet.I.setEnv("test")/RxNet.setDefaultEnv("test") methods;
+  static void setDefaultEnv(String env) {
+    I._client?.options.baseUrl = I._baseUrlEnv[env];
+  }
   void setEnv(String env) {
     _client?.options.baseUrl = _baseUrlEnv[env];
   }
@@ -344,7 +347,7 @@ class RxNet {
 
   //通过key获取缓存数据
   //Get cached data through key
-  static Future<dynamic> readCache(String key) {
+  static Future<dynamic> readCache(String key) async{
     return I.cacheManager.readCache(key);
   }
 

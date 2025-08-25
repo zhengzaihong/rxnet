@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
+import 'package:flutter_uikit_forzzh/ext/top_view.dart';
 import 'bean/new_weather_info.dart';
 
 class GetRequestPage extends StatefulWidget {
@@ -40,7 +42,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
                 child: const Text("发起get请求",
                     style: TextStyle(color: Colors.black, fontSize: 16)),
               ),
-
+              hGap(20),
               TextButton(
                 onPressed: () {
                   RxNet.showDebugWindow(context);
@@ -74,6 +76,15 @@ class _GetRequestPageState extends State<GetRequestPage> {
 
   var count = 1;
 
+  CancelToken pageRequestToken = CancelToken();
+
+    @override
+    void dispose() {
+      pageRequestToken.cancel();
+      _subscription?.cancel();
+      super.dispose();
+    }
+
   void request()  {
 
     //// 公共请求头 public request header
@@ -85,19 +96,19 @@ class _GetRequestPageState extends State<GetRequestPage> {
     RxNet.get()
         .setPath('api/weather/')
         .setParam("city", "101030100")
-        // .setParam("area", "9000")
-        ///Restful  http://t.weather.sojson.com/api/weather/city/101030100
-        .setRestfulUrl(true)
-         // .setCancelToken(tag)
+        .setRestfulUrl(true) // http://t.weather.sojson.com/api/weather/city/101030100
+        .setCancelToken(pageRequestToken) //取消请求的CancelToken
         .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
-        .setRetryCount(2, interval: const Duration(seconds: 7))  //重试2次,每次间隔7秒
-        // .setLoop(true)
+        //.setRetryCount(2, interval: const Duration(seconds: 7))  //失败重试，重试2次,每次间隔7秒
+        // .setLoop(true) // 定时请求
         .setContentType(ContentTypes.json) //application/json
-        // .setCacheInvalidationTime(1000*10)  //毫秒
-        // .setRequestIgnoreCacheTime(true)
-        .setJsonConvert(NewWeatherInfo.fromJson)
+        .setResponseType(ResponseType.json) //json
+        // .setCacheInvalidationTime(1000*10)  //本次请求的缓存失效时间-毫秒
+        // .setRequestIgnoreCacheTime(true)  // 是否直接忽略缓存失效时间
+        .setJsonConvert(NewWeatherInfo.fromJson) //解析成NewWeatherInfo对象
         .execute<NewWeatherInfo>(
             success: (data, source) {
+              //刷新UI
               count++;
               setState(() {
                 content ="$count : ${jsonEncode(data)}";
@@ -115,39 +126,41 @@ class _GetRequestPageState extends State<GetRequestPage> {
          });
   }
 
-  Stream<RxResult>? _pollingSubscription;
-  void test(){
-    _pollingSubscription = RxNet.get()
-        .setPath("api/weather")
-        .setParam("city", "101030100")
-        .setRestfulUrl(true)
-        .setLoop(true, interval: const Duration(seconds: 7))
-        .executeStream(); // 直接使用 executeStream
-    //     .listen((data) {
-    //       setState(() {
-    //         count++;
-    //         if (data.isSuccess) {
-    //           var result = data.value;
-    //           content =count.toString() +" : "+ jsonEncode(result);
-    //           sourcesType = data.model;
-    //         } else {
-    //           content = data.error.toString();
-    //         }
-    //       });
-    // });
-    _pollingSubscription?.listen((data){
-            setState(() {
-              count++;
-              if (data.isSuccess) {
-                var result = data.value;
-                content ="$count : ${jsonEncode(result)}";
-                sourcesType = data.model;
-              } else {
-                content = data.error.toString();
-              }
-            });
-    });
-  }
+    StreamSubscription? _subscription;
+    void testStreamRequest(){
+
+     final pollingSubscription = RxNet.get()
+          .setPath("api/weather")
+          .setParam("city", "101030100")
+          .setRestfulUrl(true)
+          .setLoop(true, interval: const Duration(seconds: 7))
+          .executeStream(); // 直接使用 executeStream
+      //     .listen((data) {
+      //       setState(() {
+      //         count++;
+      //         if (data.isSuccess) {
+      //           var result = data.value;
+      //           content =count.toString() +" : "+ jsonEncode(result);
+      //           sourcesType = data.model;
+      //         } else {
+      //           content = data.error.toString();
+      //         }
+      //       });
+      // });
+     _subscription = pollingSubscription.listen((data){
+              setState(() {
+                count++;
+                if (data.isSuccess) {
+                  var result = data.value;
+                  content ="$count : ${jsonEncode(result)}";
+                  sourcesType = data.model;
+                } else {
+                  content = data.error.toString();
+                }
+              });
+      });
+     _subscription?.cancel();
+    }
 
   void requestData() async {
     final data = await RxNet.get()
@@ -155,7 +168,6 @@ class _GetRequestPageState extends State<GetRequestPage> {
         .setParam("city", "101030100")
         // .setParam("area", "9000")
         .setRestfulUrl(true)
-        .setLoop(true) //
         // .setRetryCount(2)  //重试次数
         // .setRetryInterval(7000) //毫秒
         .setCacheMode(CacheMode.ONLY_REQUEST)
