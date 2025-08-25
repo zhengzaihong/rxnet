@@ -2,21 +2,28 @@
 
 Language: English | [简体中文](README-ZH.md)
 
-A minimalist Flutter network request tool. This library is an extension of Dio, making it more natural to use, enabling smoother app experiences, and features like having data available as soon as the screen opens.
+🚀 RxNet: A Lightweight, Powerful, and Native-Styled Network Toolkit for Flutter
+RxNet is a minimalist yet feature-rich network communication framework for Flutter, built on top of Dio. Designed to feel natural for native developers, it offers a silky-smooth experience with zero learning curve. Whether you're building a weather app or a complex enterprise-grade system, RxNet helps you write clean, maintainable, and scalable network code.
 
-*   Supports multiple caching strategies.
-*   Supports resumable uploads and downloads.
-*   Supports retry on failure.
-*   Supports cache expiration.
-*   Supports RESTful style requests.
-*   Supports polling requests.
-*   Supports JSON to entity request.
-*   Supports global interceptors.
-*   Supports async/await style.
-*   Supports response data callback style.
-*   Supports streaming data responses.
-*   Supports log console UI display.
-*   Supports storage for small amounts of key-value data.
+🧩 Key Features：
+
+🔁 Multiple Cache Strategies: First-use cache, fallback on failure, cache-only, and more
+
+📡 Breakpoint Resume: Upload/download with resume support for large files
+
+🔄 Polling Requests: Easily implement periodic data fetching
+
+🌐 RESTful API Support: Auto-converts parameters into clean RESTful URLs
+
+🧠 JSON to Entity Conversion: Seamless mapping with setJsonConvert
+
+🛡️ Global Interceptors & Error Handling: Centralized control over request flow
+
+🧪 Dual Request Modes: Supports both async/await and callback styles
+
+🧰 Built-in Debug Console UI: Visualize logs and network activity in-app
+
+📦 Lightweight Key-Value Storage: Faster than SharedPreferences
 
 ## Dependency:
 
