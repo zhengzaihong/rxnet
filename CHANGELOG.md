@@ -1,4 +1,7 @@
 
+## 0.4.0
+- The overall architecture has been redesigned to make it more elegant and easier to get started
+- 
 ## 0.3.1
 - Fixed some bugs in the callback pattern
 
