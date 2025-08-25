@@ -78,9 +78,6 @@ class _GetRequestPageState extends State<GetRequestPage> {
 
     //// 公共请求头 public request header
     RxNet.setGlobalHeaders({
-      "User-Agent": "PostmanRuntime-ApipostRuntime/1.1.0",
-      "Cache-Control": "no-cache",
-      "Accept": "*",
       "Accept-Encoding": "gzip, deflate, br",
       "Connection": "keep-alive",
     });
@@ -93,8 +90,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
         .setRestfulUrl(true)
          // .setCancelToken(tag)
         .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
-        .setRetryCount(2)  //重试次数
-        .setRetryInterval(7000) //毫秒
+        .setRetryCount(2, interval: const Duration(seconds: 7))  //重试2次,每次间隔7秒
         // .setLoop(true)
         .setContentType(ContentTypes.json) //application/json
         // .setCacheInvalidationTime(1000*10)  //毫秒
@@ -135,7 +131,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
     //           content =count.toString() +" : "+ jsonEncode(result);
     //           sourcesType = data.model;
     //         } else {
-    //           content = jsonEncode(data.error);
+    //           content = data.error.toString();
     //         }
     //       });
     // });
@@ -147,7 +143,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
                 content ="$count : ${jsonEncode(result)}";
                 sourcesType = data.model;
               } else {
-                content = jsonEncode(data.error);
+                content = data.error.toString();
               }
             });
     });

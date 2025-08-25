@@ -32,7 +32,7 @@ class BuildRequest<T> {
   int? _cacheInvalidationTime;
   bool _requestIgnoreCacheTime = false;
   int _retryCount = 0;
-  int _retryInterval = 1000;
+  Duration _retryInterval = const Duration(seconds: 0);
   bool _isLoop = false;
   Duration _loopInterval = const Duration(seconds: 5);
   bool _RESTFul = false;
@@ -192,13 +192,11 @@ class BuildRequest<T> {
     return this;
   }
 
-  BuildRequest<T> setRetryCount(int count) {
+  BuildRequest<T> setRetryCount(int count,{Duration? interval}) {
     _retryCount = count;
-    return this;
-  }
-
-  BuildRequest<T> setRetryInterval(int interval) {
-    _retryInterval = interval;
+    if (interval != null) {
+      _retryInterval = interval;
+    }
     return this;
   }
 
@@ -422,7 +420,7 @@ class BuildRequest<T> {
       } catch (e) {
         yield RxResult.error(e);
         if (attempt <= _retryCount) {
-          await Future.delayed(Duration(milliseconds: _retryInterval));
+          await Future.delayed(_retryInterval);
         }
       }
     } while (attempt <= _retryCount && !success);
