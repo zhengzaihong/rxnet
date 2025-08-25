@@ -142,6 +142,9 @@ RxNet 是一款专为 Flutter 打造的跨平台网络请求工具，基于 Dio 
         //.setCacheInvalidationTime(1000*10)  //本次请求的缓存失效时间-毫秒
         //.setRequestIgnoreCacheTime(true)  //是否直接忽略缓存失效时间
         .setJsonConvert(NewWeatherInfo.fromJson) //解析成NewWeatherInfo对象
+        // .setJsonConvert((data)=> BaseBean<Data>.fromJson(data).data) // 如果你只关心data实体部分
+        // .setJsonConvert((data)=> BaseInfo<Data>.fromJson(data, Data.fromJson)) //如果你想要 code 等信息
+        //.setJsonConvert((data)=>BaseInfo<Data>.fromJson(data, Data.fromJson).data) //如果你只关心data实体部分
         .execute<NewWeatherInfo>(
             success: (data, source) {
               //刷新UI

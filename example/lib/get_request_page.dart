@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
 import 'package:flutter_uikit_forzzh/ext/top_view.dart';
+import 'bean/BaseBean.dart';
+import 'bean/BaseInfo.dart';
 import 'bean/new_weather_info.dart';
 
 class GetRequestPage extends StatefulWidget {
@@ -33,8 +35,8 @@ class _GetRequestPageState extends State<GetRequestPage> {
               TextButton(
                 onPressed: () {
                   // test();
-                  // request();
-                  requestData();
+                  request();
+                  // requestData();
                 },
                 style: ButtonStyle(
                   backgroundColor: WidgetStateProperty.all(Colors.cyan),
@@ -88,25 +90,27 @@ class _GetRequestPageState extends State<GetRequestPage> {
   void request()  {
 
     //// 公共请求头 public request header
-    RxNet.setGlobalHeaders({
-      "Accept-Encoding": "gzip, deflate, br",
-      "Connection": "keep-alive",
-    });
-
+    // RxNet.setGlobalHeaders({
+    //   "Accept-Encoding": "gzip, deflate, br",
+    //   "Connection": "keep-alive",
+    // });
     RxNet.get()
         .setPath('api/weather/')
         .setParam("city", "101030100")
         .setRestfulUrl(true) // http://t.weather.sojson.com/api/weather/city/101030100
         .setCancelToken(pageRequestToken) //取消请求的CancelToken
-        .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
+        .setCacheMode(CacheMode.ONLY_REQUEST)
         //.setRetryCount(2, interval: const Duration(seconds: 7))  //失败重试，重试2次,每次间隔7秒
         // .setLoop(true) // 定时请求
         .setContentType(ContentTypes.json) //application/json
         .setResponseType(ResponseType.json) //json
         // .setCacheInvalidationTime(1000*10)  //本次请求的缓存失效时间-毫秒
         // .setRequestIgnoreCacheTime(true)  // 是否直接忽略缓存失效时间
-        .setJsonConvert(NewWeatherInfo.fromJson) //解析成NewWeatherInfo对象
-        .execute<NewWeatherInfo>(
+        // .setJsonConvert(NewWeatherInfo.fromJson) //解析成NewWeatherInfo对象
+        // .setJsonConvert((data)=> BaseBean<Data>.fromJson(data).data) // 如果你只关心data实体部分
+        // .setJsonConvert((data)=> BaseInfo<Data>.fromJson(data, Data.fromJson)) //如果你想要 code 等信息
+        .setJsonConvert((data)=>BaseInfo<Data>.fromJson(data, Data.fromJson).data) //如果你只关心data实体部分
+        .execute<BaseInfo<Data>>(
             success: (data, source) {
               //刷新UI
               count++;
