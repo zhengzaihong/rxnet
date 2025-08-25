@@ -225,11 +225,14 @@ Language: [English](README.md) | 简体中文
     }
 
 特别说明：
+
  无论使用那种请求方式，本质上都是 Stream,当轮询启用时，async/await 只返回首次的结果,底层流将被取消。
  如要获得所有响应结果，你必须使用execute（）或者直接监听executeStream（）。
 
- 1.方式1中的success第二个参数和RxResult中的Model说明了数据来源：网络/缓存
- 2.使用方式三时，在不需需要时，及时关闭订阅：_subscription?.cancel();
+ 1.方式1中的success第二个参数和RxResult中的Model说明了数据来源：网络/缓存。
+
+ 2.使用方式三时，在不需需要时，及时关闭订阅：_subscription?.cancel()
+
  3.当页面需要退出时，或者不在关系请求结果时，可通过设置的CancelToken取消请求。
 
 

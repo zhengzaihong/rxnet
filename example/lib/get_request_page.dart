@@ -182,6 +182,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
       });
     }
 
+
     void newInstanceRequest() async {
       // 为这个实例进行独立的初始化配置
       final apiService = RxNet.create();
