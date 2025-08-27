@@ -136,9 +136,9 @@ To convert JSON to an object, please set `setJsonConvert` and perform the conver
         //.setCacheInvalidationTime(1000*10)  // Cache invalidation time for this request - milliseconds
         //.setRequestIgnoreCacheTime(true)  // Whether to directly ignore cache invalidation time
         .setJsonConvert(NewWeatherInfo.fromJson) // Parse into NewWeatherInfo object
-        //.setJsonConvert((data)=> BaseBean<Data>.fromJson(data).data) // 如果你只关心data实体部分
-        //.setJsonConvert((data)=> BaseInfo<Data>.fromJson(data, Data.fromJson)) //如果你想要 code 等信息
-        //.setJsonConvert((data)=>BaseInfo<Data>.fromJson(data, Data.fromJson).data) //如果你只关心data实体部分
+        //.setJsonConvert((data)=> BaseBean<Data>.fromJson(data).data) // If you only care about the data entity part
+        //.setJsonConvert((data)=> BaseInfo<Data>.fromJson(data, Data.fromJson)) //If you want information such as code
+        //.setJsonConvert((data)=>BaseInfo<Data>.fromJson(data, Data.fromJson).data) //If you only care about the data entity part
         .execute<NewWeatherInfo>(
             success: (data, source) {
               // Refresh UI
