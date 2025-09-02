@@ -399,7 +399,7 @@ Output Format:
 ## Debug Window:
 ![Debug Window](https://github.com/zhengzaihong/rxnet/blob/master/images/app_logcat.jpg)
 
-    Copyright (c) 2018 zhengzaihong
+    Copyright (c) 2018 ZhengZaiHong
     
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
