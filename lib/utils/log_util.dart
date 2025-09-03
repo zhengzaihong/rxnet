@@ -1,7 +1,7 @@
 import 'dart:developer';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
+import 'package:rxnet_plus/rxnet_lib.dart';
 
 ///
 /// create_user: zhengzaihong

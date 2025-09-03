@@ -1,5 +1,5 @@
 
-import 'package:flutter_rxnet_forzzh/utils/text_util.dart';
+import 'package:rxnet_plus/utils/text_util.dart';
 
 import 'md5_util.dart';
 

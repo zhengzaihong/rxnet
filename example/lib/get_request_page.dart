@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
+import 'package:rxnet_plus/rxnet_lib.dart';
 import 'package:flutter_uikit_forzzh/ext/top_view.dart';
 import 'bean/BaseBean.dart';
 import 'bean/BaseInfo.dart';
@@ -108,8 +108,8 @@ class _GetRequestPageState extends State<GetRequestPage> {
         // .setRequestIgnoreCacheTime(true)  // 是否直接忽略缓存失效时间
         // .setJsonConvert(NewWeatherInfo.fromJson) //解析成NewWeatherInfo对象
         // .setJsonConvert((data)=> BaseBean<Data>.fromJson(data).data) // 如果你只关心data实体部分
-        // .setJsonConvert((data)=> BaseInfo<Data>.fromJson(data, Data.fromJson)) //如果你想要 code 等信息
-        .setJsonConvert((data)=>BaseInfo<Data>.fromJson(data, Data.fromJson).data) //如果你只关心data实体部分
+        .setJsonConvert((data)=> BaseInfo<Data>.fromJson(data, Data.fromJson)) //如果你想要 code 等信息
+        // .setJsonConvert((data)=>BaseInfo<Data>.fromJson(data, Data.fromJson).data) //如果你只关心data实体部分
         .execute<BaseInfo<Data>>(
             success: (data, source) {
               //刷新UI

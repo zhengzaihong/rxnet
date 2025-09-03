@@ -28,7 +28,7 @@ RxNet is a minimalist yet feature-rich network communication framework for Flutt
 ## Dependency:
 
     dependencies:
-       flutter_rxnet_forzzh:0.4.0
+       rxnet_plus:0.4.0 //The old version is not maintained, and the old version last relies on the address: flutter_rxnet_forzzh:0.4.0
 
 ## Common Parameters:
 

@@ -1,9 +1,9 @@
 
 import 'package:flutter/material.dart';
-import 'package:flutter_rxnet_forzzh/logcat/debug_page.dart';
-import 'package:flutter_rxnet_forzzh/logcat/drag_box.dart';
-import 'package:flutter_rxnet_forzzh/net/rx_net.dart';
-import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
+import 'package:rxnet_plus/logcat/debug_page.dart';
+import 'package:rxnet_plus/logcat/drag_box.dart';
+import 'package:rxnet_plus/net/rx_net.dart';
+import 'package:rxnet_plus/rxnet_lib.dart';
 
 import '../net/rx_net.dart';
 

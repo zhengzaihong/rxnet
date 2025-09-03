@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter_rxnet_forzzh/utils/rx_net_platform.dart';
+import 'package:rxnet_plus/utils/rx_net_platform.dart';
 import 'package:hive/hive.dart';
 import 'package:path/path.dart';
 import 'package:path/path.dart' as p;

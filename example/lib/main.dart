@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
+import 'package:rxnet_plus/rxnet_lib.dart';
 import 'package:flutter_uikit_forzzh/uikitlib.dart';
 import 'package:rxnet_example/get_request_page.dart';
 import 'download_page.dart';

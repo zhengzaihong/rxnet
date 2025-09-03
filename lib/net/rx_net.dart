@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
+import 'package:rxnet_plus/rxnet_lib.dart';
 import 'package:hive/hive.dart';
 import '../logcat/debug_manager.dart';
 import '../src/cache/cache_manager.dart';

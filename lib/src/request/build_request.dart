@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:flutter_rxnet_forzzh/rxnet_lib.dart';
+import 'package:rxnet_plus/rxnet_lib.dart';
 import '../../utils/net_utils.dart';
 import '../../utils/rx_net_database.dart';
 
