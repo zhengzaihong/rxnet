@@ -2,8 +2,8 @@
 
 Language: English | [简体中文](README-ZH.md)
 
-🚀 RxNet: A Lightweight, Powerful, and Native-Styled Network Toolkit for Flutter
-RxNet is a minimalist yet feature-rich network communication framework for Flutter, built on top of Dio. Designed to feel natural for native developers, it offers a silky-smooth experience with zero learning curve.  RxNet helps you write clean, maintainable, and scalable network code.
+🚀 RxNet: Extremely easy-to-use, powerful, native-style Flutter network communication framework
+RxNet is a cross-platform network request tool specially built for Flutter.  It is based on Dio's deep encapsulation and conforms to native development habits.  It can be started with almost zero learning costs.  Easily implement data features on the screen, and support a rich combination of functions to help you build high-performance, maintainable applications.
 
 🧩 Key Features：
 
@@ -340,7 +340,7 @@ To get all response results, you must use execute() or listen directly to execut
       },
     );
 
-### Clear Log Interceptor, Avoid Debugging Blindly.
+### Log Interceptor, Avoid Debugging Blindly.
 
     If you need log information, please add the RxNetLogInterceptor or your custom interceptor when initializing the network framework.
 
