@@ -1,5 +1,9 @@
 # RxNet 
 
+[![pub package](https://img.shields.io/pub/v/rxnet_plus.svg)](https://pub.dev/packages/rxnet_plus)
+[![GitHub stars](https://img.shields.io/github/stars/zhengzaihong/rxnet.svg?style=social)](https://github.com/zhengzaihong/rxnet)
+[![license](https://img.shields.io/github/license/zhengzaihong/rxnet)](LICENSE)
+
 Language: [English](README.md) | 简体中文
 
 🚀 RxNet：极简易用、强大、原生风格的 Flutter 网络通信框架

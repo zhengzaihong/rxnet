@@ -1,4 +1,7 @@
 # RxNet
+[![pub package](https://img.shields.io/pub/v/rxnet_plus.svg)](https://pub.dev/packages/rxnet_plus)
+[![GitHub stars](https://img.shields.io/github/stars/zhengzaihong/rxnet.svg?style=social)](https://github.com/zhengzaihong/rxnet)
+[![license](https://img.shields.io/github/license/zhengzaihong/rxnet)](LICENSE)
 
 Language: English | [简体中文](README-ZH.md)
 
