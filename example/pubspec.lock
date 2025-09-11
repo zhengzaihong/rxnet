@@ -86,14 +86,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.1"
-  flutter_uikit_forzzh:
-    dependency: "direct main"
-    description:
-      name: flutter_uikit_forzzh
-      sha256: d48c40566b2966e431b9a6e62d8dbcd5d5022c9e51269b562fdfdf6da80aa94c
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.2.1"
   hive:
     dependency: transitive
     description:
@@ -196,10 +188,10 @@ packages:
     dependency: transitive
     description:
       name: path_provider_platform_interface
-      sha256: "94b1e0dd80970c1ce43d5d4e050a9918fce4f4a775e6142424c30a29a363265c"
+      sha256: "88f5779f72ba699763fa3a3b06aa4bf6de76c8e5de842cf6f29e2e06476c2334"
       url: "https://pub.dev"
     source: hosted
-    version: "2.1.1"
+    version: "2.1.2"
   path_provider_windows:
     dependency: transitive
     description:
@@ -260,10 +252,10 @@ packages:
     dependency: transitive
     description:
       name: plugin_platform_interface
-      sha256: "6a2128648c854906c53fa8e33986fc0247a1116122f9534dd20e3ab9e16a32bc"
+      sha256: "4820fbfdb9478b1ebae27888254d445073732dae3d6ea81f0b7e06d5dedc3f02"
       url: "https://pub.dev"
     source: hosted
-    version: "2.1.4"
+    version: "2.1.8"
   process:
     dependency: transitive
     description:
@@ -316,6 +308,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.3.2"
+  uikit_plus:
+    dependency: "direct main"
+    description:
+      name: uikit_plus
+      sha256: "3773021412eaf2b7deed8b92e692be604f9868021e3c92fea25bc46fb7fa6f46"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.4.0"
   vector_math:
     dependency: transitive
     description:

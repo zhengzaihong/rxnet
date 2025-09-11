@@ -32,10 +32,12 @@ dependencies:
 
   path: ^1.9.0
 #  path_provider: ^2.1.4
+
   path_provider:
     git:
       url: "https://gitcode.com/openharmony-tpc/flutter_packages.git"
       path: "packages/path_provider/path_provider"
+  path_provider_platform_interface: ^2.0.0
 
 dev_dependencies:
   flutter_lints: ^2.0.0

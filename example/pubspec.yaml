@@ -33,7 +33,7 @@ dependencies:
 #  connectivity_plus: ^2.0.2
   permission_handler: ^10.0.0
 #  path_provider: ^2.0.11
-  flutter_uikit_forzzh: ^0.2.1
+  uikit_plus: ^0.4.0
 
 dev_dependencies:
   # The "flutter_lints" package below contains a set of recommended lints to

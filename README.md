@@ -402,6 +402,9 @@ Output Format:
 ## Debug Window:
 ![Debug Window](https://github.com/zhengzaihong/rxnet/blob/master/images/app_logcat.jpg)
 
+## HarmonyOS is also supported:
+![HarmonyOS-example.gif](https://github.com/zhengzaihong/rxnet/blob/master/images/HarmonyOS-example.gif)
+
     Copyright (c) 2018 ZhengZaiHong
     
     Permission is hereby granted, free of charge, to any person obtaining a copy

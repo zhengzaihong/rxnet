@@ -417,6 +417,9 @@ RxNet 是一款专为 Flutter 打造的跨平台网络请求工具，基于 Dio 
 ## 调试窗口：
 ![调试窗口](https://github.com/zhengzaihong/rxnet/blob/master/images/app_logcat.jpg) 
 
+## 对HarmonyOS也支持：
+![HarmonyOS-example.gif](https://github.com/zhengzaihong/rxnet/blob/master/images/HarmonyOS-example.gif)
+
 
     Copyright (c) 2018 ZhengZaiHong
     
