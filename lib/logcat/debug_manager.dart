@@ -5,8 +5,6 @@ import 'package:rxnet_plus/logcat/drag_box.dart';
 import 'package:rxnet_plus/net/rx_net.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
 
-import '../net/rx_net.dart';
-
 ///
 /// create_user: zhengzaihong
 /// email:1096877329@qq.com

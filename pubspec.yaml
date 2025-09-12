@@ -1,6 +1,6 @@
 name: rxnet_plus
 description: Based on Dio's extended network request framework, it supports various caching strategies and is easy to use
-version: 0.4.0
+version: 0.4.1
 homepage: https://github.com/zhengzaihong/rxnet
 
 platforms:
@@ -20,24 +20,12 @@ dependencies:
   flutter:
     sdk: flutter
 
-
-  #MD5加密
   crypto:  ^3.0.2
-
-  #dio网络请求
   dio: ^5.8.0+1
-
-#  sqflite: ^2.0.3+1
   hive: ^2.2.3
-
   path: ^1.9.0
-#  path_provider: ^2.1.4
-
-  path_provider:
-    git:
-      url: "https://gitcode.com/openharmony-tpc/flutter_packages.git"
-      path: "packages/path_provider/path_provider"
-  path_provider_platform_interface: ^2.0.0
+  path_provider: ^2.1.5
+  path_provider_harmonyos: ^0.0.1
 
 dev_dependencies:
   flutter_lints: ^2.0.0

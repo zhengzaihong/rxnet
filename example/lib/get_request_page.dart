@@ -4,8 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
 import 'package:uikit_plus/ext/top_view.dart';
-import 'bean/BaseBean.dart';
-import 'bean/BaseInfo.dart';
+import 'bean/base_info.dart';
 import 'bean/new_weather_info.dart';
 
 class GetRequestPage extends StatefulWidget {

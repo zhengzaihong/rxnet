@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
 import 'package:rxnet_example/get_request_page.dart';

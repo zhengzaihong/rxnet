@@ -32,7 +32,7 @@ RxNet 是一款专为 Flutter 打造的跨平台网络请求工具，基于 Dio 
 ## 依赖：
 
     dependencies:
-       rxnet_plus:0.4.0 //旧版本不在维护，旧版本最后依赖地址：flutter_rxnet_forzzh:0.4.0
+       rxnet_plus:0.4.1 //旧版本不在维护，旧版本最后依赖地址：flutter_rxnet_forzzh:0.4.0
 
 
 ## 常用参数：
