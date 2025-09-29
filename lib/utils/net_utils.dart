@@ -13,26 +13,45 @@ import 'md5_util.dart';
 class NetUtils {
   NetUtils._();
 
-  // restful处理
+  // restful处理 - Retrofit style
   static String restfulUrl(String url, Map<String, dynamic> params) {
-    StringBuffer buffer = StringBuffer(url);
+    String resultUrl = url;
+    List<String> keysToRemove = [];
+
     params.forEach((key, value) {
-      buffer.write("/");
-      buffer.write(key);
-      buffer.write("/");
-      buffer.write(value);
+      String placeholder = "{$key}";
+      if (resultUrl.contains(placeholder)) {
+        resultUrl = resultUrl.replaceAll(placeholder, Uri.encodeComponent(value.toString()));
+        keysToRemove.add(key);
+      }
     });
-    return buffer.toString().replaceAll(RegExp(r'/+'), '/');
-    // return normalizeUrl(buffer.toString());
+
+    // 从 params Map 中移除已用于路径替换的键
+    for (String key in keysToRemove) {
+      params.remove(key);
+    }
+    // Normalize slashes after replacements
+    // First, handle the scheme part if present to avoid mangling http:// to http:/
+    int schemeEndIndex = resultUrl.indexOf("://");
+    String scheme = "";
+    String rest = resultUrl;
+
+    if (schemeEndIndex != -1) {
+      scheme = resultUrl.substring(0, schemeEndIndex + 3);
+      rest = resultUrl.substring(schemeEndIndex + 3);
+    }
+    
+    rest = rest.replaceAll(RegExp(r'/+'), '/');
+    return scheme + rest;
   }
 
-  //处理url，去掉多余的斜杠
-  static String normalizeUrl(String url) {
-    // 只处理路径部分，保留协议和域名
-    Uri uri = Uri.parse(url);
-    String cleanedPath = uri.path.replaceAll(RegExp(r'/+'), '/');
-    return '${uri.scheme}://${uri.host}$cleanedPath';
-  }
+  //处理url，去掉多余的斜杠 (This specific normalizeUrl might be redundant if restfulUrl handles it)
+  // static String normalizeUrl(String url) {
+  //   // 只处理路径部分，保留协议和域名
+  //   Uri uri = Uri.parse(url);
+  //   String cleanedPath = uri.path.replaceAll(RegExp(r'/+'), '/');
+  //   return '${uri.scheme}://${uri.host}$cleanedPath';
+  // }
 
   static String getCacheKeyFromPath(String? path, Map<String, dynamic> params,List<String> ignoreKeys) {
     String cacheKey = "";
@@ -42,13 +61,20 @@ class NetUtils {
       throw Exception("请求地址不能为空！");
     }
     if (params.isNotEmpty) {
-      final tempParams = Map.from(params);
+      final tempParams = Map<String,dynamic>.from(params);
       tempParams.removeWhere((key, value) => ignoreKeys.contains(key));
       String paramsStr = "";
-      tempParams.forEach((key, value) {
-        paramsStr = "$paramsStr$key$value";
-      });
-      cacheKey = cacheKey + MD5Util.generateMd5(paramsStr);
+      // Sort keys for consistent cache key generation
+      List<String> sortedKeys = tempParams.keys.toList()..sort();
+      for (var key in sortedKeys) {
+        paramsStr = "$paramsStr$key${tempParams[key]}";
+      }
+      // tempParams.forEach((key, value) {
+      //   paramsStr = "$paramsStr$key$value";
+      // });
+      if (paramsStr.isNotEmpty) {
+         cacheKey = cacheKey + MD5Util.generateMd5(paramsStr);
+      }
     }
     return cacheKey;
   }

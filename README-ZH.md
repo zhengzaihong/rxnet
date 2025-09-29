@@ -32,7 +32,7 @@ RxNet 是一款专为 Flutter 打造的跨平台网络请求工具，基于 Dio 
 ## 依赖：
 
     dependencies:
-       rxnet_plus:0.4.1 //旧版本不在维护，旧版本最后依赖地址：flutter_rxnet_forzzh:0.4.0
+       rxnet_plus:0.4.2 //旧版本不在维护，旧版本最后依赖地址：flutter_rxnet_forzzh:0.4.0
 
 
 ## 常用参数：
@@ -134,8 +134,8 @@ RxNet 是一款专为 Flutter 打造的跨平台网络请求工具，基于 Dio 
 ###    1.回调模式：
 
     RxNet.get()
-        .setPath('api/weather/') //地址
-        .setParam("city", "101030100") //参数
+        .setPath('api/weather/city/{id}')
+        .setParam("id", "101030100") //RESTFul时，这里的参数名称需要和路径中占位符--保持一直
         .setRestfulUrl(true) // http://t.weather.sojson.com/api/weather/city/101030100
         .setCancelToken(pageRequestToken) //取消请求的CancelToken
         .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)

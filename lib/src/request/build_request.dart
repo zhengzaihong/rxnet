@@ -225,7 +225,8 @@ class BuildRequest<T> {
     return this;
   }
 
-  Future<RxResult<T>> _doWorkRequest<T>({bool cache = false}) async {
+
+  Future<RxResult<T>> _doRequest<T>({bool cache = false}) async {
     String url = _path.toString();
     Map<String, dynamic> queryParameters = {};
     dynamic requestBody = _bodyData;
@@ -234,8 +235,6 @@ class BuildRequest<T> {
 
     if (isRestfulUrl()) {
       url = NetUtils.restfulUrl(_path.toString(), tempParams);
-      // After building the restful URL, remaining params should be query parameters
-      // queryParameters.addAll(tempParams);
     } else {
       queryParameters.addAll(tempParams);
     }
@@ -254,6 +253,8 @@ class BuildRequest<T> {
     }
 
     try {
+      LogUtil.v("$url，JsonConvert：${_jsonTransformation != null}");
+
       _options?.method = _httpType.name;
       if (_headers.isNotEmpty) {
         _options?.headers = _headers;
@@ -262,8 +263,6 @@ class BuildRequest<T> {
         _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet.getHeaders());
       }
-
-      LogUtil.v("$url，JsonConvert：${_jsonTransformation != null}");
 
       Response<dynamic> response = await _rxNet.client!.request(url,
           data: requestBody,
@@ -294,8 +293,7 @@ class BuildRequest<T> {
             _ignoreCacheKeys.addAll(_rxNet.getIgnoreCacheKeys()!);
             _ignoreCacheKeys = _ignoreCacheKeys.toSet().toList();
           }
-          String cacheKey =
-          NetUtils.getCacheKeyFromPath(_path, _params, _ignoreCacheKeys);
+          String cacheKey = NetUtils.getCacheKeyFromPath(_path, _params, _ignoreCacheKeys);
           final map = <String, dynamic>{
             'timestamp': DateTime.now().millisecondsSinceEpoch,
             'data': responseData
@@ -327,8 +325,7 @@ class BuildRequest<T> {
       _ignoreCacheKeys.addAll(_rxNet.getIgnoreCacheKeys()!);
       _ignoreCacheKeys = _ignoreCacheKeys.toSet().toList();
     }
-    final cacheKey =
-        NetUtils.getCacheKeyFromPath(_path, _params, _ignoreCacheKeys);
+    final cacheKey = NetUtils.getCacheKeyFromPath(_path, _params, _ignoreCacheKeys);
     final cacheData = await _rxNet.cacheManager.readCache(cacheKey);
 
     if (TextUtil.isEmpty(cacheData)) {
@@ -413,7 +410,7 @@ class BuildRequest<T> {
     do {
       attempt++;
       try {
-        final result = await _doWorkRequest<T>(cache: shouldCache);
+        final result = await _doRequest<T>(cache: shouldCache);
         yield result;
         success = true;
         break;
@@ -748,8 +745,7 @@ class BuildRequest<T> {
         _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet.getHeaders());
       }
-      _options?.headers?.addAll(
-          {'Content-Range': 'bytes $progress-${fileSize - 1}/$fileSize'});
+      _options?.headers?.addAll({'Content-Range': 'bytes $progress-${fileSize - 1}/$fileSize'});
 
       if (_toFormData) {
         _bodyData = FormData.fromMap(_params);
@@ -762,8 +758,7 @@ class BuildRequest<T> {
         options: _options,
         cancelToken: _cancelToken,
         data: data,
-        queryParameters:
-            (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
+        queryParameters: (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
       );
       onResponse?.call(response);
       Stream<Uint8List> stream = response.data!.stream;

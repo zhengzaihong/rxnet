@@ -138,11 +138,11 @@ class RxNetLogInterceptor extends Interceptor {
     logPrint("***************** Response End *****************");
   }
 
-  printKV(String key, Object v) {
+  void printKV(String key, Object v) {
     logPrint('$key: $v');
   }
 
-  printAll(msg) {
+  void printAll(msg) {
     msg.toString().split("\n").forEach(logPrint);
   }
 }

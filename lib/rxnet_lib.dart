@@ -23,7 +23,6 @@ export 'package:dio/dio.dart';
 export 'package:dio/io.dart';
 
 // utils
-export 'package:rxnet_plus/utils/database_util.dart';
 export 'package:rxnet_plus/utils/downloader.dart';
 export 'package:rxnet_plus/utils/http_error.dart';
 export 'package:rxnet_plus/utils/log_util.dart';

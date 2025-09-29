@@ -1,4 +1,10 @@
 
+## 0.4.2
+- Support retrofit RESTFul style @path style request
+- 
+## 0.4.1
+- fix bug
+- 
 ## 0.4.0
 - The overall architecture has been redesigned to make it more elegant and easier to get started
 - 

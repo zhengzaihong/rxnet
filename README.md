@@ -31,7 +31,7 @@ RxNet is a cross-platform network request tool specially built for Flutter.  It 
 ## Dependency:
 
     dependencies:
-       rxnet_plus:0.4.1 //The old version is not maintained, and the old version last relies on the address: flutter_rxnet_forzzh:0.4.0
+       rxnet_plus:0.4.2 //The old version is not maintained, and the old version last relies on the address: flutter_rxnet_forzzh:0.4.0
 
 ## Common Parameters:
 
@@ -127,8 +127,8 @@ To convert JSON to an object, please set `setJsonConvert` and perform the conver
 ###    1. Callback Mode:
 
     RxNet.get()
-        .setPath('api/weather/') // Address
-        .setParam("city", "101030100") // Parameter
+        .setPath('api/weather/city/{id}')
+        .setParam("id", "101030100") //When RESTFul, the parameter names here need to be consistent with the placeholders in the path--remain constant.
         .setRestfulUrl(true) // http://t.weather.sojson.com/api/weather/city/101030100
         .setCancelToken(pageRequestToken) // CancelToken for canceling the request
         .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
