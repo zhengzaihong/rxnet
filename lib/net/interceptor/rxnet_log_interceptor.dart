@@ -142,7 +142,7 @@ class RxNetLogInterceptor extends Interceptor {
     logPrint('$key: $v');
   }
 
-  void printAll(msg) {
+  void printAll(String msg) {
     msg.toString().split("\n").forEach(logPrint);
   }
 }

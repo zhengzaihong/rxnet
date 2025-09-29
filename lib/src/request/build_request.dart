@@ -35,7 +35,7 @@ class BuildRequest<T> {
   Duration _retryInterval = const Duration(seconds: 0);
   bool _isLoop = false;
   Duration _loopInterval = const Duration(seconds: 5);
-  bool _RESTFul = false;
+  bool _restful = false;
   CheckNetWork? checkNetWork;
   Function(Response response)? onResponse;
 
@@ -75,12 +75,12 @@ class BuildRequest<T> {
   }
 
   BuildRequest<T> setRestfulUrl(bool restful) {
-    _RESTFul = restful;
+    _restful = restful;
     return this;
   }
 
   bool isRestfulUrl() {
-    return _RESTFul;
+    return _restful;
   }
 
   BuildRequest<T> setPath(String path) {
