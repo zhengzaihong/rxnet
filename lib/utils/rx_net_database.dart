@@ -5,7 +5,6 @@ import 'package:hive/hive.dart';
 import 'package:path/path.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:rxnet_plus/rxnet_plus.dart' as ohos;
 import 'log_util.dart';
 
 ///
