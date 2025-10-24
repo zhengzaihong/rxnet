@@ -34,8 +34,8 @@ class _GetRequestPageState extends State<GetRequestPage> {
               TextButton(
                 onPressed: () {
                   // test();
-                  request();
-                  // requestData();
+                  // request();
+                  requestData();
                 },
                 style: ButtonStyle(
                   backgroundColor: WidgetStateProperty.all(Colors.cyan),
@@ -133,8 +133,8 @@ class _GetRequestPageState extends State<GetRequestPage> {
     void testStreamRequest(){
 
      final pollingSubscription = RxNet.get()
-          .setPath("api/weather")
-          .setParam("city", "101030100")
+         .setPath('api/weather/city/{id}')
+          .setParam("id", "101030100")
           .setRestfulUrl(true)
           .setLoop(true, interval: const Duration(seconds: 7))
           .executeStream(); // 直接使用 executeStream
@@ -167,15 +167,16 @@ class _GetRequestPageState extends State<GetRequestPage> {
 
   void requestData() async {
     final data = await RxNet.get()
-        .setPath("api/weather")
-        .setParam("city", "101030100")
+        .setPath('api/weather/city/101030100')
+        // .setPath('api/weather/city/{id}')
+        // .setParam("id", "101030100")
         // .setParam("area", "9000")
         .setRestfulUrl(true)
         // .setRetryCount(2)  //重试次数
         // .setRetryInterval(7000) //毫秒
-        .setCacheMode(CacheMode.ONLY_REQUEST)
+        .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
         .setJsonConvert(NewWeatherInfo.fromJson)
-        .request();
+        .request<NewWeatherInfo>();
 
       setState(() {
         count++;
@@ -194,7 +195,7 @@ class _GetRequestPageState extends State<GetRequestPage> {
       final response = await apiService.getRequest()
           .setPath("/users/1")
           .setJsonConvert(NewWeatherInfo.fromJson)
-          .request();
+          .request<NewWeatherInfo>();
 
       final weatherInfo = response.value;
     }

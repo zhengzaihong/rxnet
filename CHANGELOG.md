@@ -1,4 +1,8 @@
 
+## 0.4.3
+- Optimize requests support generic requests, which can obtain expected results and eliminate the trouble of generic conversions
+- harmony cache plug-in optimization
+- 
 ## 0.4.2
 - Support retrofit RESTFul style @path style request
 - 

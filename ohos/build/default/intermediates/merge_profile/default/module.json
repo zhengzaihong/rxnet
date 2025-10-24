@@ -1,0 +1,29 @@
+{
+	"app": {
+		"bundleName": "com.happy.coupon.shopping",
+		"debug": true,
+		"versionCode": 1,
+		"versionName": "1.0.0",
+		"minAPIVersion": 50005017,
+		"targetAPIVersion": 60000020,
+		"apiReleaseType": "Release",
+		"targetMinorAPIVersion": 0,
+		"targetPatchAPIVersion": 0,
+		"compileSdkVersion": "6.0.0.47",
+		"compileSdkType": "HarmonyOS",
+		"appEnvironments": [],
+		"bundleType": "app",
+		"buildMode": "debug"
+	},
+	"module": {
+		"name": "rxnet_plus",
+		"type": "har",
+		"deviceTypes": [
+			"default",
+			"tablet",
+			"2in1"
+		],
+		"packageName": "rxnet_plus",
+		"installationFree": false
+	}
+}

@@ -38,7 +38,7 @@ class RxNetPlatform {
     return true;
   }
 
-  static bool get isAndroidOrIOS => _isAndroid() || _isIOS();
+  static bool get isAndroid_IOS_HarmonyOS => _isAndroid() || _isIOS() || _isHarmonyOS();
 
   static bool get isWeb => _isWeb();
 

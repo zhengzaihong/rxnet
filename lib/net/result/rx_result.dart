@@ -23,4 +23,5 @@ class RxResult<T> {
   }
 
   bool get isSuccess => error == null;
+  bool get isError => error != null;
 }

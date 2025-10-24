@@ -1,6 +1,6 @@
 name: rxnet_plus
 description: Based on Dio's extended network request framework, it supports various caching strategies and is easy to use
-version: 0.4.2
+version: 0.4.3
 homepage: https://github.com/zhengzaihong/rxnet
 
 platforms:
@@ -25,8 +25,8 @@ dependencies:
   hive: ^2.2.3
   path: ^1.9.0
   path_provider: ^2.1.5
-  path_provider_harmonyos: ^0.0.1
-
+#  path_provider_harmonyos: ^0.0.1
+  path_provider_platform_interface: ^2.1.0
 dev_dependencies:
   flutter_lints: ^2.0.0
 
@@ -47,14 +47,12 @@ flutter:
   # adding or updating assets for this project.
   plugin:
     platforms:
-    # This plugin project was generated without specifying any
-    # platforms with the `--platform` argument. If you see the `some_platform` map below, remove it and
-    # then add platforms following the instruction here:
-    # https://flutter.dev/docs/development/packages-and-plugins/developing-packages#plugin-platforms
-    # -------------------
+      implements: path_provider
       some_platform:
         pluginClass: somePluginClass
-    # -------------------
+      ohos:
+        pluginClass: RxNetPathProviderPlugin
+        dartPluginClass: RxNetPlus
 
   # To add assets to your plugin package, add an assets section, like this:
   # assets:

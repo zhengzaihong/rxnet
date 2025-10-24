@@ -5,6 +5,7 @@ import 'package:hive/hive.dart';
 import 'package:path/path.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:rxnet_plus/rxnet_plus.dart' as ohos;
 import 'log_util.dart';
 
 ///
@@ -50,9 +51,11 @@ class RxNetDataBase {
         } else if (RxNetPlatform.isLinux) {
           final home = Platform.environment['HOME'];
           appDir = appDir??Directory(join(home!, '.rxnet_local_cache'));
-        } else if(RxNetPlatform.isAndroidOrIOS){
+        } else if(RxNetPlatform.isAndroid || RxNetPlatform.isIOS){
           appDir = appDir??await getTemporaryDirectory();
-        } else{
+        } else if(RxNetPlatform.isHarmonyOS){
+          appDir = appDir??await getTemporaryDirectory();
+        } else {
           appDir = appDir??await getApplicationDocumentsDirectory();
         }
       }catch (e){

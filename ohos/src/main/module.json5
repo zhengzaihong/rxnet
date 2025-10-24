@@ -1,0 +1,11 @@
+{
+  "module": {
+    "name": "rxnet_plus",
+    "type": "har",
+    "deviceTypes": [
+      "default",
+      "tablet",
+      "2in1"
+    ]
+  }
+}

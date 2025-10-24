@@ -180,7 +180,7 @@ RxNet 是一款专为 Flutter 打造的跨平台网络请求工具，基于 Dio 
         .setCacheMode(CacheMode.ONLY_REQUEST)
         //.setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data)) //解析成NormalWaterInfoEntity对象
         .setJsonConvert(NormalWaterInfoEntity.fromJson)
-        .request();
+        .request<NormalWaterInfoEntity>();
 
       print("--------->#${data.error}");
       var result = data.value;

@@ -22,6 +22,9 @@ export 'package:rxnet_plus/net/fun/fun_apply.dart';
 export 'package:dio/dio.dart';
 export 'package:dio/io.dart';
 
+// path_provider
+export 'package:rxnet_plus/rxnet_plus.dart';
+
 // utils
 export 'package:rxnet_plus/utils/downloader.dart';
 export 'package:rxnet_plus/utils/http_error.dart';

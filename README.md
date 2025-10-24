@@ -172,7 +172,7 @@ To convert JSON to an object, please set `setJsonConvert` and perform the conver
         .setCacheMode(CacheMode.ONLY_REQUEST)
         //.setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data)) // Parse into NormalWaterInfoEntity object
         .setJsonConvert(NormalWaterInfoEntity.fromJson)
-        .request();
+        .request<NormalWaterInfoEntity>();
 
       print("--------->#${data.error}");
       var result = data.value;

@@ -348,7 +348,7 @@ class BuildRequest<T> {
       throw CacheException("Cache expired");
     }
     if (dataValue != null ) {
-      return _parseLocalData(dataValue);
+      return _parseLocalData<T>(dataValue);
     } else {
       throw CacheException("Cache is empty");
     }
@@ -383,7 +383,7 @@ class BuildRequest<T> {
   //使用回调的方式
   //use callbacks
   void execute<T>({Success<T>? success, Failure? failure, Completed? completed}) {
-    executeStream().listen((result) {
+    executeStream<T>().listen((result) {
       if (result.isSuccess) {
         success?.call(result.value as T, result.model);
       } else {
@@ -395,16 +395,16 @@ class BuildRequest<T> {
   }
 
   // async/await
-  Future<RxResult<T>> request() async {
+  Future<RxResult<T>> request<T>() async {
     //重要：当轮询启用时，这将返回首次的结果,底层流将被取消。
     //要获得所有响应结果，你必须使用execute（）或者直接监听executeStream（）。
     // IMPORTANT: When polling is enabled, this will return the *first* result
     // and the underlying stream will be cancelled. To get all polling results,
     // you must use execute() or listen to executeStream() directly.
-    return await executeStream().first;
+    return await executeStream<T>().first;
   }
 
-  Stream<RxResult<T>> _networkRequestStream({required bool shouldCache}) async* {
+  Stream<RxResult<T>> _networkRequestStream<T>({required bool shouldCache}) async* {
     int attempt = 0;
     bool success = false;
     do {
@@ -423,7 +423,7 @@ class BuildRequest<T> {
     } while (attempt <= _retryCount && !success);
   }
 
-  Stream<RxResult<T>> executeStream() async* {
+  Stream<RxResult<T>> executeStream<T>() async* {
     if (TextUtil.isEmpty(_path)) {
       yield RxResult.error(Exception("请求路径不能为空 path:$_path"));
       return;
@@ -441,7 +441,7 @@ class BuildRequest<T> {
       keepLooping = _isLoop;
       switch (_cacheMode!) {
         case CacheMode.ONLY_REQUEST:
-          yield* _networkRequestStream(shouldCache: false);
+          yield* _networkRequestStream<T>(shouldCache: false);
           break;
         case CacheMode.FIRST_USE_CACHE_THEN_REQUEST:
           try {
@@ -450,12 +450,12 @@ class BuildRequest<T> {
           } catch (e) {
             // Cache errors are ignored, proceed to network.
           }
-          yield* _networkRequestStream(shouldCache: true);
+          yield* _networkRequestStream<T>(shouldCache: true);
           break;
         case CacheMode.REQUEST_FAILED_READ_CACHE:
           bool networkSucceeded = false;
           await for (final netResult
-              in _networkRequestStream(shouldCache: true)) {
+              in _networkRequestStream<T>(shouldCache: true)) {
             if (netResult.isSuccess) {
               networkSucceeded = true;
             }
@@ -482,7 +482,7 @@ class BuildRequest<T> {
             }
           }
           if (!yieldedFromCache) {
-            yield* _networkRequestStream(shouldCache: true);
+            yield* _networkRequestStream<T>(shouldCache: true);
           }
           break;
         case CacheMode.ONLY_CACHE:
