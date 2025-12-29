@@ -163,7 +163,7 @@ To convert JSON to an object, please set `setJsonConvert` and perform the conver
 ###   2. async/await Style:
 
      var data = await RxNet.get()
-        .setPath("api/weather")
+        .setPath("api/weather/{id}")
         .setParam("city", "101030100")
         //.addParams(Map) // Add multiple parameters at once
         .setRestfulUrl(true) //RESTFul
@@ -187,7 +187,7 @@ To convert JSON to an object, please set `setJsonConvert` and perform the conver
     void testStreamRequest(){
 
       final pollingSubscription = RxNet.get()
-           .setPath("api/weather")
+           .setPath("api/weather/{id}")
            .setParam("city", "101030100")
            .setRestfulUrl(true)
            .setLoop(true, interval: const Duration(seconds: 7))

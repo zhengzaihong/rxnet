@@ -1,4 +1,4 @@
-# RxNet 
+# RxNet
 
 [![pub package](https://img.shields.io/pub/v/rxnet_plus.svg)](https://pub.dev/packages/rxnet_plus)
 [![GitHub stars](https://img.shields.io/github/stars/zhengzaihong/rxnet.svg?style=social)](https://github.com/zhengzaihong/rxnet)
@@ -171,7 +171,7 @@ RxNet 是一款专为 Flutter 打造的跨平台网络请求工具，基于 Dio 
 ###   2. async/await方式：
 
      var data = await RxNet.get()  
-        .setPath("api/weather")
+        .setPath("api/weather/{id}")
         .setParam("city", "101030100")
         //.addParams(Map) //一次添加多个参数
         .setRestfulUrl(true) //RESTFul 
@@ -195,7 +195,7 @@ RxNet 是一款专为 Flutter 打造的跨平台网络请求工具，基于 Dio 
     void testStreamRequest(){
 
       final pollingSubscription = RxNet.get()
-           .setPath("api/weather")
+           .setPath("api/weather/{id}")
            .setParam("city", "101030100")
            .setRestfulUrl(true)
            .setLoop(true, interval: const Duration(seconds: 7))
