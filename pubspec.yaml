@@ -1,6 +1,6 @@
 name: rxnet_plus
 description: Based on Dio's extended network request framework, it supports various caching strategies and is easy to use
-version: 0.4.3
+version: 0.5.0
 homepage: https://github.com/zhengzaihong/rxnet
 
 platforms:

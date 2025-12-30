@@ -1,3 +1,10 @@
+## 0.5.0
+- ** Clarify parameter types ** -Separation of path parameters, query parameters, and Body parameters
+- **RESTful automatic detection ** -No manual settings required
+- **API semantic ** -Method names are more intuitive
+- ** Low-level reconstruction ** -update `BuildRequest`
+- harmony cache plug-in optimization
+
 
 ## 0.4.3
 - Optimize requests support generic requests, which can obtain expected results and eliminate the trouble of generic conversions
