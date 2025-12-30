@@ -399,7 +399,7 @@ class RxNet {
   }
 
   static BuildRequest post<T>({String path = ""}) {
-    return I.postRequest<T>().setPath(path).toBodyData();
+    return I.postRequest<T>().setPath(path);
   }
 
   static BuildRequest delete<T>({String path = ""}) {

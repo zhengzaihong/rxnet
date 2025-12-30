@@ -530,14 +530,14 @@ class BuildRequest<T> {
 
     final timestamp = data['timestamp'];
     final dataValue = data['data'];
-    LogUtil.v("-->缓存数据:${jsonEncode(data)}");
+    LogUtil.v("缓存数据:${jsonEncode(data)}");
 
     final now = DateTime.now().millisecondsSinceEpoch;
+    LogUtil.v("缓存数据时效:${_cacheInvalidationTime} now - timestamp ：${now - timestamp }");
     if (now - timestamp > (_cacheInvalidationTime ?? _rxNet.getCacheInvalidationTime())) {
-      LogUtil.v("-->缓存数据:超时效");
+      LogUtil.v("缓存数据:超时效");
       throw CacheException("Cache expired");
     }
-
     if (dataValue != null) {
       return _parseLocalData<T>(dataValue);
     } else {
@@ -594,7 +594,7 @@ class BuildRequest<T> {
   /// Stream方式（支持轮询）
   Stream<RxResult<T>> executeStream<T>() async* {
     if (TextUtil.isEmpty(_path)) {
-      yield RxResult.error(Exception("请求路径不能为空 path:$_path"));
+      yield RxResult.error(Exception("The request path cannot be empty path:$_path"));
       return;
     }
 
