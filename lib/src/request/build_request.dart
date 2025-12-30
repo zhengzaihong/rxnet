@@ -945,14 +945,14 @@ class BuildRequest<T> {
       });
 
       // 准备请求体（如果有额外的body参数）
-      dynamic requestBody = _rawBody;
-      if (_rawBody == null && _bodyParams.isNotEmpty) {
-        if (_bodyType == RequestBodyType.formData) {
-          requestBody = FormData.fromMap(_bodyParams);
-        } else if (_bodyType == RequestBodyType.json) {
-          requestBody = _bodyParams;
-        }
-      }
+      // dynamic requestBody = _rawBody;
+      // if (_rawBody == null && _bodyParams.isNotEmpty) {
+      //   if (_bodyType == RequestBodyType.formData) {
+      //     requestBody = FormData.fromMap(_bodyParams);
+      //   } else if (_bodyType == RequestBodyType.json) {
+      //     requestBody = _bodyParams;
+      //   }
+      // }
 
       final response = await _rxNet.client!.request<ResponseBody>(
         url,
