@@ -1,6 +1,5 @@
 import 'dart:developer';
 
-import 'package:flutter/foundation.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
 
 ///
@@ -17,13 +16,14 @@ class LogUtil {
 
   ///是否 debug 默认调试为true 正式环境为false
   ///Whether to debug The default debugging is true, the official environment is false
-  static bool _debugMode = kDebugMode;
+  static bool _debugMode = true;
 
   static String tagDefault = _TAG_DEFAULT;
 
   static bool _isSystemPrint = false;
 
-  static void init({bool systemLog = false}) {
+  static void init({bool systemLog = false, bool debug = true}) {
+    _debugMode = debug;
     _isSystemPrint = systemLog;
   }
 

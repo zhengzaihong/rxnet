@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
 import 'package:hive/hive.dart';
@@ -329,6 +330,7 @@ class RxNet {
     List<Interceptor>? interceptors,
     BaseOptions? baseOptions,
     bool systemLog = false,
+    bool isDebug = kDebugMode,
     CheckNetWork? baseCheckNet,
     List<String>? ignoreCacheKeys,
     HiveCipher? encryptionCipher,
@@ -337,7 +339,7 @@ class RxNet {
     double debugWindowWidth = 800,
     double debugWindowHeight = 600
 }) async {
-    LogUtil.init(systemLog: systemLog);
+    LogUtil.init(systemLog: systemLog,debug: isDebug);
 
     this._baseCheckNet = baseCheckNet;
     this._baseCacheMode = baseCacheMode;

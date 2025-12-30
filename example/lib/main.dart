@@ -49,6 +49,7 @@ void main() async {
   //     },
   //   );
 
+
   RxNet.saveCache("name", "张三");
   RxNet.readCache("name").then((value) {
     LogUtil.v(value); //输出：张三
