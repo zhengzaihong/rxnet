@@ -14,7 +14,7 @@ RxNet is a cross-platform network request tool specially built for Flutter. It i
 
 RxNet 0.5.0 brings a brand new API design, significantly improving code readability and development experience!
 
-📖 **Detailed Migration Guide:** [MIGRATION_GUIDE_0.5.0.md](MIGRATION_GUIDE_0.5.0.md)
+📖 **Detailed Migration Guide:** [MIGRATION_GUIDE_0.5.0.md](迁移指南_0.5.0.md)
 
 🌟 Key Features:
 
@@ -43,12 +43,7 @@ RxNet 0.5.0 brings a brand new API design, significantly improving code readabil
        # rxnet_plus: ^0.4.3  // Old version
        # flutter_rxnet_forzzh: ^0.4.0  // Older version (no longer maintained)
 
-**Version Notes:**
-- **0.5.0+** - New API design with explicit parameter types and RESTful auto-detection (Recommended)
-- **0.4.3** - Stable version, still maintained
-- **0.4.0 and below** - Old version, no longer maintained
-
-**Upgrading from 0.4.3 to 0.5.0?** Check [Migration Guide](MIGRATION_GUIDE_0.5.0.md)
+**Upgrading from 0.4.3 to 0.5.0?** Check [Migration Guide](迁移指南_0.5.0.md)
 
 ## Common Parameters:
 
