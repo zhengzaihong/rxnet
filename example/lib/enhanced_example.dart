@@ -145,11 +145,11 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         .setPathParam("id", "101030100") //RESTFul时，这里的参数名称需要和路径中占位符--保持一直: http://t.weather.sojson.com/api/weather/city/101030100
         .setCancelToken(pageRequestToken) //取消请求的CancelToken
         .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
-        .setRetryCount(2, interval: const Duration(seconds: 7))  //失败重试，重试2次,每次间隔7秒
-    // .setLoop(true) // 定时请求
+        // .setRetryCount(2, interval: const Duration(seconds: 7))  //失败重试，重试2次,每次间隔7秒
+        //.setLoop(true) // 定时请求
         .setContentType(ContentTypes.json) //application/json
         .setResponseType(ResponseType.json) //json
-    // .setCacheInvalidationTime(1000*10)  //本次请求的缓存失效时间-毫秒
+        // .setCacheInvalidationTime(1000*5)  //本次请求的缓存失效时间-毫秒
     // .setRequestIgnoreCacheTime(true)  // 是否直接忽略缓存失效时间
     // .setJsonConvert(NewWeatherInfo.fromJson) //解析成NewWeatherInfo对象
     // .setJsonConvert((data)=> BaseBean<Data>.fromJson(data).data) // 如果你只关心data实体部分
@@ -227,8 +227,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         .setPath("/users/1")
         .setJsonConvert(NewWeatherInfo.fromJson)
         .request<NewWeatherInfo>();
-
-    final weatherInfo = response.value;
+    // final weatherInfo = response.value;
   }
 
 
@@ -421,9 +420,9 @@ class UserApiExample {
       .request();
     
     if (result.isSuccess) {
-      print("用户列表：${result.value}");
+      debugPrint("用户列表：${result.value}");
     } else {
-      print("错误：${result.error}");
+      debugPrint("错误：${result.error}");
     }
   }
 
@@ -436,7 +435,7 @@ class UserApiExample {
       .request();
     
     if (result.isSuccess) {
-      print("用户详情：${result.value}");
+      debugPrint("用户详情：${result.value}");
     }
   }
 
@@ -450,7 +449,7 @@ class UserApiExample {
       .request();
     
     if (result.isSuccess) {
-      print("创建成功：${result.value}");
+      debugPrint("创建成功：${result.value}");
     }
   }
 
@@ -464,7 +463,7 @@ class UserApiExample {
       .request();
     
     if (result.isSuccess) {
-      print("更新成功");
+      debugPrint("更新成功");
     }
   }
 
@@ -476,7 +475,7 @@ class UserApiExample {
       .request();
     
     if (result.isSuccess) {
-      print("删除成功");
+      debugPrint("删除成功");
     }
   }
 }
@@ -516,8 +515,8 @@ class ProductApiExample {
       .request();
     
     if (result.isSuccess) {
-      print("商品列表：${result.value}");
-      print("数据来源：${result.model}");  // 网络或缓存
+      debugPrint("商品列表：${result.value}");
+      debugPrint("数据来源：${result.model}");  // 网络或缓存
     }
   }
 }
@@ -541,7 +540,7 @@ class FileApiExample {
     //   .request();
     
     // if (result.isSuccess) {
-    //   print("上传成功：${result.value}");
+    //   debugPrint("上传成功：${result.value}");
     // }
   }
 
@@ -559,7 +558,7 @@ class FileApiExample {
     //   .request();
     
     // if (result.isSuccess) {
-    //   print("批量上传成功");
+    //   debugPrint("批量上传成功");
     // }
   }
 }
@@ -579,7 +578,7 @@ class FormApiExample {
       .request();
     
     if (result.isSuccess) {
-      print("登录成功：${result.value}");
+      debugPrint("登录成功：${result.value}");
     }
   }
 
@@ -606,7 +605,7 @@ class FormApiExample {
       .request();
     
     if (result.isSuccess) {
-      print("提交成功");
+      debugPrint("提交成功");
     }
   }
 }

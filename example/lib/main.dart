@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
-import 'package:rxnet_example/get_request_page.dart';
-import 'package:uikit_plus/ext/top_view.dart';
 import 'package:uikit_plus/toast/toast_utils.dart';
-import 'package:uikit_plus/utils/route_utils.dart';
-import 'download_page.dart';
 import 'enhanced_example.dart';
 // import 'package:connectivity_plus/connectivity_plus.dart';
 
