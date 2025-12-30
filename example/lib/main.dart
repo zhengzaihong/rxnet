@@ -5,6 +5,7 @@ import 'package:uikit_plus/ext/top_view.dart';
 import 'package:uikit_plus/toast/toast_utils.dart';
 import 'package:uikit_plus/utils/route_utils.dart';
 import 'download_page.dart';
+import 'enhanced_example.dart';
 // import 'package:connectivity_plus/connectivity_plus.dart';
 
 void main() async {
@@ -81,58 +82,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const MyHomePage(title: 'Flutter RxNet Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: <Widget>[
-          buildButton("getDemo", const GetRequestPage()),
-          hGap(10),
-          buildButton("download demo", const DownLoadPage())
-        ],
-      ),
-    );
-  }
-
-  Widget buildButton(String name, Widget page) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          height: 60,
-          width: 200,
-          margin: const EdgeInsets.only(top: 30),
-          child: GestureDetector(
-              child: Row(children: [
-            Expanded(
-                child: TextButton(
-              onPressed: () {
-                RouteUtils.push(context, page);
-              },
-              style: ButtonStyle(
-                backgroundColor: WidgetStateProperty.all(Colors.cyan),
-              ),
-              child: Text(name,
-                  style: const TextStyle(color: Colors.black, fontSize: 16)),
-            ))
-          ])),
-        )
-      ],
+      home: const EnhancedExample(),
     );
   }
 }

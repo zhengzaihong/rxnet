@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:rxnet_plus/rxnet_lib.dart';
+import 'package:rxnet_plus/src/request/request_body_type.dart';
 import '../../utils/net_utils.dart';
 import '../../utils/rx_net_database.dart';
 
@@ -12,30 +13,52 @@ import '../../utils/rx_net_database.dart';
 /// create_date: 2025-08-12
 /// create_time: 17:22
 /// describe: 优化 RxNet职责，将BuildRequest从RxNet中分离出来，
+/// update_date: 2025-10-03
+/// 主要改进：
+/// 1. 引入RequestBodyType枚举，明确参数发送方式
+/// 2. 优化RESTful参数处理，支持路径参数和查询参数分离
+/// 3. 改进缓存键生成逻辑
+/// 4. 统一错误处理
+/// 5. 更流畅的API设计
 ///
 class BuildRequest<T> {
-
   final HttpType _httpType;
   final RxNet _rxNet;
+
+  // 基础配置
   CancelToken? _cancelToken;
   String? _path;
   CacheMode? _cacheMode;
-  Map<String, dynamic> _params = {};
-  List<String> _ignoreCacheKeys = [];
+  Options? _options;
+
+  // 参数管理 - 优化：分离路径参数和查询参数
+  Map<String, dynamic> _pathParams = {};  // RESTful路径参数
+  Map<String, dynamic> _queryParams = {}; // URL查询参数
+  Map<String, dynamic> _bodyParams = {};  // Body参数
+  dynamic _rawBody;  // 原始body数据（用于自定义body）
+
+  // 请求体类型 - 新增：明确的类型控制
+  RequestBodyType _bodyType = RequestBodyType.auto;
+
+  // 请求头
   Map<String, dynamic> _headers = {};
   bool _enableGlobalHeader = true;
-  dynamic _bodyData;
-  bool _toFormData = false;
-  bool _toBodyData = false;
-  JsonTransformation? _jsonTransformation;
-  Options? _options;
+
+  // 缓存配置
+  List<String> _ignoreCacheKeys = [];
   int? _cacheInvalidationTime;
   bool _requestIgnoreCacheTime = false;
+
+  // 重试和轮询
   int _retryCount = 0;
   Duration _retryInterval = const Duration(seconds: 0);
   bool _isLoop = false;
   Duration _loopInterval = const Duration(seconds: 5);
-  bool _restful = false;
+
+  // JSON转换
+  JsonTransformation? _jsonTransformation;
+
+  // 回调
   CheckNetWork? checkNetWork;
   Function(Response response)? onResponse;
 
@@ -59,95 +82,188 @@ class BuildRequest<T> {
     );
   }
 
-  BuildRequest<T> setJsonConvert(JsonTransformation convert) {
-    _jsonTransformation = convert;
-    return this;
-  }
-  BuildRequest<T> setResponseType(ResponseType type) {
-    _options?.responseType = type;
-    return this;
-  }
-
-  //ContentTypes
-  BuildRequest<T> setContentType(String type) {
-    _options?.contentType = type;
-    return this;
-  }
-
-  BuildRequest<T> setRestfulUrl(bool restful) {
-    _restful = restful;
-    return this;
-  }
-
-  bool isRestfulUrl() {
-    return _restful;
-  }
+  // ==================== 路径配置 ====================
 
   BuildRequest<T> setPath(String path) {
     _path = path;
     return this;
   }
 
+  // ==================== 参数配置 -  ====================
+
+  /// 设置路径参数（用于RESTful风格）
+  /// 例如：setPathParam("id", "123") 会将 /user/{id} 替换为 /user/123
+  BuildRequest<T> setPathParam(String key, dynamic value) {
+    _pathParams[key] = value;
+    return this;
+  }
+
+  /// 批量设置路径参数
+  BuildRequest<T> setPathParams(Map<String, dynamic> params) {
+    _pathParams.addAll(params);
+    return this;
+  }
+
+  /// 设置查询参数（拼接在URL后）
+  /// 例如：setQueryParam("page", 1) 会生成 ?page=1
+  BuildRequest<T> setQueryParam(String key, dynamic value) {
+    _queryParams[key] = value;
+    return this;
+  }
+
+  /// 批量设置查询参数
+  BuildRequest<T> setQueryParams(Map<String, dynamic> params) {
+    _queryParams.addAll(params);
+    return this;
+  }
+
+  /// 设置Body参数（用于POST/PUT/PATCH）
+  BuildRequest<T> setBodyParam(String key, dynamic value) {
+    _bodyParams[key] = value;
+    return this;
+  }
+
+  /// 批量设置Body参数
+  BuildRequest<T> setBodyParams(Map<String, dynamic> params) {
+    _bodyParams.addAll(params);
+    return this;
+  }
+
+  /// 设置原始Body数据（用于自定义body）
+  BuildRequest<T> setRawBody(dynamic body) {
+    _rawBody = body;
+    return this;
+  }
+
+  /// 兼容旧API：setParam - 根据HTTP方法自动判断参数类型
+  @Deprecated('使用 setPathParam/setQueryParam/setBodyParam 更明确')
   BuildRequest<T> setParam(String key, dynamic value) {
-    _params[key] = value;
+    // 自动判断：GET/DELETE用query，POST/PUT/PATCH用body
+    if (_httpType == HttpType.get || _httpType == HttpType.delete) {
+      _queryParams[key] = value;
+    } else {
+      _bodyParams[key] = value;
+    }
     return this;
   }
 
+  /// 兼容旧API：setParams
+  @Deprecated('使用 setPathParams/setQueryParams/setBodyParams 更明确')
   BuildRequest<T> setParams(Map<String, dynamic> params) {
-    _params = params;
+    if (_httpType == HttpType.get || _httpType == HttpType.delete) {
+      _queryParams.addAll(params);
+    } else {
+      _bodyParams.addAll(params);
+    }
     return this;
   }
 
+  /// 兼容旧API：addParams
+  @Deprecated('使用 setPathParams/setQueryParams/setBodyParams 更明确')
   BuildRequest<T> addParams(Map<String, dynamic> params) {
-    _params.addAll(params);
+    return setParams(params);
+  }
+
+  // ==================== 请求体类型配置 - 新增 ====================
+
+  /// 设置请求体类型
+  BuildRequest<T> setBodyType(RequestBodyType type) {
+    _bodyType = type;
     return this;
   }
 
-  BuildRequest<T> setParamsToFormData(bool toFormData) {
-    _toFormData = toFormData;
-    _toBodyData = false;
+  /// 使用JSON格式发送（application/json）
+  BuildRequest<T> asJson() {
+    _bodyType = RequestBodyType.json;
+    _options?.contentType = ContentTypes.json;
     return this;
   }
 
-  BuildRequest<T> setParamsToBodyData(bool toBody) {
-    _toBodyData = toBody;
-    _toFormData = false;
+  /// 使用FormData格式发送（multipart/form-data）
+  BuildRequest<T> asFormData() {
+    _bodyType = RequestBodyType.formData;
+    _options?.contentType = ContentTypes.multipartFormData;
     return this;
   }
 
+  /// 使用URL编码格式发送（application/x-www-form-urlencoded）
+  BuildRequest<T> asUrlEncoded() {
+    _bodyType = RequestBodyType.urlEncoded;
+    _options?.contentType = ContentTypes.formUrlEncoded;
+    return this;
+  }
+
+  /// 兼容旧API：toFormData
+  @Deprecated('使用 asFormData() 更简洁')
   BuildRequest<T> toFormData() {
-    setParamsToFormData(true);
-    return this;
+    return asFormData();
   }
 
+  /// 兼容旧API：toBodyData
+  @Deprecated('使用 asJson() 更明确')
   BuildRequest<T> toBodyData() {
-    setParamsToBodyData(true);
-    return this;
+    return asJson();
   }
 
+  /// 兼容旧API：toUrlEncoded
+  @Deprecated('使用 asUrlEncoded() 更简洁')
   BuildRequest<T> toUrlEncoded() {
-    setParamsToFormData(true);
-    _options?.contentType = Headers.formUrlEncodedContentType;
+    return asUrlEncoded();
+  }
+
+  // ==================== RESTful 支持 -  ====================
+
+  /// 兼容旧API：setRestfulUrl
+  /// 新版本会自动检测路径中的占位符，无需手动设置
+  @Deprecated('框架会自动检测RESTful路径，无需手动设置')
+  BuildRequest<T> setRestfulUrl(bool restful) {
+    // 保留方法体以兼容旧代码，不做任何事了
     return this;
   }
 
-  BuildRequest<T> removeNullValueKeys() {
-    _params.removeWhere((key, value) => value == null);
+  /// 检测路径是否包含RESTful占位符
+  bool _hasRestfulPlaceholders() {
+    return _path?.contains(RegExp(r'\{[^}]+\}')) ?? false;
+  }
+
+  /// 构建最终的URL（处理RESTful参数）
+  String _buildFinalUrl() {
+    String url = _path ?? '';
+
+    // 如果路径包含占位符，自动进行RESTful替换
+    if (_hasRestfulPlaceholders()) {
+      // 创建副本避免修改原始数据
+      final pathParamsCopy = Map<String, dynamic>.from(_pathParams);
+      url = NetUtils.restfulUrl(url, pathParamsCopy);
+    }
+
+    return url;
+  }
+
+  // ==================== 其他配置方法 ====================
+
+  BuildRequest<T> setJsonConvert(JsonTransformation convert) {
+    _jsonTransformation = convert;
     return this;
   }
 
-  BuildRequest<T> getParams(ParamCallBack callBack) {
-    callBack.call(_params);
+  BuildRequest<T> setResponseType(ResponseType type) {
+    _options?.responseType = type;
     return this;
   }
 
-  BuildRequest<T> addHeaders(Map<String, dynamic> headers) {
-    _headers = headers;
+  BuildRequest<T> setContentType(String type) {
+    _options?.contentType = type;
     return this;
   }
 
   BuildRequest<T> setHeader(String key, dynamic value) {
     _headers[key] = value;
+    return this;
+  }
+
+  BuildRequest<T> addHeaders(Map<String, dynamic> headers) {
+    _headers.addAll(headers);
     return this;
   }
 
@@ -192,7 +308,7 @@ class BuildRequest<T> {
     return this;
   }
 
-  BuildRequest<T> setRetryCount(int count,{Duration? interval}) {
+  BuildRequest<T> setRetryCount(int count, {Duration? interval}) {
     _retryCount = count;
     if (interval != null) {
       _retryInterval = interval;
@@ -215,41 +331,87 @@ class BuildRequest<T> {
     return this;
   }
 
-  CancelToken? getCancelToken() {
-    return _cancelToken;
-  }
-
-  BuildRequest<T> setResponseCallBack(
-      Function(Response response) responseCallBack) {
+  BuildRequest<T> setResponseCallBack(Function(Response response) responseCallBack) {
     this.onResponse = responseCallBack;
     return this;
   }
 
+  BuildRequest<T> removeNullValueKeys() {
+    _pathParams.removeWhere((key, value) => value == null);
+    _queryParams.removeWhere((key, value) => value == null);
+    _bodyParams.removeWhere((key, value) => value == null);
+    return this;
+  }
 
+  BuildRequest<T> getParams(ParamCallBack callBack) {
+    // 合并所有参数供回调使用
+    final allParams = <String, dynamic>{}
+      ..addAll(_pathParams)
+      ..addAll(_queryParams)
+      ..addAll(_bodyParams);
+    callBack.call(allParams);
+    return this;
+  }
+
+  CancelToken? getCancelToken() {
+    return _cancelToken;
+  }
+
+  // ==================== 核心请求方法 -  ====================
+
+  /// 执行请求的核心方法
   Future<RxResult<T>> _doRequest<T>({bool cache = false}) async {
-    String url = _path.toString();
-    Map<String, dynamic> queryParameters = {};
-    dynamic requestBody = _bodyData;
+    final url = _buildFinalUrl();
 
-    final Map<String, dynamic> tempParams = Map.from(_params);
+    // 准备查询参数
+    Map<String, dynamic> queryParameters = Map.from(_queryParams);
 
-    if (isRestfulUrl()) {
-      url = NetUtils.restfulUrl(_path.toString(), tempParams);
-    } else {
-      queryParameters.addAll(tempParams);
-    }
+    // 准备请求体
+    dynamic requestBody = _rawBody;
 
-    bool hasFile = tempParams.values.any((element) => element is MultipartFile);
-    if(hasFile) {
-      _toFormData = true;
-    }
+    // 根据bodyType决定如何处理参数
+    if (_rawBody == null && _bodyParams.isNotEmpty) {
+      // 检测是否包含文件
+      bool hasFile = _bodyParams.values.any((element) =>
+      element is MultipartFile || element is File);
 
-    if (_toFormData) {
-      requestBody = FormData.fromMap(tempParams);
-      queryParameters = {}; // FormData sends params in the body
-    } else if (_toBodyData) {
-      requestBody = tempParams;
-      queryParameters = {}; // Body data sends params in the body
+      // 自动判断body类型
+      if (_bodyType == RequestBodyType.auto) {
+        if (hasFile) {
+          _bodyType = RequestBodyType.formData;
+        } else if (_httpType == HttpType.post ||
+            _httpType == HttpType.put ||
+            _httpType == HttpType.patch) {
+          _bodyType = RequestBodyType.json;
+        }
+      }
+
+      // 根据类型处理参数
+      switch (_bodyType) {
+        case RequestBodyType.query:
+          queryParameters.addAll(_bodyParams);
+          requestBody = null;
+          break;
+        case RequestBodyType.json:
+          requestBody = _bodyParams;
+          break;
+        case RequestBodyType.formData:
+          requestBody = FormData.fromMap(_bodyParams);
+          break;
+        case RequestBodyType.urlEncoded:
+          requestBody = FormData.fromMap(_bodyParams);
+          _options?.contentType = ContentTypes.formUrlEncoded;
+          break;
+        case RequestBodyType.auto:
+        // GET/DELETE默认用query
+          if (_httpType == HttpType.get || _httpType == HttpType.delete) {
+            queryParameters.addAll(_bodyParams);
+            requestBody = null;
+          } else {
+            requestBody = _bodyParams;
+          }
+          break;
+      }
     }
 
     try {
@@ -288,18 +450,11 @@ class BuildRequest<T> {
           throw ParsingException("Data parsing failed", e);
         }
 
+        // 缓存处理 - 优化：使用更清晰的缓存键生成
         if (cache && !RxNetPlatform.isWeb) {
-          if (_rxNet.getIgnoreCacheKeys() != null) {
-            _ignoreCacheKeys.addAll(_rxNet.getIgnoreCacheKeys()!);
-            _ignoreCacheKeys = _ignoreCacheKeys.toSet().toList();
-          }
-          String cacheKey = NetUtils.getCacheKeyFromPath(_path, _params, _ignoreCacheKeys);
-          final map = <String, dynamic>{
-            'timestamp': DateTime.now().millisecondsSinceEpoch,
-            'data': responseData
-          };
-          _rxNet.cacheManager.saveCache(cacheKey, jsonEncode(map));
+          _saveCacheData(responseData);
         }
+
         return RxResult(value: data, model: SourcesType.net);
       } else {
         throw NetworkException("Request failed with status code ${response.statusCode}", response);
@@ -313,41 +468,77 @@ class BuildRequest<T> {
         throw e;
       }
     }
-    throw NetworkException("Request failed",null);
+    throw NetworkException("Request failed", null);
   }
 
+  /// 保存缓存数据
+  void _saveCacheData(dynamic responseData) {
+    // 合并全局和本地忽略键
+    final allIgnoreKeys = <String>[];
+    if (_rxNet.getIgnoreCacheKeys() != null) {
+      allIgnoreKeys.addAll(_rxNet.getIgnoreCacheKeys()!);
+    }
+    allIgnoreKeys.addAll(_ignoreCacheKeys);
+
+    // 生成缓存键：合并所有参数
+    final allParams = <String, dynamic>{}
+      ..addAll(_pathParams)
+      ..addAll(_queryParams)
+      ..addAll(_bodyParams);
+
+    String cacheKey = NetUtils.getCacheKeyFromPath(_path, allParams, allIgnoreKeys);
+
+    final map = <String, dynamic>{
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+      'data': responseData
+    };
+    _rxNet.cacheManager.saveCache(cacheKey, jsonEncode(map));
+  }
+
+  /// 读取缓存
   Future<RxResult<T>> _readCache<T>() async {
     if (RxNetPlatform.isWeb || !await RxNetDataBase.isDatabaseReady) {
       throw CacheException("Cache not available");
     }
 
+    // 合并全局和本地忽略键
+    final allIgnoreKeys = <String>[];
     if (_rxNet.getIgnoreCacheKeys() != null) {
-      _ignoreCacheKeys.addAll(_rxNet.getIgnoreCacheKeys()!);
-      _ignoreCacheKeys = _ignoreCacheKeys.toSet().toList();
+      allIgnoreKeys.addAll(_rxNet.getIgnoreCacheKeys()!);
     }
-    final cacheKey = NetUtils.getCacheKeyFromPath(_path, _params, _ignoreCacheKeys);
+    allIgnoreKeys.addAll(_ignoreCacheKeys);
+
+    // 生成缓存键
+    final allParams = <String, dynamic>{}
+      ..addAll(_pathParams)
+      ..addAll(_queryParams)
+      ..addAll(_bodyParams);
+
+    final cacheKey = NetUtils.getCacheKeyFromPath(_path, allParams, allIgnoreKeys);
     final cacheData = await _rxNet.cacheManager.readCache(cacheKey);
 
     if (TextUtil.isEmpty(cacheData)) {
       throw CacheException("Cache is empty");
     }
-    
+
     dynamic data;
     try {
       data = jsonDecode(cacheData);
-    } catch(e) {
-        throw ParsingException("Failed to decode cache data", e);
+    } catch (e) {
+      throw ParsingException("Failed to decode cache data", e);
     }
-    
+
     final timestamp = data['timestamp'];
     final dataValue = data['data'];
     LogUtil.v("-->缓存数据:${jsonEncode(data)}");
+
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now - timestamp > (_cacheInvalidationTime ?? _rxNet.getCacheInvalidationTime())) {
       LogUtil.v("-->缓存数据:超时效");
       throw CacheException("Cache expired");
     }
-    if (dataValue != null ) {
+
+    if (dataValue != null) {
       return _parseLocalData<T>(dataValue);
     } else {
       throw CacheException("Cache is empty");
@@ -380,8 +571,9 @@ class BuildRequest<T> {
     return true;
   }
 
-  //使用回调的方式
-  //use callbacks
+  // ==================== 公共请求方法 ====================
+
+  /// 使用回调的方式
   void execute<T>({Success<T>? success, Failure? failure, Completed? completed}) {
     executeStream<T>().listen((result) {
       if (result.isSuccess) {
@@ -394,35 +586,12 @@ class BuildRequest<T> {
     }, onDone: completed);
   }
 
-  // async/await
+  /// async/await方式
   Future<RxResult<T>> request<T>() async {
-    //重要：当轮询启用时，这将返回首次的结果,底层流将被取消。
-    //要获得所有响应结果，你必须使用execute（）或者直接监听executeStream（）。
-    // IMPORTANT: When polling is enabled, this will return the *first* result
-    // and the underlying stream will be cancelled. To get all polling results,
-    // you must use execute() or listen to executeStream() directly.
     return await executeStream<T>().first;
   }
 
-  Stream<RxResult<T>> _networkRequestStream<T>({required bool shouldCache}) async* {
-    int attempt = 0;
-    bool success = false;
-    do {
-      attempt++;
-      try {
-        final result = await _doRequest<T>(cache: shouldCache);
-        yield result;
-        success = true;
-        break;
-      } catch (e) {
-        yield RxResult.error(e);
-        if (attempt <= _retryCount) {
-          await Future.delayed(_retryInterval);
-        }
-      }
-    } while (attempt <= _retryCount && !success);
-  }
-
+  /// Stream方式（支持轮询）
   Stream<RxResult<T>> executeStream<T>() async* {
     if (TextUtil.isEmpty(_path)) {
       yield RxResult.error(Exception("请求路径不能为空 path:$_path"));
@@ -454,8 +623,7 @@ class BuildRequest<T> {
           break;
         case CacheMode.REQUEST_FAILED_READ_CACHE:
           bool networkSucceeded = false;
-          await for (final netResult
-              in _networkRequestStream<T>(shouldCache: true)) {
+          await for (final netResult in _networkRequestStream<T>(shouldCache: true)) {
             if (netResult.isSuccess) {
               networkSucceeded = true;
             }
@@ -501,8 +669,28 @@ class BuildRequest<T> {
     } while (keepLooping);
   }
 
+  Stream<RxResult<T>> _networkRequestStream<T>({required bool shouldCache}) async* {
+    int attempt = 0;
+    bool success = false;
+    do {
+      attempt++;
+      try {
+        final result = await _doRequest<T>(cache: shouldCache);
+        yield result;
+        success = true;
+        break;
+      } catch (e) {
+        yield RxResult.error(e);
+        if (attempt <= _retryCount) {
+          await Future.delayed(_retryInterval);
+        }
+      }
+    } while (attempt <= _retryCount && !success);
+  }
 
+  // ==================== 下载上传方法 ====================
 
+  /// 下载文件
   void download({
     required String savePath,
     ProgressCallback? onReceiveProgress,
@@ -513,10 +701,9 @@ class BuildRequest<T> {
     if (!(await _checkNetWork())) {
       return;
     }
-    String url = _path.toString();
-    if (isRestfulUrl()) {
-      url = NetUtils.restfulUrl(_path.toString(), _params);
-    }
+
+    final url = _buildFinalUrl();
+
     try {
       _options?.method = _httpType.name;
       if (_headers.isNotEmpty) {
@@ -526,25 +713,33 @@ class BuildRequest<T> {
         _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet.getHeaders());
       }
-      if (_toFormData) {
-        _bodyData = FormData.fromMap(_params);
-      }
-      if (_toBodyData) {
-        _bodyData = _params;
+
+      // 准备请求体
+      dynamic requestBody = _rawBody;
+      if (_rawBody == null && _bodyParams.isNotEmpty) {
+        if (_bodyType == RequestBodyType.formData) {
+          requestBody = FormData.fromMap(_bodyParams);
+        } else if (_bodyType == RequestBodyType.json) {
+          requestBody = _bodyParams;
+        }
       }
 
-      final response = await _rxNet.client!.download(url, savePath,
+      final response = await _rxNet.client!.download(
+          url,
+          savePath,
           onReceiveProgress: (received, total) {
-        if (total != -1) {
-          onReceiveProgress?.call(received, total);
-        }
-        if (received >= total) {
-          success?.call(savePath, SourcesType.net);
-        }},
-          queryParameters: (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
-          data: _bodyData,
+            if (total != -1) {
+              onReceiveProgress?.call(received, total);
+            }
+            if (received >= total) {
+              success?.call(savePath, SourcesType.net);
+            }
+          },
+          queryParameters: _queryParams,
+          data: requestBody,
           options: _options,
-          cancelToken: _cancelToken);
+          cancelToken: _cancelToken
+      );
 
       onResponse?.call(response);
       if (response.statusCode != 200) {
@@ -556,9 +751,7 @@ class BuildRequest<T> {
     completed?.call();
   }
 
-
-  //断点下载
-  //Breakpoint download
+  /// 断点下载
   void breakPointDownload({
     required String savePath,
     ProgressCallback? onReceiveProgress,
@@ -573,18 +766,14 @@ class BuildRequest<T> {
 
     int downloadStart = 0;
     File file = File(savePath);
+
     try {
-      String url = _path.toString();
-      if (isRestfulUrl()) {
-        url = NetUtils.restfulUrl(_path.toString(), _params);
-      }
+      final url = _buildFinalUrl();
+
       if (file.existsSync()) {
-        // Stream<List<int>> streamFileSize = file.openRead();
-        // await for (var chunk in streamFileSize) {
-        //   downloadStart += chunk.length;
-        // }
         downloadStart = file.lengthSync();
       }
+
       _options?.method = _httpType.name;
       _options = _options?.copyWith(
         responseType: ResponseType.stream,
@@ -598,21 +787,25 @@ class BuildRequest<T> {
         _options?.headers?.addAll(_rxNet.getHeaders());
       }
       _options?.headers?.addAll({"Range": "bytes=$downloadStart-"});
-      if (_toFormData) {
-        _bodyData = FormData.fromMap(_params);
-      }
-      if (_toBodyData) {
-        _bodyData = _params;
+
+      // 准备请求体
+      dynamic requestBody = _rawBody;
+      if (_rawBody == null && _bodyParams.isNotEmpty) {
+        if (_bodyType == RequestBodyType.formData) {
+          requestBody = FormData.fromMap(_bodyParams);
+        } else if (_bodyType == RequestBodyType.json) {
+          requestBody = _bodyParams;
+        }
       }
 
       final response = await _rxNet.client!.request<ResponseBody>(
         url,
         options: _options,
         cancelToken: _cancelToken,
-        data: _bodyData,
-        queryParameters:
-            (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
+        data: requestBody,
+        queryParameters: _queryParams,
       );
+
       onResponse?.call(response);
       RandomAccessFile raf = file.openSync(mode: FileMode.append);
       Stream<Uint8List> stream = response.data!.stream;
@@ -660,6 +853,7 @@ class BuildRequest<T> {
     completed?.call();
   }
 
+  /// 上传文件
   void upload({
     ProgressCallback? onSendProgress,
     Success? success,
@@ -670,10 +864,8 @@ class BuildRequest<T> {
       return;
     }
 
-    String url = _path.toString();
-    if (isRestfulUrl()) {
-      url = NetUtils.restfulUrl(_path.toString(), _params);
-    }
+    final url = _buildFinalUrl();
+
     try {
       _options?.method = _httpType.name;
       if (_headers.isNotEmpty) {
@@ -683,19 +875,25 @@ class BuildRequest<T> {
         _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet.getHeaders());
       }
-      if (_toFormData) {
-        _bodyData = FormData.fromMap(_params);
-      }
-      if (_toBodyData) {
-        _bodyData = _params;
+
+      // 准备请求体
+      dynamic requestBody = _rawBody;
+      if (_rawBody == null && _bodyParams.isNotEmpty) {
+        if (_bodyType == RequestBodyType.formData) {
+          requestBody = FormData.fromMap(_bodyParams);
+        } else if (_bodyType == RequestBodyType.json) {
+          requestBody = _bodyParams;
+        }
       }
 
-      Response response = await _rxNet.client!.request(url,
-          data: _bodyData,
-          queryParameters:
-          (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
-          options: _options,
-          cancelToken: _cancelToken);
+      Response response = await _rxNet.client!.request(
+        url,
+        data: requestBody,
+        queryParameters: _queryParams,
+        options: _options,
+        cancelToken: _cancelToken,
+        onSendProgress: onSendProgress,
+      );
 
       onResponse?.call(response);
       if (response.statusCode == 200) {
@@ -707,8 +905,7 @@ class BuildRequest<T> {
     completed?.call();
   }
 
-  //断点上传
-  //Breakpoint upload
+  /// 断点上传
   void breakPointUpload({
     required String filePath,
     ProgressCallback? onSendProgress,
@@ -721,21 +918,19 @@ class BuildRequest<T> {
     if (!(await _checkNetWork())) {
       return;
     }
-    String url = _path.toString();
-    if (isRestfulUrl()) {
-      url = NetUtils.restfulUrl(_path.toString(), _params);
-    }
+
+    final url = _buildFinalUrl();
+
     var progress = start ?? 0;
     int fileSize = 0;
     File file = File(filePath);
+
     if (file.existsSync()) {
-      // Stream<List<int>> streamFileSize = file.openRead();
-      // await for (var chunk in streamFileSize) {
-      //   fileSize += chunk.length;
-      // }
       fileSize = file.lengthSync();
     }
+
     var data = file.openRead(progress, fileSize - progress);
+
     try {
       _options?.method = _httpType.name;
       if (_headers.isNotEmpty) {
@@ -745,23 +940,31 @@ class BuildRequest<T> {
         _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet.getHeaders());
       }
-      _options?.headers?.addAll({'Content-Range': 'bytes $progress-${fileSize - 1}/$fileSize'});
+      _options?.headers?.addAll({
+        'Content-Range': 'bytes $progress-${fileSize - 1}/$fileSize'
+      });
 
-      if (_toFormData) {
-        _bodyData = FormData.fromMap(_params);
+      // 准备请求体（如果有额外的body参数）
+      dynamic requestBody = _rawBody;
+      if (_rawBody == null && _bodyParams.isNotEmpty) {
+        if (_bodyType == RequestBodyType.formData) {
+          requestBody = FormData.fromMap(_bodyParams);
+        } else if (_bodyType == RequestBodyType.json) {
+          requestBody = _bodyParams;
+        }
       }
-      if (_toBodyData) {
-        _bodyData = _params;
-      }
+
       final response = await _rxNet.client!.request<ResponseBody>(
         url,
         options: _options,
         cancelToken: _cancelToken,
         data: data,
-        queryParameters: (isRestfulUrl() || _toFormData || _toBodyData) ? {} : _params,
+        queryParameters: _queryParams,
       );
+
       onResponse?.call(response);
       Stream<Uint8List> stream = response.data!.stream;
+
       final subscription = stream.listen((data) {
         progress = progress + data.length;
         onSendProgress?.call(progress, fileSize);
@@ -770,6 +973,7 @@ class BuildRequest<T> {
       }, onError: (e) async {
         failure?.call(e);
       }, cancelOnError: true);
+
       _cancelToken?.whenCancel.then((_) async {
         await subscription.cancel();
         cancelCallback?.call();
@@ -791,6 +995,7 @@ class BuildRequest<T> {
     completed?.call();
   }
 
+  /// 获取内容长度
   Future<String?> getContentLength(Response<dynamic> response) async {
     try {
       return response.headers.value(HttpHeaders.contentRangeHeader);

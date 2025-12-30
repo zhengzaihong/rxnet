@@ -2,9 +2,13 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 
 import 'ohos/messages.g.dart' as messages;
 
-/// This file must be in the root directory
-
+/// create_user: zhengzaihong
+/// email:1096877329@qq.com
+/// create_date: 2025-08-12
+/// create_time: 11:20
+/// describe: 必须在根路径下
 /// The OHOS implementation of [PathProviderPlatform].
+///
 class RxNetPlus extends PathProviderPlatform {
   final messages.PathProviderApi _api = messages.PathProviderApi();
 
