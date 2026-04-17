@@ -321,8 +321,14 @@ class BuildRequest<T> {
     return this;
   }
 
-  BuildRequest<T> setOptionConfig(OptionConfig callBack) {
+  @Deprecated('Please use the updateOptionConfig method instead, which will be removed in future versions')
+  BuildRequest<T> setOptionConfig(UpdateOptionConfig callBack) {
     callBack.call(_options!);
+    return this;
+  }
+
+  BuildRequest<T> updateOptionConfig(UpdateOptionConfig update) {
+    update.call(_options!);
     return this;
   }
 
@@ -418,12 +424,12 @@ class BuildRequest<T> {
       LogUtil.v("$url，JsonConvert：${_jsonTransformation != null}");
 
       _options?.method = _httpType.name;
-      if (_headers.isNotEmpty) {
-        _options?.headers = _headers;
-      }
+      _options?.headers ??= {};
       if (_enableGlobalHeader) {
-        _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet.getHeaders());
+      }
+      if (_headers.isNotEmpty) {
+        _options?.headers?.addAll(_headers);
       }
 
       Response<dynamic> response = await _rxNet.client!.request(url,
@@ -533,7 +539,7 @@ class BuildRequest<T> {
     LogUtil.v("缓存数据:${jsonEncode(data)}");
 
     final now = DateTime.now().millisecondsSinceEpoch;
-    LogUtil.v("缓存数据时效:${_cacheInvalidationTime} now - timestamp ：${now - timestamp }");
+    // LogUtil.v("缓存数据时效:${_cacheInvalidationTime} || now - timestamp ：${now - timestamp }");
     if (now - timestamp > (_cacheInvalidationTime ?? _rxNet.getCacheInvalidationTime())) {
       LogUtil.v("缓存数据:超时效");
       throw CacheException("Cache expired");
@@ -705,13 +711,14 @@ class BuildRequest<T> {
     final url = _buildFinalUrl();
 
     try {
+
       _options?.method = _httpType.name;
-      if (_headers.isNotEmpty) {
-        _options?.headers = _headers;
-      }
+      _options?.headers ??= {};
       if (_enableGlobalHeader) {
-        _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet.getHeaders());
+      }
+      if (_headers.isNotEmpty) {
+        _options?.headers?.addAll(_headers);
       }
 
       // 准备请求体
@@ -779,12 +786,13 @@ class BuildRequest<T> {
         responseType: ResponseType.stream,
       );
 
+
+      _options?.headers ??= {};
+      if (_enableGlobalHeader) {
+        _options?.headers?.addAll(_rxNet.getHeaders());
+      }
       if (_headers.isNotEmpty) {
         _options?.headers?.addAll(_headers);
-      }
-      if (_enableGlobalHeader) {
-        _options?.headers ??= {};
-        _options?.headers?.addAll(_rxNet.getHeaders());
       }
       _options?.headers?.addAll({"Range": "bytes=$downloadStart-"});
 
@@ -868,12 +876,13 @@ class BuildRequest<T> {
 
     try {
       _options?.method = _httpType.name;
-      if (_headers.isNotEmpty) {
-        _options?.headers = _headers;
-      }
+
+      _options?.headers ??= {};
       if (_enableGlobalHeader) {
-        _options?.headers ??= {};
         _options?.headers?.addAll(_rxNet.getHeaders());
+      }
+      if (_headers.isNotEmpty) {
+        _options?.headers?.addAll(_headers);
       }
 
       // 准备请求体
@@ -933,12 +942,13 @@ class BuildRequest<T> {
 
     try {
       _options?.method = _httpType.name;
+
+      _options?.headers ??= {};
+      if (_enableGlobalHeader) {
+        _options?.headers?.addAll(_rxNet.getHeaders());
+      }
       if (_headers.isNotEmpty) {
         _options?.headers?.addAll(_headers);
-      }
-      if (_enableGlobalHeader) {
-        _options?.headers ??= {};
-        _options?.headers?.addAll(_rxNet.getHeaders());
       }
       _options?.headers?.addAll({
         'Content-Range': 'bytes $progress-${fileSize - 1}/$fileSize'
