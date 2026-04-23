@@ -9,14 +9,31 @@ Language: [English](README.md) | 简体中文
 🚀 RxNet：极简易用、强大、原生风格的 Flutter 网络通信框架
 RxNet 是一款专为 Flutter 打造的跨平台网络请求工具，基于 Dio 深度封装，贴合原生开发习惯，几乎零学习成本即可上手。可轻松实现开屏即有数据特性，支持丰富的功能组合，助你构建高性能、可维护的应用程序。
 
-## 🎉 0.5.0 重大更新
+## 🎉 0.6.0 重大更新 - 可插拔适配器架构
 
-RxNet 0.5.0 带来了更多全新的API设计，大幅提升代码可读性和开发体验！
+RxNet 0.6.0 引入了革命性的可插拔适配器架构，完全解耦框架与特定 HTTP 客户端库！
 
+📖 **迁移指南：** [MIGRATION_GUIDE_0.6.0.md](MIGRATION_GUIDE_0.6.0.md) | [迁移指南_0.6.0.md](迁移指南_0.6.0.md) | [0.5.0 指南](迁移指南_0.5.0.md)
 
-📖 **详细迁移指南：** [迁移指南_0.5.0.md](迁移指南_0.5.0.md)
+🌟 0.6.0 新特性：
 
-🌟 核心亮点：
+🔌 **可插拔适配器**：在 DioAdapter（全功能）、HttpAdapter（轻量级）、MockAdapter（测试）之间选择，或创建自己的自定义适配器
+
+🔄 **100% 向后兼容**：现有代码无需任何更改即可工作 - 默认使用 DioAdapter
+
+🧪 **MockAdapter 测试**：内置模拟适配器，用于无需网络调用的单元测试和集成测试
+
+🎯 **多实例支持**：为不同 API 创建具有不同适配器的多个 RxNet 实例
+
+🛠️ **自定义适配器**：实现 NetworkAdapter 接口以集成任何 HTTP 客户端
+
+🔗 **统一拦截器**：新的 AdapterInterceptor 系统适用于所有适配器，保留完整的请求信息
+
+⚡ **改进的 CancelToken**：独立的 CancelToken，支持真正的取消（DioAdapter）和回调通知
+
+📊 **更好的日志**：拦截器现在可以访问 bodyParams、pathParams 和所有请求详细信息
+
+### 之前的功能（0.5.0）：
 
 ✅ 多种缓存策略：支持首次缓存、失败兜底、仅缓存等多种模式，灵活应对各种场景
 
@@ -38,13 +55,37 @@ RxNet 0.5.0 带来了更多全新的API设计，大幅提升代码可读性和�
 
 ## 依赖：
 
-    dependencies:
-       rxnet_plus: ^0.5.0  // 最新版本，全新API设计
-       # rxnet_plus: ^0.4.3  // 旧版本
-       # flutter_rxnet_forzzh: ^0.4.0  // 更旧的版本（不再维护）
+```yaml
+dependencies:
+  rxnet_plus: ^0.6.0  # 最新版本，可插拔适配器架构
+  
+  # 选择您的适配器（如果未指定适配器，默认使用 DioAdapter）
+  dio: ^5.8.0+1       # 用于 DioAdapter（推荐，全功能）
+  # http: ^1.2.0      # 用于 HttpAdapter（轻量级替代方案）
+```
 
+**升级？** 
+- 从 0.5.x 到 0.6.0：查看[迁移指南 0.6.0](迁移指南_0.6.0.md)（100% 向后兼容！）
+- 从 0.4.3 到 0.5.0：查看[迁移指南 0.5.0](迁移指南_0.5.0.md)
 
-**从0.4.3升级到0.5.0？** 查看 [迁移指南](迁移指南_0.5.0.md)
+## 选择适配器
+
+RxNet 0.6.0 支持多个 HTTP 客户端适配器。选择适合您需求的：
+
+| 适配器 | 包 | 大小 | 功能 | 取消 | 最适合 |
+|--------|-----|------|------|------|--------|
+| **DioAdapter** | `dio: ^5.8.0+1` | 完整 | 所有功能、拦截器 | ✅ 真正取消（中止连接） | 生产应用（默认） |
+| **HttpAdapter** | `http: ^1.2.0` | 轻量 | 基础 HTTP、拦截器 | ⚠️ 伪取消（标记已取消） | 轻量级应用 |
+| **MockAdapter** | 内置 | 最小 | 测试、无网络 | ✅ 模拟 | 单元/集成测试 |
+
+**默认行为：** 如果您不指定适配器，将自动使用 DioAdapter（需要 `dio` 依赖）。
+
+**取消说明：**
+- **DioAdapter**：提供真正的取消 - 立即中止 HTTP 连接，节省带宽
+- **HttpAdapter**：提供伪取消 - 标记为已取消但 HTTP 请求在后台继续
+- 对于需要真正取消的场景（大文件、长请求），使用 DioAdapter
+
+详见[适配器指南](lib/adapters/README.md)和[取消令牌分析](.kiro/specs/network-adapter-decoupling/CANCEL_TOKEN_ANALYSIS.md)。
 
 
 ## 常用参数：
@@ -124,25 +165,80 @@ Future.delayed(const Duration(seconds: 5),() async{
 ## 服用说明：
  
  ### 初始化网络框架
+
+#### 选项 1：默认（DioAdapter - 推荐）
 ```dart
  await RxNet.init(
     baseUrl: "http://t.weather.sojson.com/",
-    // cacheDir: "xxx",   ///缓存目录
-    // cacheName: "local_cache", ///缓存文件
+    // 未指定适配器 = 默认使用 DioAdapter
     baseCacheMode: CacheMode.REQUEST_FAILED_READ_CACHE, //请求失败读取缓存数据
     baseCheckNet:checkNet, //全局检查网络，所有的请求都走这个方法
     cacheInvalidationTime: 24 * 60 * 60 * 1000, //缓存时效毫秒
-    // baseUrlEnv: {  ///支持多环境 baseUrl调试，RxNet.setDefaultEnv("test") 方式切换;
-    //   "test": "http://t.weather.sojson1.com/",
-    //   "debug": "http://t.weather.sojson2.com/",
-    //   "release": "http://t.weather.sojson.com/",
-    // },
     interceptors: [
-      // TokenInterceptor // token拦截器，更多功能请自定义拦截器
-      //日志拦截器
-       RxNetLogInterceptor()
-      //ResponseInterceptor() //自定义响应拦截器，预处理结果等
+      RxNetLogAdapterInterceptor()  // 新的统一拦截器
     ]);
+```
+
+#### 选项 2：显式适配器选择
+```dart
+import 'package:rxnet_plus/adapters/dio_adapter.dart';
+// 或：import 'package:rxnet_plus/adapters/http_adapter.dart';
+
+await RxNet.init(
+  baseUrl: "http://t.weather.sojson.com/",
+  adapter: DioAdapter(),  // 或 HttpAdapter()
+  baseCacheMode: CacheMode.REQUEST_FAILED_READ_CACHE,
+  baseCheckNet: checkNet,
+  cacheInvalidationTime: 24 * 60 * 60 * 1000,
+  interceptors: [
+    RxNetLogAdapterInterceptor()
+  ],
+);
+```
+
+#### 选项 3：使用不同适配器的多个实例
+```dart
+import 'package:rxnet_plus/adapters/dio_adapter.dart';
+import 'package:rxnet_plus/adapters/http_adapter.dart';
+
+// 使用 DioAdapter 的主 API（全功能）
+final mainApi = RxNet.create();
+await mainApi.initNet(
+  baseUrl: "https://api.main.com",
+  adapter: DioAdapter(),
+);
+
+// 使用 HttpAdapter 的分析 API（轻量级）
+final analyticsApi = RxNet.create();
+await analyticsApi.initNet(
+  baseUrl: "https://analytics.example.com",
+  adapter: HttpAdapter(),
+);
+```
+
+#### 选项 4：使用 MockAdapter 测试
+```dart
+import 'package:rxnet_plus/adapters/mock_adapter.dart';
+
+final mockAdapter = MockAdapter();
+mockAdapter.setMockResponse(
+  '/api/weather/city/101030100',
+  AdapterResponse(
+    statusCode: 200,
+    data: {'message': 'success', 'data': {...}},
+    headers: {},
+    request: AdapterRequest(
+      baseUrl: 'http://t.weather.sojson.com/',
+      path: '/api/weather/city/101030100',
+      method: HttpMethod.GET,
+    ),
+  ),
+);
+
+await RxNet.init(
+  baseUrl: "http://t.weather.sojson.com/",
+  adapter: mockAdapter,
+);
 ```
 
  ### 发起网络请求（ post, get, delete, put, patch等同理）这里get举例：
@@ -309,15 +405,70 @@ RxNet.setGlobalHeaders({
 
 ```dart
 
- class TokenInterceptors extends Interceptor {
-  @override
-  onRequest( RequestOptions options, RequestInterceptorHandler handler) async {
-    Map<String, dynamic> header = {};
-    header["token"] = "xxxxx";
-    header["version"] = "1.0";
-    options.headers.addAll(header);
-    handler.next(options);
-  }
+class AuthInterceptor extends AdapterInterceptor {
+   String? _token;
+
+   /// 设置认证令牌
+   void setToken(String token) {
+      _token = token;
+   }
+
+   /// 清除认证令牌
+   void clearToken() {
+      _token = null;
+   }
+
+   @override
+   void onRequest(
+           AdapterRequest request,
+           RequestInterceptorHandler handler,
+           ) {
+      if (_token != null) {
+         // 添加 Authorization 头
+         final headers = Map<String, String>.from(request.headers);
+         headers['Authorization'] = 'Bearer $_token';
+
+         // 创建新的请求对象
+         final newRequest = request.copyWith(headers: headers);
+
+         debugPrint('🔐 Added Authorization header to ${request.buildFullUrl()}');
+
+         // 使用修改后的请求继续
+         handler.next(newRequest);
+      } else {
+         // 没有令牌，直接继续
+         handler.next(request);
+      }
+   }
+
+   @override
+   void onResponse(
+           AdapterResponse response,
+           ResponseInterceptorHandler handler,
+           ) {
+      // 检查是否有新的令牌
+      final newToken = response.headers['x-new-token']?.first;
+      if (newToken != null) {
+         debugPrint('🔐 Received new token, updating...');
+         _token = newToken;
+      }
+
+      handler.next(response);
+   }
+
+   @override
+   void onError(
+           AdapterException error,
+           ErrorInterceptorHandler handler,
+           ) {
+      // 如果是 401 错误，清除令牌
+      if (error.statusCode == 401) {
+         debugPrint('🔐 Unauthorized, clearing token...');
+         clearToken();
+      }
+
+      handler.next(error);
+   }
 }
 
 ```
@@ -364,39 +515,83 @@ Future<bool> checkNet() async{
 ```
 
 ### 证书校验：
+
+#### 使用 DioAdapter（dio 包方式）
+
 ```dart
-RxNet.getDefaultClient()?.httpClientAdapter = IOHttpClientAdapter(
+// 获取 DioAdapter 实例
+final adapter = DioAdapter();
+
+// 配置证书校验
+adapter.dio.httpClientAdapter = IOHttpClientAdapter(
   createHttpClient: () {
     final client = HttpClient();
-    // 在这里进行自定义配置，例如证书校验等：
-    // 设置为 false，表示默认拒绝所有无效证书
-    client.badCertificateCallback = (X509Certificate cert, String host, int port) {
-      // 你可以在这里添加更复杂的校验逻辑，例如校验证书指纹或颁发机构
-      // 你的可能是xx.pem 等文件，读取出来再校验
-      const trustedFingerprint = 'AB:CD:EF:12:34:56:78:90:AB:CD:EF:12:34:56:78:90:AB:CD:EF:12';
-      final certFingerprint = cert.sha1.toString().toUpperCase();
-      final isTrusted = certFingerprint == trustedFingerprint;
-      // 只有当证书可信时才允许请求
-      return isTrusted;
+    client.badCertificateCallback = (cert, host, port) {
+      // 在这里添加您的证书校验逻辑
+      // 例如：校验证书指纹
+      // const trustedFingerprint = 'YOUR_SHA256_FINGERPRINT';
+      // final certFingerprint = cert.sha1.toString().toUpperCase();
+      // return certFingerprint == trustedFingerprint;
+      return true; // 仅用于测试，生产环境请正确校验
     };
     return client;
   },
+);
+
+// 使用配置好的适配器初始化 RxNet
+await RxNet.init(
+  baseUrl: "https://your-api.com",
+  adapter: adapter,
+);
+```
+
+#### 使用 HttpAdapter（http 包方式）
+
+```dart
+import 'dart:io';
+import 'package:http/io_client.dart';
+
+// 创建带证书校验的自定义 HTTP 客户端
+IOClient createPinnedClient() {
+  final HttpClient httpClient = HttpClient();
+  httpClient.badCertificateCallback = (X509Certificate cert, String host, int port) {
+    // 在这里添加您的证书校验逻辑
+    // 例如：校验证书指纹
+    // final der = cert.der;
+    // final sha256 = sha256Convert(der);
+    // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
+    // return sha256 == trustedFingerprint;
+    return true; // 仅用于测试，生产环境请正确校验
+  };
+  return IOClient(httpClient);
+}
+
+// 使用自定义客户端创建 HttpAdapter
+final httpAdapter = HttpAdapter(client: createPinnedClient());
+
+// 使用配置好的适配器初始化 RxNet
+await RxNet.init(
+  baseUrl: "https://your-api.com",
+  adapter: httpAdapter,
 );
 ```
 
 ### 清晰的日志拦截器，拒绝调试抓瞎。
      
-    需要日志信息，初始化配置网络框架时请添加 RxNetLogInterceptor 拦截器 或者您自定义的
+需要日志信息，初始化配置网络框架时请添加 RxNetLogAdapterInterceptor 拦截器或者您自定义的
+
 ```dart
  await RxNet.init(
     // xxxxxx
     interceptors: [
-      //TokenInterceptor // token拦截器，更多功能请自定义拦截器
-      ///日志拦截器
-       RxNetLogInterceptor()
-       //ResponseInterceptor() //响应拦截器，预处理结果
+      // TokenInterceptor // token拦截器，更多功能请自定义拦截器
+      /// 日志拦截器（0.6.0 新版）
+      RxNetLogAdapterInterceptor()
+      // ResponseInterceptor() // 响应拦截器，预处理结果
     ]);
 ```
+
+**注意：** 0.6.0 引入了新的 `RxNetLogAdapterInterceptor`，它适用于所有适配器并可以访问完整的请求信息（包括 bodyParams、pathParams 等）。
 
    输出格式：
 ```dart

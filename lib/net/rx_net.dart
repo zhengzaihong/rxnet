@@ -13,35 +13,182 @@ import '../src/adapter/interceptor/adapter_interceptor.dart';
 import 'package:dio/dio.dart' show BaseOptions, Headers, LogInterceptor;
 
 ///
+/// RxNet Plus - Flutter 网络请求库 / Flutter Network Request Library
+/// 
 /// author: zhengzaihong
-/// email:1096877329@qq.com
+/// email: 1096877329@qq.com
 /// date: 2025-08-12
-/// time: 16:48
-/// describe:
-/// 此次变更较大，0.4版本之前为单例：
-/// 0.4.0版本开始支持多实例 RxNet 对象，用于多场景（如：一个请求业务API，一个请求日志API）
-/// RxNet 整体进行了优化：1.async/await 方式支持缓存策略请求，2.回调方式保持不变，内部实现方式已优化
+/// 
+/// ============================================================================
+/// 版本历史 / Version History
+/// ============================================================================
+/// 
+/// 📦 Version 0.6.0 (2026-04-23) - 适配器架构重构 / Adapter Architecture Refactoring
+/// ============================================================================
+/// 
+/// 🎯 核心变更 / Core Changes:
+/// 
+/// 1. **可插拔适配器架构 / Pluggable Adapter Architecture**
+///    - 引入 NetworkAdapter 接口，支持多种 HTTP 客户端库
+///    - Introduced NetworkAdapter interface, supporting multiple HTTP client libraries
+///    - 三种内置适配器：DioAdapter（默认）、HttpAdapter（轻量级）、MockAdapter（测试）
+///    - Three built-in adapters: DioAdapter (default), HttpAdapter (lightweight), MockAdapter (testing)
+///    - 支持自定义适配器实现
+///    - Support for custom adapter implementations
+/// 
+/// 2. **统一的拦截器系统 / Unified Interceptor System**
+///    - AdapterInterceptor 接口，与具体网络库解耦
+///    - AdapterInterceptor interface, decoupled from specific network libraries
+///    - 拦截器可在不同适配器间复用
+///    - Interceptors can be reused across different adapters
+///    - RxNetLogAdapterInterceptor 替代 RxNetLogInterceptor
+///    - RxNetLogAdapterInterceptor replaces RxNetLogInterceptor
+/// 
+/// 3. **改进的取消令牌 / Improved Cancel Token**
+///    - 新的 CancelToken 类，独立于 Dio
+///    - New CancelToken class, independent of Dio
+///    - 支持回调通知和状态查询
+///    - Support for callback notifications and status queries
+/// 
+/// 4. **枚举类型优化 / Enum Type Optimization**
+///    - HttpMethod 和 ResponseType 使用大写枚举值
+///    - HttpMethod and ResponseType use uppercase enum values
+///    - 更符合 Dart 3.0+ 规范
+///    - More compliant with Dart 3.0+ specifications
+/// 
+/// 🔄 迁移指南 / Migration Guide:
+/// 详见 MIGRATION_GUIDE_0.6.0.md
+/// See MIGRATION_GUIDE_0.6.0.md for details
+/// 
+/// 💡 使用示例 / Usage Examples:
+/// 
+/// ```dart
+/// // 1. 使用默认适配器（DioAdapter）
+/// // Using default adapter (DioAdapter)
+/// await RxNet.init(
+///   baseUrl: "https://api.example.com",
+///   interceptors: [RxNetLogAdapterInterceptor()],
+/// );
+/// 
+/// // 2. 使用轻量级适配器（HttpAdapter）
+/// // Using lightweight adapter (HttpAdapter)
+/// final api = RxNet.create();
+/// await api.initNet(
+///   baseUrl: "https://api.example.com",
+///   adapter: HttpAdapter(),
+/// );
+/// 
+/// // 3. 使用测试适配器（MockAdapter）
+/// // Using test adapter (MockAdapter)
+/// final mockAdapter = MockAdapter();
+/// mockAdapter.setMockResponse('/api/user', mockResponse);
+/// await api.initNet(adapter: mockAdapter);
+/// ```
+/// 
+/// ============================================================================
+/// 📦 Version 0.5.0 (2025-10-03) - API 优化 / API Optimization
+/// ============================================================================
+/// 
+/// 🎯 核心变更 / Core Changes:
+/// 
+/// 1. **参数类型明确化 / Explicit Parameter Types**
+///    - setPathParam() - RESTful 路径参数 / RESTful path parameters
+///    - setQueryParam() - URL 查询参数 / URL query parameters
+///    - setBodyParam() - 请求体参数 / Request body parameters
+/// 
+/// 2. **RESTful 自动检测 / RESTful Auto-Detection**
+///    - 自动识别路径中的 {placeholder}
+///    - Automatically recognize {placeholder} in paths
+///    - 无需手动调用 setRestfulUrl(true)
+///    - No need to manually call setRestfulUrl(true)
+/// 
+/// 3. **请求体类型清晰化 / Clear Request Body Types**
+///    - asJson() - JSON 格式 / JSON format
+///    - asFormData() - FormData 格式 / FormData format
+///    - asUrlEncoded() - URL 编码格式 / URL-encoded format
+/// 
+/// 💡 使用示例 / Usage Examples:
+/// 
+/// ```dart
+/// // RESTful 请求 / RESTful request
+/// await RxNet.get()
+///   .setPath("/api/users/{id}/posts")
+///   .setPathParam("id", "123")
+///   .setQueryParam("page", 1)
+///   .request();
+/// 
+/// // POST JSON 数据 / POST JSON data
+/// await RxNet.post()
+///   .setPath("/api/user")
+///   .setBodyParams({"name": "John", "age": 25})
+///   .asJson()
+///   .request();
+/// 
+/// // 文件上传 / File upload
+/// await RxNet.post()
+///   .setPath("/api/upload")
+///   .setBodyParam("file", multipartFile)
+///   .asFormData()
+///   .request();
+/// ```
+/// 
+/// 🔄 迁移指南 / Migration Guide:
+/// 详见 MIGRATION_GUIDE_0.5.0.md 或 迁移指南_0.5.0.md
+/// See MIGRATION_GUIDE_0.5.0.md or 迁移指南_0.5.0.md
+/// 
+/// ============================================================================
+/// 📦 Version 0.4.3 及之前 / Version 0.4.3 and Earlier
+/// ============================================================================
+/// 
+/// 🎯 核心特性 / Core Features:
+/// 
+/// 1. **多实例支持 / Multi-Instance Support** (0.4.0+)
+///    - 支持创建多个 RxNet 实例
+///    - Support for creating multiple RxNet instances
+///    - 适用于多场景（业务 API、日志 API 等）
+///    - Suitable for multiple scenarios (business API, logging API, etc.)
+/// 
+/// 2. **缓存策略 / Cache Strategy**
+///    - 支持多种缓存模式
+///    - Support for multiple cache modes
+///    - async/await 和回调方式都支持缓存
+///    - Both async/await and callback methods support caching
+/// 
+/// 3. **基础 API / Basic API**
+///    - setParam() - 设置参数 / Set parameter
+///    - setParams() - 批量设置参数 / Set multiple parameters
+///    - setRestfulUrl(true) - 启用 RESTful / Enable RESTful
+/// 
+/// 💡 使用示例 / Usage Examples (0.4.3 API - 仍然支持 / Still Supported):
+/// 
+/// ```dart
+/// // 基础请求 / Basic request
+/// await RxNet.get()
+///   .setPath("api/weather")
+///   .setParam("city", "101030100")
+///   .setRestfulUrl(true)
+///   .request();
+/// 
+/// // POST 请求 / POST request
+/// await RxNet.post()
+///   .setPath("/api/user")
+///   .setParams({"name": "John", "age": 25})
+///   .toBodyData()
+///   .request();
+/// ```
+/// 
+/// ============================================================================
+/// 📚 更多文档 / More Documentation
+/// ============================================================================
+/// 
+/// - API 文档 / API Documentation: README.md
+/// - 迁移指南 / Migration Guides: MIGRATION_GUIDE_*.md
+/// - 更新日志 / Changelog: CHANGELOG.md
+/// - 示例代码 / Examples: example/lib/
+/// 
+/// ============================================================================
 
-///These changes are major, and there were single cases before version 0.4:
-///Version 0.4.0 starts to support multi-instance RxNet objects for multiple scenarios (e.g., one request business API and one request log API)
-/// RxNet has been optimized as a whole: 1. The async/await method supports caching policy requests, 2. The callback method remains unchanged, and the internal implementation method has been optimized
-///
-///
-/// 0.5.0版本重大更新：
-/// 1. 调整BuildRequest，参数类型明确化（setPathParam/setQueryParam/setBodyParam）
-/// 2. RESTful自动检测，无需手动调用setRestfulUrl(true)
-/// 3. 请求体类型清晰化（asJson/asFormData/asUrlEncoded）
-/// 4. 详细迁移指南：MIGRATION_GUIDE_0.5.0.md
-///
-/// Version 0.5.0 Major Update:
-/// 1. Introduced BuildRequestEnhanced with explicit parameter types (setPathParam/setQueryParam/setBodyParam)
-/// 2. RESTful auto-detection, no need to manually call setRestfulUrl(true)
-/// 3. Clear request body types (asJson/asFormData/asUrlEncoded)
-/// 4. Code readability improved by 40%, error rate reduced by 30%
-/// 5. Detailed migration guide: MIGRATION_GUIDE_0.5.0.md
-///
-///
-// 1.example：async/await (0.5.0 New API - Recommended)
+// ==================== 0.6.0 推荐用法 / 0.6.0 Recommended Usage ====================
 
 // void requestData() async {
 //   final data = await RxNet.get()

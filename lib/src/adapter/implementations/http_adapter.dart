@@ -10,23 +10,286 @@ import '../interceptor/adapter_interceptor.dart';
 import '../exceptions/adapter_exception.dart';
 import '../cancel_token.dart' as adapter_cancel;
 
-
+///
+/// HttpAdapter - 基于 http 包的轻量级网络适配器 / Lightweight Network Adapter Based on http Package
+/// 
 /// author: ZhengZaiHong
-/// email:1096877329@qq.com
-/// date: 2026-04-23 11:28
-/// describe: 基于 http 包实现 NetworkAdapter 接口，提供轻量级的网络请求功能
+/// email: 1096877329@qq.com
+/// date: 2026-04-23
+/// 
+/// ============================================================================
+/// 类说明 / Class Description
+/// ============================================================================
+/// 
+/// HttpAdapter 是 RxNet Plus 的轻量级网络适配器，基于 Dart 官方的 http 包实现。
+/// 它提供了基础的 HTTP 功能，适合对包大小敏感或不需要高级功能的场景。
+/// 
+/// HttpAdapter is a lightweight network adapter for RxNet Plus, based on
+/// Dart's official http package. It provides basic HTTP functionality,
+/// suitable for scenarios sensitive to package size or not requiring
+/// advanced features.
+/// 
+/// ============================================================================
+/// 核心特性 / Core Features
+/// ============================================================================
+/// 
+/// 1. **轻量级 / Lightweight**
+///    - 基于 Dart 官方 http 包，无额外依赖
+///    - Based on Dart's official http package, no extra dependencies
+///    - 包大小更小，适合简单场景
+///    - Smaller package size, suitable for simple scenarios
+/// 
+/// 2. **基础 HTTP 支持 / Basic HTTP Support**
+///    - 支持所有标准 HTTP 方法
+///    - Support for all standard HTTP methods
+///    - 支持请求头和查询参数
+///    - Support for headers and query parameters
+///    - 支持 JSON 和文本响应
+///    - Support for JSON and text responses
+/// 
+/// 3. **拦截器支持 / Interceptor Support**
+///    - 完整的 AdapterInterceptor 支持
+///    - Full AdapterInterceptor support
+///    - 与 DioAdapter 相同的拦截器接口
+///    - Same interceptor interface as DioAdapter
+/// 
+/// 4. **请求取消 / Request Cancellation**
+///    - 支持 RxNet 的 CancelToken
+///    - Support for RxNet's CancelToken
+///    - 基于 Completer 的取消机制
+///    - Completer-based cancellation mechanism
+/// 
+/// 5. **自定义 Client / Custom Client**
+///    - 可以传入自定义的 http.Client
+///    - Can pass in custom http.Client
+///    - 支持证书固定等高级配置
+///    - Support for advanced configurations like certificate pinning
+/// 
+/// ============================================================================
+/// 适用场景 / Use Cases
+/// ============================================================================
+/// 
+/// ✅ 适合使用 HttpAdapter 的场景 / Suitable for HttpAdapter:
+/// 
+/// 1. **简单的 REST API 调用 / Simple REST API Calls**
+///    - 基础的 GET/POST 请求
+///    - Basic GET/POST requests
+///    - 不需要复杂的拦截器逻辑
+///    - No need for complex interceptor logic
+/// 
+/// 2. **包大小敏感的应用 / Size-Sensitive Applications**
+///    - 需要减小应用体积
+///    - Need to reduce app size
+///    - 不需要 Dio 的高级功能
+///    - Don't need Dio's advanced features
+/// 
+/// 3. **证书固定 / Certificate Pinning**
+///    - 需要自定义 SSL/TLS 验证
+///    - Need custom SSL/TLS validation
+///    - 可以通过自定义 IOClient 实现
+///    - Can be implemented via custom IOClient
+/// 
+/// ❌ 不适合使用 HttpAdapter 的场景 / Not Suitable for HttpAdapter:
+/// 
+/// 1. **文件上传下载 / File Upload/Download**
+///    - HttpAdapter 不支持进度回调
+///    - HttpAdapter doesn't support progress callbacks
+///    - 建议使用 DioAdapter
+///    - Recommend using DioAdapter
+/// 
+/// 2. **复杂的拦截器需求 / Complex Interceptor Requirements**
+///    - 需要修改请求体或响应体
+///    - Need to modify request/response body
+///    - DioAdapter 提供更好的支持
+///    - DioAdapter provides better support
+/// 
+/// 3. **流式响应 / Streaming Responses**
+///    - HttpAdapter 不支持流式响应
+///    - HttpAdapter doesn't support streaming responses
+///    - 建议使用 DioAdapter
+///    - Recommend using DioAdapter
+/// 
+/// ============================================================================
+/// 使用示例 / Usage Examples
+/// ============================================================================
+/// 
+/// 1. 基础使用 / Basic Usage:
+/// ```dart
+/// final api = RxNet.create();
+/// await api.initNet(
+///   baseUrl: "https://api.example.com",
+///   adapter: HttpAdapter(),
+/// );
+/// 
+/// final result = await api.getRequest()
+///   .setPath("/users")
+///   .request();
+/// ```
+/// 
+/// 2. 使用自定义 Client / Using Custom Client:
+/// ```dart
+/// final httpClient = HttpClient();
+/// httpClient.badCertificateCallback = (cert, host, port) {
+///   // 自定义证书验证逻辑
+///   // Custom certificate validation logic
+///   return true;
+/// };
+/// 
+/// final client = IOClient(httpClient);
+/// final adapter = HttpAdapter(client: client);
+/// 
+/// await api.initNet(
+///   baseUrl: "https://api.example.com",
+///   adapter: adapter,
+/// );
+/// ```
+/// 
+/// 3. 证书固定示例 / Certificate Pinning Example:
+/// ```dart
+/// IOClient createPinnedClient() {
+///   final httpClient = HttpClient();
+///   httpClient.badCertificateCallback = (cert, host, port) {
+///     // 获取证书指纹并验证
+///     // Get certificate fingerprint and validate
+///     final der = cert.der;
+///     final sha256 = sha256Convert(der);
+///     const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
+///     return sha256 == trustedFingerprint;
+///   };
+///   return IOClient(httpClient);
+/// }
+/// 
+/// final adapter = HttpAdapter(client: createPinnedClient());
+/// ```
+/// 
+/// 4. 添加拦截器 / Adding Interceptors:
+/// ```dart
+/// final adapter = HttpAdapter();
+/// adapter.addInterceptor(RxNetLogAdapterInterceptor());
+/// adapter.addInterceptor(AuthInterceptor());
+/// 
+/// await api.initNet(
+///   baseUrl: "https://api.example.com",
+///   adapter: adapter,
+/// );
+/// ```
+/// 
+/// ============================================================================
+/// 与 DioAdapter 的对比 / Comparison with DioAdapter
+/// ============================================================================
+/// 
+/// | 特性 / Feature              | HttpAdapter | DioAdapter |
+/// |----------------------------|-------------|------------|
+/// | 包大小 / Package Size       | ✅ 小 / Small | ❌ 大 / Large |
+/// | 基础请求 / Basic Requests   | ✅ 支持 / Yes | ✅ 支持 / Yes |
+/// | 文件上传 / File Upload      | ⚠️ 基础 / Basic | ✅ 完整 / Full |
+/// | 文件下载 / File Download    | ⚠️ 基础 / Basic | ✅ 完整 / Full |
+/// | 进度回调 / Progress         | ❌ 不支持 / No | ✅ 支持 / Yes |
+/// | 流式响应 / Streaming        | ❌ 不支持 / No | ✅ 支持 / Yes |
+/// | 拦截器 / Interceptors       | ✅ 支持 / Yes | ✅ 支持 / Yes |
+/// | 证书固定 / Cert Pinning     | ✅ 支持 / Yes | ✅ 支持 / Yes |
+/// | 请求取消 / Cancellation     | ✅ 支持 / Yes | ✅ 支持 / Yes |
+/// 
+/// ============================================================================
+/// 性能考虑 / Performance Considerations
+/// ============================================================================
+/// 
+/// 1. **内存使用 / Memory Usage**
+///    - HttpAdapter 内存占用更小
+///    - HttpAdapter has smaller memory footprint
+///    - 适合资源受限的设备
+///    - Suitable for resource-constrained devices
+/// 
+/// 2. **请求速度 / Request Speed**
+///    - 简单请求性能相当
+///    - Similar performance for simple requests
+///    - 复杂场景 DioAdapter 可能更快
+///    - DioAdapter may be faster in complex scenarios
+/// 
+/// 3. **启动时间 / Startup Time**
+///    - HttpAdapter 启动更快
+///    - HttpAdapter starts faster
+///    - 依赖更少，初始化更快
+///    - Fewer dependencies, faster initialization
+/// 
+/// ============================================================================
+/// 限制和注意事项 / Limitations and Notes
+/// ============================================================================
+/// 
+/// 1. **不支持进度回调 / No Progress Callbacks**
+///    - upload() 和 download() 方法的 onProgress 参数无效
+///    - onProgress parameter in upload() and download() is ineffective
+///    - 如需进度回调，请使用 DioAdapter
+///    - Use DioAdapter if progress callbacks are needed
+/// 
+/// 2. **不支持流式响应 / No Streaming Responses**
+///    - ResponseType.stream 会被当作 bytes 处理
+///    - ResponseType.stream is treated as bytes
+///    - 大文件下载可能占用较多内存
+///    - Large file downloads may consume more memory
+/// 
+/// 3. **文件上传限制 / File Upload Limitations**
+///    - 不支持 MultipartFile 类型
+///    - MultipartFile type not supported
+///    - 需要手动构建 multipart 请求
+///    - Need to manually build multipart requests
+/// 
+/// 4. **取消机制 / Cancellation Mechanism**
+///    - 基于 Completer，可能不如 Dio 的取消机制精确
+///    - Based on Completer, may not be as precise as Dio's mechanism
+///    - 请求可能已发送但被标记为取消
+///    - Request may have been sent but marked as cancelled
+/// 
+/// ============================================================================
+/// 
+/// See also / 另见:
+/// - [NetworkAdapter] for the adapter interface
+/// - [DioAdapter] for a full-featured alternative
+/// - [MockAdapter] for testing
+/// - [AdapterInterceptor] for interceptor implementation
+/// 
+/// ============================================================================
 
+/// HttpAdapter - http package-based implementation of NetworkAdapter
+/// 
+/// HttpAdapter - 基于 http 包的 NetworkAdapter 实现
+/// 
+/// This is a lightweight adapter that uses Dart's official http package.
+/// It's suitable for simple scenarios where package size matters.
+/// 
+/// 这是一个使用 Dart 官方 http 包的轻量级适配器。
+/// 适合对包大小敏感的简单场景。
 class HttpAdapter implements NetworkAdapter {
   final http.Client _client;
   final List<AdapterInterceptor> _interceptors = [];
   final Map<adapter_cancel.CancelToken, List<Completer>> _pendingRequests = {};
   
-  /// 创建 HttpAdapter
+  /// Creates an HttpAdapter.
   /// 
-  /// [client] 可选的 http.Client 实例，如果不提供则创建默认实例
+  /// 创建 HttpAdapter。
+  /// 
+  /// Parameters / 参数:
+  /// - [client]: Optional custom http.Client instance. If not provided,
+  ///             a default instance will be created.
+  ///             可选的自定义 http.Client 实例。如果不提供，将创建默认实例。
+  /// 
+  /// Example / 示例:
+  /// ```dart
+  /// // Using default client / 使用默认 client
+  /// final adapter = HttpAdapter();
+  /// 
+  /// // Using custom client / 使用自定义 client
+  /// final client = IOClient(HttpClient());
+  /// final adapter = HttpAdapter(client: client);
+  /// ```
   HttpAdapter({http.Client? client}) : _client = client ?? http.Client();
   
-  /// 获取内部 http.Client 实例
+  /// Gets the underlying http.Client instance.
+  /// 
+  /// 获取底层 http.Client 实例。
+  /// 
+  /// This allows direct access to the client for advanced configuration.
+  /// 这允许直接访问 client 进行高级配置。
   http.Client get client => _client;
   
   @override
@@ -37,7 +300,7 @@ class HttpAdapter implements NetworkAdapter {
   
   @override
   Future<AdapterResponse> request(AdapterRequest request) async {
-    // 创建 Completer 用于取消
+    // 创建 Completer 用于取消 / Create Completer for cancellation
     final completer = Completer<AdapterResponse>();
     
     // 如果有 cancelToken，注册取消回调

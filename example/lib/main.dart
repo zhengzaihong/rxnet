@@ -49,7 +49,7 @@ void main() async {
       adapter: adapter,
       cacheInvalidationTime: 365 * 24 * 60 * 60 * 1000,
       interceptors: [
-        RxNetLogAdapterInterceptor()
+        RxNetLogAdapterInterceptor(),
       ]);
 
 

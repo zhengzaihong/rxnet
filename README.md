@@ -12,13 +12,13 @@ RxNet is a cross-platform network request tool specially built for Flutter. It i
 
 ## 🎉 0.6.0 Major Update - Pluggable Adapter Architecture
 
-RxNet 0.6.0 introduces a revolutionary pluggable adapter architecture, allowing you to choose the HTTP client that best fits your needs!
+RxNet 0.6.0 introduces a revolutionary pluggable adapter architecture that completely decouples the framework from specific HTTP client libraries!
 
-📖 **Migration Guide:** [MIGRATION_GUIDE_0.6.0.md](MIGRATION_GUIDE_0.6.0.md) | [0.5.0 Guide](迁移指南_0.5.0.md)
+📖 **Migration Guide:** [MIGRATION_GUIDE_0.6.0.md](MIGRATION_GUIDE_0.6.0.md) | [迁移指南_0.6.0.md](迁移指南_0.6.0.md) | [0.5.0 Guide](迁移指南_0.5.0.md)
 
 🌟 New in 0.6.0:
 
-🔌 **Pluggable Adapters**: Choose between DioAdapter (full-featured), HttpAdapter (lightweight), or create your own custom adapter
+🔌 **Pluggable Adapters**: Choose between DioAdapter (full-featured), HttpAdapter (lightweight), MockAdapter (testing), or create your own custom adapter
 
 🔄 **100% Backward Compatible**: Existing code works without any changes - DioAdapter is used by default
 
@@ -27,6 +27,12 @@ RxNet 0.6.0 introduces a revolutionary pluggable adapter architecture, allowing 
 🎯 **Multiple Instances**: Create multiple RxNet instances with different adapters for different APIs
 
 🛠️ **Custom Adapters**: Implement the NetworkAdapter interface to integrate any HTTP client
+
+🔗 **Unified Interceptors**: New AdapterInterceptor system works across all adapters, preserving complete request information
+
+⚡ **Improved CancelToken**: Standalone CancelToken with true cancellation support (DioAdapter) and callback notifications
+
+📊 **Better Logging**: Interceptors now have access to bodyParams, pathParams, and all request details
 
 ### Previous Features (0.5.0):
 
@@ -67,15 +73,20 @@ dependencies:
 
 RxNet 0.6.0 supports multiple HTTP client adapters. Choose the one that fits your needs:
 
-| Adapter | Package | Size | Features | Best For |
-|---------|---------|------|----------|----------|
-| **DioAdapter** | `dio: ^5.8.0+1` | Full | All features, interceptors, cancellation | Production apps (default) |
-| **HttpAdapter** | `http: ^1.2.0` | Light | Basic HTTP, interceptors | Lightweight apps |
-| **MockAdapter** | Built-in | Minimal | Testing, no network | Unit/integration tests |
+| Adapter | Package | Size | Features | Cancellation | Best For |
+|---------|---------|------|----------|--------------|----------|
+| **DioAdapter** | `dio: ^5.8.0+1` | Full | All features, interceptors | ✅ True (aborts connection) | Production apps (default) |
+| **HttpAdapter** | `http: ^1.2.0` | Light | Basic HTTP, interceptors | ⚠️ Pseudo (marks cancelled) | Lightweight apps |
+| **MockAdapter** | Built-in | Minimal | Testing, no network | ✅ Simulated | Unit/integration tests |
 
 **Default behavior:** If you don't specify an adapter, DioAdapter is used automatically (requires `dio` dependency).
 
-See [Adapter Guide](lib/adapters/README.md) for detailed comparison and usage.
+**Cancellation Note:** 
+- **DioAdapter**: Provides true cancellation - aborts the HTTP connection immediately, saves bandwidth
+- **HttpAdapter**: Provides pseudo-cancellation - marks as cancelled but HTTP request continues in background
+- For scenarios requiring true cancellation (large files, long requests), use DioAdapter
+
+See [Adapter Guide](lib/adapters/README.md) and [CancelToken Analysis](.kiro/specs/network-adapter-decoupling/CANCEL_TOKEN_ANALYSIS.md) for detailed comparison.
 
 ## Common Parameters:
 
@@ -162,7 +173,7 @@ await RxNet.init(
   baseCheckNet: checkNet,
   cacheInvalidationTime: 24 * 60 * 60 * 1000,
   interceptors: [
-    RxNetLogInterceptor()
+    RxNetLogAdapterInterceptor()  // New unified interceptor
   ],
 );
 ```
@@ -179,7 +190,7 @@ await RxNet.init(
   baseCheckNet: checkNet,
   cacheInvalidationTime: 24 * 60 * 60 * 1000,
   interceptors: [
-    RxNetLogInterceptor()
+    RxNetLogAdapterInterceptor()
   ],
 );
 ```
@@ -189,7 +200,7 @@ await RxNet.init(
 import 'package:rxnet_plus/adapters/dio_adapter.dart';
 import 'package:rxnet_plus/adapters/http_adapter.dart';
 
-// Main API with DioAdapter
+// Main API with DioAdapter (full-featured)
 final mainApi = RxNet.create();
 await mainApi.initNet(
   baseUrl: "https://api.main.com",
@@ -218,7 +229,7 @@ mockAdapter.setMockResponse(
     request: AdapterRequest(
       baseUrl: 'http://t.weather.sojson.com/',
       path: '/api/weather/city/101030100',
-      method: HttpMethod.get,
+      method: HttpMethod.GET,
     ),
   ),
 );
@@ -394,16 +405,71 @@ RxNet.setGlobalHeaders({
 
  ```dart
 
- class TokenInterceptors extends Interceptor {
-      @override
-      onRequest( RequestOptions options, RequestInterceptorHandler handler) async {
-          Map<String, dynamic> header = {};
-          header["token"] = "xxxxx";
-          header["version"] = "1.0";
-          options.headers.addAll(header);
-          handler.next(options);
+class AuthInterceptor extends AdapterInterceptor {
+   String? _token;
+
+   /// 设置认证令牌
+   void setToken(String token) {
+      _token = token;
+   }
+
+   /// 清除认证令牌
+   void clearToken() {
+      _token = null;
+   }
+
+   @override
+   void onRequest(
+           AdapterRequest request,
+           RequestInterceptorHandler handler,
+           ) {
+      if (_token != null) {
+         // 添加 Authorization 头
+         final headers = Map<String, String>.from(request.headers);
+         headers['Authorization'] = 'Bearer $_token';
+
+         // 创建新的请求对象
+         final newRequest = request.copyWith(headers: headers);
+
+         debugPrint('🔐 Added Authorization header to ${request.buildFullUrl()}');
+
+         // 使用修改后的请求继续
+         handler.next(newRequest);
+      } else {
+         // 没有令牌，直接继续
+         handler.next(request);
       }
-  }
+   }
+
+   @override
+   void onResponse(
+           AdapterResponse response,
+           ResponseInterceptorHandler handler,
+           ) {
+      // 检查是否有新的令牌
+      final newToken = response.headers['x-new-token']?.first;
+      if (newToken != null) {
+         debugPrint('🔐 Received new token, updating...');
+         _token = newToken;
+      }
+
+      handler.next(response);
+   }
+
+   @override
+   void onError(
+           AdapterException error,
+           ErrorInterceptorHandler handler,
+           ) {
+      // 如果是 401 错误，清除令牌
+      if (error.statusCode == 401) {
+         debugPrint('🔐 Unauthorized, clearing token...');
+         clearToken();
+      }
+
+      handler.next(error);
+   }
+}
   
 ```
 
@@ -469,26 +535,64 @@ Future<bool> checkNet() async{
 
 ### Certificate Validation:
 
-```dart
+#### Using DioAdapter (dio package)
 
-RxNet.getDefaultClient()?.httpClientAdapter = IOHttpClientAdapter(
+```dart
+// Get DioAdapter instance
+final adapter = DioAdapter();
+
+// Configure certificate validation
+adapter.dio.httpClientAdapter = IOHttpClientAdapter(
   createHttpClient: () {
     final client = HttpClient();
-    // Perform custom configuration here, such as certificate validation, etc.:
-    // Set to false, indicating default rejection of all invalid certificates
-    client.badCertificateCallback = (X509Certificate cert, String host, int port) {
-      // You can add more complex validation logic here, such as validating certificate fingerprints or issuers
-      // Your file might be xx.pem, etc., read it out and then validate
-      const trustedFingerprint = 'AB:CD:EF:12:34:56:78:90:AB:CD:EF:12:34:56:78:90:AB:CD:EF:12';
-      final certFingerprint = cert.sha1.toString().toUpperCase();
-      final isTrusted = certFingerprint == trustedFingerprint;
-      // Only allow requests when the certificate is trusted
-      return isTrusted;
+    client.badCertificateCallback = (cert, host, port) {
+      // Add your certificate validation logic here
+      // For example: validate certificate fingerprint
+      // const trustedFingerprint = 'YOUR_SHA256_FINGERPRINT';
+      // final certFingerprint = cert.sha1.toString().toUpperCase();
+      // return certFingerprint == trustedFingerprint;
+      return true; // For testing only, validate properly in production
     };
     return client;
   },
 );
-    
+
+// Initialize RxNet with the configured adapter
+await RxNet.init(
+  baseUrl: "https://your-api.com",
+  adapter: adapter,
+);
+```
+
+#### Using HttpAdapter (http package)
+
+```dart
+import 'dart:io';
+import 'package:http/io_client.dart';
+
+// Create a custom HTTP client with certificate validation
+IOClient createPinnedClient() {
+  final HttpClient httpClient = HttpClient();
+  httpClient.badCertificateCallback = (X509Certificate cert, String host, int port) {
+    // Add your certificate validation logic here
+    // For example: validate certificate fingerprint
+    // final der = cert.der;
+    // final sha256 = sha256Convert(der);
+    // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
+    // return sha256 == trustedFingerprint;
+    return true; // For testing only, validate properly in production
+  };
+  return IOClient(httpClient);
+}
+
+// Create HttpAdapter with custom client
+final httpAdapter = HttpAdapter(client: createPinnedClient());
+
+// Initialize RxNet with the configured adapter
+await RxNet.init(
+  baseUrl: "https://your-api.com",
+  adapter: httpAdapter,
+);
 ```
 
 ### Clear Log Interceptor, Refuse Debugging Blindness.
@@ -496,12 +600,10 @@ RxNet.getDefaultClient()?.httpClientAdapter = IOHttpClientAdapter(
     If you need log information, please add RxNetLogInterceptor or your custom interceptor when initializing the network framework
 ```dart
  await RxNet.init(
-    // xxxxxx
     interceptors: [
       // TokenInterceptor // Token interceptor, customize for more features
       /// Log interceptor
-       RxNetLogInterceptor()
-       // ResponseInterceptor() // Response interceptor, preprocess results
+       RxNetLogAdapterInterceptor()
     ]);
 ```
 

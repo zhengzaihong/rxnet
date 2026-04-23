@@ -10,29 +10,265 @@ import '../interceptor/adapter_interceptor.dart' as adapter_interceptor;
 import '../exceptions/adapter_exception.dart';
 import '../cancel_token.dart' as adapter_cancel;
 
-
+///
+/// DioAdapter - 基于 Dio 的网络适配器 / Dio-based Network Adapter
+/// 
 /// author: ZhengZaiHong
-/// email:1096877329@qq.com
-/// date: 2026-04-23 9:56
-/// describe: 基于 Dio 库实现 NetworkAdapter 接口，保持与现有代码的兼容性
+/// email: 1096877329@qq.com
+/// date: 2026-04-23
+/// 
+/// ============================================================================
+/// 类说明 / Class Description
+/// ============================================================================
+/// 
+/// DioAdapter 是 RxNet Plus 的默认网络适配器，基于强大的 Dio 库实现。
+/// 它提供了完整的 HTTP 功能，包括拦截器、文件上传下载、请求取消等。
+/// 
+/// DioAdapter is the default network adapter for RxNet Plus, based on the
+/// powerful Dio library. It provides complete HTTP functionality including
+/// interceptors, file upload/download, request cancellation, etc.
+/// 
+/// ============================================================================
+/// 核心特性 / Core Features
+/// ============================================================================
+/// 
+/// 1. **完整的 HTTP 支持 / Complete HTTP Support**
+///    - 支持所有 HTTP 方法（GET、POST、PUT、DELETE 等）
+///    - Support for all HTTP methods (GET, POST, PUT, DELETE, etc.)
+///    - 支持文件上传和下载
+///    - Support for file upload and download
+///    - 支持流式响应
+///    - Support for streaming responses
+/// 
+/// 2. **拦截器系统 / Interceptor System**
+///    - 统一的 AdapterInterceptor 接口
+///    - Unified AdapterInterceptor interface
+///    - 在 Dio 请求前执行，保留完整的请求信息
+///    - Executed before Dio requests, preserving complete request information
+///    - 支持请求、响应、错误拦截
+///    - Support for request, response, and error interception
+/// 
+/// 3. **请求取消 / Request Cancellation**
+///    - 支持 RxNet 的 CancelToken
+///    - Support for RxNet's CancelToken
+///    - 向后兼容 Dio 的 CancelToken
+///    - Backward compatible with Dio's CancelToken
+/// 
+/// 4. **自动类型转换 / Automatic Type Conversion**
+///    - 自动转换 AdapterRequest 到 Dio RequestOptions
+///    - Automatically convert AdapterRequest to Dio RequestOptions
+///    - 自动转换 Dio Response 到 AdapterResponse
+///    - Automatically convert Dio Response to AdapterResponse
+///    - 自动转换异常类型
+///    - Automatically convert exception types
+/// 
+/// 5. **灵活的配置 / Flexible Configuration**
+///    - 可以传入自定义的 Dio 实例
+///    - Can pass in custom Dio instance
+///    - 支持所有 Dio 配置选项
+///    - Support for all Dio configuration options
+/// 
+/// ============================================================================
+/// 使用示例 / Usage Examples
+/// ============================================================================
+/// 
+/// 1. 使用默认 DioAdapter / Using Default DioAdapter:
+/// ```dart
+/// await RxNet.init(
+///   baseUrl: "https://api.example.com",
+///   // DioAdapter 是默认适配器，无需显式指定
+///   // DioAdapter is the default adapter, no need to specify explicitly
+/// );
+/// ```
+/// 
+/// 2. 使用自定义 Dio 实例 / Using Custom Dio Instance:
+/// ```dart
+/// final dio = Dio(BaseOptions(
+///   connectTimeout: Duration(seconds: 30),
+///   receiveTimeout: Duration(seconds: 30),
+/// ));
+/// 
+/// final adapter = DioAdapter(dio: dio);
+/// await RxNet.init(
+///   baseUrl: "https://api.example.com",
+///   adapter: adapter,
+/// );
+/// ```
+/// 
+/// 3. 添加拦截器 / Adding Interceptors:
+/// ```dart
+/// final adapter = DioAdapter();
+/// adapter.addInterceptor(RxNetLogAdapterInterceptor());
+/// adapter.addInterceptor(AuthInterceptor());
+/// 
+/// await RxNet.init(
+///   baseUrl: "https://api.example.com",
+///   adapter: adapter,
+/// );
+/// ```
+/// 
+/// 4. 访问底层 Dio 实例 / Accessing Underlying Dio Instance:
+/// ```dart
+/// final adapter = DioAdapter();
+/// final dio = adapter.dio;
+/// 
+/// // 配置 Dio
+/// // Configure Dio
+/// dio.options.connectTimeout = Duration(seconds: 30);
+/// dio.interceptors.add(LogInterceptor());
+/// ```
+/// 
+/// ============================================================================
+/// 拦截器执行流程 / Interceptor Execution Flow
+/// ============================================================================
+/// 
+/// 在 0.6.0 版本中，拦截器执行流程已优化：
+/// In version 0.6.0, the interceptor execution flow has been optimized:
+/// 
+/// 1. BuildRequest 创建 AdapterRequest（包含 bodyParams）
+///    BuildRequest creates AdapterRequest (with bodyParams)
+///    ↓
+/// 2. DioAdapter.request() 接收 AdapterRequest
+///    DioAdapter.request() receives AdapterRequest
+///    ↓
+/// 3. 执行 AdapterInterceptor（可访问完整的 bodyParams）
+///    Execute AdapterInterceptor (can access complete bodyParams)
+///    ↓
+/// 4. 转换为 Dio RequestOptions
+///    Convert to Dio RequestOptions
+///    ↓
+/// 5. 调用 Dio.request()
+///    Call Dio.request()
+///    ↓
+/// 6. 转换 Dio Response 为 AdapterResponse
+///    Convert Dio Response to AdapterResponse
+///    ↓
+/// 7. 执行响应拦截器
+///    Execute response interceptors
+///    ↓
+/// 8. 返回 AdapterResponse
+///    Return AdapterResponse
+/// 
+/// 注意：拦截器在 Dio 请求前执行，避免了信息丢失和重复执行的问题。
+/// Note: Interceptors are executed before Dio requests, avoiding information
+/// loss and duplicate execution issues.
+/// 
+/// ============================================================================
+/// 类型转换 / Type Conversion
+/// ============================================================================
+/// 
+/// DioAdapter 负责在 RxNet 类型和 Dio 类型之间进行转换：
+/// DioAdapter handles conversion between RxNet types and Dio types:
+/// 
+/// - HttpMethod ↔ String (GET, POST, etc.)
+/// - ResponseType ↔ Dio ResponseType
+/// - AdapterRequest ↔ Dio RequestOptions
+/// - AdapterResponse ↔ Dio Response
+/// - AdapterException ↔ DioException
+/// - CancelToken ↔ Dio CancelToken
+/// 
+/// ============================================================================
+/// 性能考虑 / Performance Considerations
+/// ============================================================================
+/// 
+/// 1. **拦截器开销 / Interceptor Overhead**
+///    - 拦截器按顺序执行，避免添加过多拦截器
+///    - Interceptors execute sequentially, avoid adding too many
+/// 
+/// 2. **类型转换 / Type Conversion**
+///    - 类型转换开销很小，可以忽略
+///    - Type conversion overhead is minimal and negligible
+/// 
+/// 3. **内存使用 / Memory Usage**
+///    - 每个请求创建新的对象，请求完成后会被垃圾回收
+///    - New objects created for each request, garbage collected after completion
+/// 
+/// ============================================================================
+/// 注意事项 / Notes
+/// ============================================================================
+/// 
+/// 1. DioAdapter 是默认适配器，通常不需要显式创建
+///    DioAdapter is the default adapter, usually no need to create explicitly
+/// 
+/// 2. 如果需要自定义 Dio 配置，可以传入自定义 Dio 实例
+///    If custom Dio configuration is needed, pass in a custom Dio instance
+/// 
+/// 3. 拦截器通过 addInterceptor() 添加，不要直接操作 Dio 的拦截器
+///    Add interceptors via addInterceptor(), don't manipulate Dio's interceptors directly
+/// 
+/// 4. 取消令牌会自动在 RxNet CancelToken 和 Dio CancelToken 之间转换
+///    Cancel tokens are automatically converted between RxNet and Dio CancelTokens
+/// 
+/// ============================================================================
+/// 
+/// See also / 另见:
+/// - [NetworkAdapter] for the adapter interface
+/// - [HttpAdapter] for a lightweight alternative
+/// - [MockAdapter] for testing
+/// - [AdapterInterceptor] for interceptor implementation
+/// 
+/// ============================================================================
 
+/// Internal exception: Interceptor returns early response
+/// 
 /// 内部异常：拦截器提前返回响应
+/// 
+/// This exception is used internally when an interceptor decides to return
+/// a response directly without making the actual HTTP request.
+/// 
+/// 当拦截器决定直接返回响应而不发起实际 HTTP 请求时，使用此异常。
 class _EarlyResponseException implements Exception {
   final AdapterResponse response;
   _EarlyResponseException(this.response);
 }
 
+/// DioAdapter - Dio-based implementation of NetworkAdapter
+/// 
+/// DioAdapter - 基于 Dio 的 NetworkAdapter 实现
+/// 
+/// This is the default and most feature-complete adapter for RxNet Plus.
+/// It leverages the powerful Dio library to provide comprehensive HTTP
+/// functionality.
+/// 
+/// 这是 RxNet Plus 的默认且功能最完整的适配器。
+/// 它利用强大的 Dio 库提供全面的 HTTP 功能。
 class DioAdapter implements NetworkAdapter {
   final Dio _dio;
   final List<AdapterInterceptor> _interceptors = [];
   final Map<adapter_cancel.CancelToken, CancelToken> _cancelTokenMap = {};
   
-  /// 创建 DioAdapter
+  /// Creates a DioAdapter.
   /// 
-  /// [dio] 可选的 Dio 实例，如果不提供则创建默认实例
+  /// 创建 DioAdapter。
+  /// 
+  /// Parameters / 参数:
+  /// - [dio]: Optional custom Dio instance. If not provided, a default
+  ///          instance will be created.
+  ///          可选的自定义 Dio 实例。如果不提供，将创建默认实例。
+  /// 
+  /// Example / 示例:
+  /// ```dart
+  /// // Using default Dio / 使用默认 Dio
+  /// final adapter = DioAdapter();
+  /// 
+  /// // Using custom Dio / 使用自定义 Dio
+  /// final dio = Dio(BaseOptions(connectTimeout: Duration(seconds: 30)));
+  /// final adapter = DioAdapter(dio: dio);
+  /// ```
   DioAdapter({Dio? dio}) : _dio = dio ?? Dio();
   
-  /// 获取内部 Dio 实例
+  /// Gets the underlying Dio instance.
+  /// 
+  /// 获取底层 Dio 实例。
+  /// 
+  /// This allows direct access to Dio for advanced configuration.
+  /// 这允许直接访问 Dio 进行高级配置。
+  /// 
+  /// Example / 示例:
+  /// ```dart
+  /// final adapter = DioAdapter();
+  /// adapter.dio.options.connectTimeout = Duration(seconds: 30);
+  /// ```
   Dio get dio => _dio;
   
   @override
