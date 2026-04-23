@@ -10,13 +10,25 @@ Language: English | [简体中文](README-ZH.md)
 
 RxNet is a cross-platform network request tool specially built for Flutter. It is based on deep encapsulation of Dio and conforms to native development habits. It can be started with almost zero learning cost. It can easily implement the feature of having data on the screen, supports rich function combinations, and helps you build high-performance, maintainable applications.
 
-## 🎉 0.5.0 Major Update
+## 🎉 0.6.0 Major Update - Pluggable Adapter Architecture
 
-RxNet 0.5.0 brings a brand new API design, significantly improving code readability and development experience!
+RxNet 0.6.0 introduces a revolutionary pluggable adapter architecture, allowing you to choose the HTTP client that best fits your needs!
 
-📖 **Detailed Migration Guide:** [MIGRATION_GUIDE_0.5.0.md](迁移指南_0.5.0.md)
+📖 **Migration Guide:** [MIGRATION_GUIDE_0.6.0.md](MIGRATION_GUIDE_0.6.0.md) | [0.5.0 Guide](迁移指南_0.5.0.md)
 
-🌟 Key Features:
+🌟 New in 0.6.0:
+
+🔌 **Pluggable Adapters**: Choose between DioAdapter (full-featured), HttpAdapter (lightweight), or create your own custom adapter
+
+🔄 **100% Backward Compatible**: Existing code works without any changes - DioAdapter is used by default
+
+🧪 **MockAdapter for Testing**: Built-in mock adapter for unit and integration tests without network calls
+
+🎯 **Multiple Instances**: Create multiple RxNet instances with different adapters for different APIs
+
+🛠️ **Custom Adapters**: Implement the NetworkAdapter interface to integrate any HTTP client
+
+### Previous Features (0.5.0):
 
 ✅ Multiple Cache Strategies: Supports first-use cache, failure fallback, cache-only, and more modes to flexibly respond to various scenarios
 
@@ -38,12 +50,32 @@ RxNet 0.5.0 brings a brand new API design, significantly improving code readabil
 
 ## Dependency:
 
-    dependencies:
-       rxnet_plus: ^0.5.0  // Latest version with new API design
-       # rxnet_plus: ^0.4.3  // Old version
-       # flutter_rxnet_forzzh: ^0.4.0  // Older version (no longer maintained)
+```yaml
+dependencies:
+  rxnet_plus: ^0.6.0  # Latest version with pluggable adapters
+  
+  # Choose your adapter (DioAdapter is used by default if no adapter specified)
+  dio: ^5.8.0+1       # For DioAdapter (recommended, full-featured)
+  # http: ^1.2.0      # For HttpAdapter (lightweight alternative)
+```
 
-**Upgrading from 0.4.3 to 0.5.0?** Check [Migration Guide](迁移指南_0.5.0.md)
+**Upgrading?** 
+- From 0.5.x to 0.6.0: Check [Migration Guide 0.6.0](MIGRATION_GUIDE_0.6.0.md) (100% backward compatible!)
+- From 0.4.3 to 0.5.0: Check [Migration Guide 0.5.0](迁移指南_0.5.0.md)
+
+## Choosing an Adapter
+
+RxNet 0.6.0 supports multiple HTTP client adapters. Choose the one that fits your needs:
+
+| Adapter | Package | Size | Features | Best For |
+|---------|---------|------|----------|----------|
+| **DioAdapter** | `dio: ^5.8.0+1` | Full | All features, interceptors, cancellation | Production apps (default) |
+| **HttpAdapter** | `http: ^1.2.0` | Light | Basic HTTP, interceptors | Lightweight apps |
+| **MockAdapter** | Built-in | Minimal | Testing, no network | Unit/integration tests |
+
+**Default behavior:** If you don't specify an adapter, DioAdapter is used automatically (requires `dio` dependency).
+
+See [Adapter Guide](lib/adapters/README.md) for detailed comparison and usage.
 
 ## Common Parameters:
 
@@ -120,25 +152,81 @@ enum CacheMode {
 ## Usage Instructions:
 
 ### Initialize Network Framework
+
+#### Option 1: Default (DioAdapter - Recommended)
 ```dart
- await RxNet.init(
-    baseUrl: "http://t.weather.sojson.com/",
-    // cacheDir: "xxx",   /// Cache directory
-    // cacheName: "local_cache", /// Cache file
-    baseCacheMode: CacheMode.REQUEST_FAILED_READ_CACHE, // Read cache data on request failure
-    baseCheckNet: checkNet, // Global network check, all requests go through this method
-    cacheInvalidationTime: 24 * 60 * 60 * 1000, // Cache expiration time in milliseconds
-    // baseUrlEnv: {  /// Supports multi-environment baseUrl debugging, switch with RxNet.setDefaultEnv("test");
-    //   "test": "http://t.weather.sojson1.com/",
-    //   "debug": "http://t.weather.sojson2.com/",
-    //   "release": "http://t.weather.sojson.com/",
-    // },
-    interceptors: [
-      // TokenInterceptor // Token interceptor, customize for more features
-      // Log interceptor
-       RxNetLogInterceptor()
-      // ResponseInterceptor() // Custom response interceptor, preprocess results, etc.
-    ]);
+await RxNet.init(
+  baseUrl: "http://t.weather.sojson.com/",
+  // No adapter specified = DioAdapter used by default
+  baseCacheMode: CacheMode.REQUEST_FAILED_READ_CACHE,
+  baseCheckNet: checkNet,
+  cacheInvalidationTime: 24 * 60 * 60 * 1000,
+  interceptors: [
+    RxNetLogInterceptor()
+  ],
+);
+```
+
+#### Option 2: Explicit Adapter Selection
+```dart
+import 'package:rxnet_plus/adapters/dio_adapter.dart';
+// or: import 'package:rxnet_plus/adapters/http_adapter.dart';
+
+await RxNet.init(
+  baseUrl: "http://t.weather.sojson.com/",
+  adapter: DioAdapter(),  // or HttpAdapter()
+  baseCacheMode: CacheMode.REQUEST_FAILED_READ_CACHE,
+  baseCheckNet: checkNet,
+  cacheInvalidationTime: 24 * 60 * 60 * 1000,
+  interceptors: [
+    RxNetLogInterceptor()
+  ],
+);
+```
+
+#### Option 3: Multiple Instances with Different Adapters
+```dart
+import 'package:rxnet_plus/adapters/dio_adapter.dart';
+import 'package:rxnet_plus/adapters/http_adapter.dart';
+
+// Main API with DioAdapter
+final mainApi = RxNet.create();
+await mainApi.initNet(
+  baseUrl: "https://api.main.com",
+  adapter: DioAdapter(),
+);
+
+// Analytics API with HttpAdapter (lightweight)
+final analyticsApi = RxNet.create();
+await analyticsApi.initNet(
+  baseUrl: "https://analytics.example.com",
+  adapter: HttpAdapter(),
+);
+```
+
+#### Option 4: Testing with MockAdapter
+```dart
+import 'package:rxnet_plus/adapters/mock_adapter.dart';
+
+final mockAdapter = MockAdapter();
+mockAdapter.setMockResponse(
+  '/api/weather/city/101030100',
+  AdapterResponse(
+    statusCode: 200,
+    data: {'message': 'success', 'data': {...}},
+    headers: {},
+    request: AdapterRequest(
+      baseUrl: 'http://t.weather.sojson.com/',
+      path: '/api/weather/city/101030100',
+      method: HttpMethod.get,
+    ),
+  ),
+);
+
+await RxNet.init(
+  baseUrl: "http://t.weather.sojson.com/",
+  adapter: mockAdapter,
+);
 ```
 
 ### Initiate Network Request (post, get, delete, put, patch are similar) - GET example:
@@ -319,23 +407,40 @@ RxNet.setGlobalHeaders({
   
 ```
 
-### If your business or project needs multiple network request instances, you can manually create multiple request objects:
+### Multiple Network Instances with Different Adapters
+
+You can create multiple RxNet instances with different adapters for different APIs:
 
 ```dart
+import 'package:rxnet_plus/adapters/dio_adapter.dart';
+import 'package:rxnet_plus/adapters/http_adapter.dart';
 
-void newInstanceRequest() async {
-  // Perform independent initialization configuration for this instance, request strategy, interceptors, etc.
-  final apiService = RxNet.create();
-  await apiService.initNet(baseUrl: "https://api.yourdomain.com");
-  // apiService.setHeaders(xxx)
-  final response = await apiService.getRequest()
+void multipleInstances() async {
+  // Main API with full-featured DioAdapter
+  final mainApi = RxNet.create();
+  await mainApi.initNet(
+    baseUrl: "https://api.yourdomain.com",
+    adapter: DioAdapter(),
+  );
+  
+  // Analytics API with lightweight HttpAdapter
+  final analyticsApi = RxNet.create();
+  await analyticsApi.initNet(
+    baseUrl: "https://analytics.yourdomain.com",
+    adapter: HttpAdapter(),
+  );
+  
+  // Use different instances independently
+  final userResponse = await mainApi.getRequest()
       .setPath("/users/1")
       .setJsonConvert(NewWeatherInfo.fromJson)
       .request();
-
-  final weatherInfo = response.value;
+  
+  final analyticsResponse = await analyticsApi.postRequest()
+      .setPath("/events")
+      .setParam("event", "page_view")
+      .request();
 }
-
 ```
 
 ### Network Detection Before Request:

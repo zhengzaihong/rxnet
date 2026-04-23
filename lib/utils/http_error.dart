@@ -2,10 +2,10 @@
 import 'package:dio/dio.dart';
 
 ///
-/// create_user: zhengzaihong
+/// author: zhengzaihong
 /// email:1096877329@qq.com
-/// create_date: 2021/6/9
-/// create_time: 15:17
+/// date: 2021/6/9
+/// time: 15:17
 /// describe: HTTP 状态码
 ///
 class HttpError {

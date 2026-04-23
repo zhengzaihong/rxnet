@@ -1,6 +1,6 @@
 name: rxnet_plus
-description: Based on Dio's extended network request framework, it supports various caching strategies and is easy to use
-version: 0.5.0
+description: Flexible network request framework with pluggable adapters (Dio, http, or custom), supporting various caching strategies
+version: 0.6.0
 homepage: https://github.com/zhengzaihong/rxnet
 
 platforms:
@@ -21,13 +21,23 @@ dependencies:
     sdk: flutter
 
   crypto:  ^3.0.2
+  
+  # Network adapters - Choose based on your needs:
+  # - dio: Default adapter, full-featured (recommended)
+  # - http: Lightweight alternative
+  # - Both can be used together for different use cases
+  # - Or implement your own custom adapter
   dio: ^5.8.0+1
+  http: ^1.2.0
+  
   hive: ^2.2.3
   path: ^1.9.0
   path_provider: ^2.1.5
   path_provider_platform_interface: ^2.1.0
   web: ^1.1.1
 dev_dependencies:
+  flutter_test:
+    sdk: flutter
   flutter_lints: ^2.0.0
 
 

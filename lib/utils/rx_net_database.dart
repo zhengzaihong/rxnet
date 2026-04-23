@@ -8,10 +8,10 @@ import 'package:path_provider/path_provider.dart';
 import 'log_util.dart';
 
 ///
-/// create_user: zhengzaihong
+/// author: zhengzaihong
 /// email:1096877329@qq.com
-/// create_date: 2023/9/9
-/// create_time: 12:41
+/// date: 2023/9/9
+/// time: 12:41
 /// describe: 数据缓存
 ///
 extension HiveExt on HiveInterface {

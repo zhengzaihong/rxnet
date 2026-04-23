@@ -1,9 +1,9 @@
 
 ///
-/// create_user: zhengzaihong
+/// author: zhengzaihong
 /// email:1096877329@qq.com
-/// create_date: 2022/8/11
-/// create_time: 9:08
+/// date: 2022/8/11
+/// time: 9:08
 /// describe: RxNet 请求缓存策略
 /// RxNet request caching strategy
 ///

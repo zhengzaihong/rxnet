@@ -1,10 +1,10 @@
 import 'package:rxnet_plus/net/type/sources_type.dart';
 
 ///
-/// create_user: zhengzaihong
+/// author: zhengzaihong
 /// email:1096877329@qq.com
-/// create_date: 2023/9/14
-/// create_time: 16:21
+/// date: 2023/9/14
+/// time: 16:21
 /// describe:  响应结果包装类
 ///
 class RxResult<T> {

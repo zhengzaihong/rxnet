@@ -3,10 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
 
 ///
-/// create_user: zhengzaihong
+/// author: zhengzaihong
 /// email:1096877329@qq.com
-/// create_date: 2024/9/10
-/// create_time: 14:53
+/// date: 2024/9/10
+/// time: 14:53
 /// describe: 展示调试界面
 ///
 class DebugPage extends StatelessWidget {

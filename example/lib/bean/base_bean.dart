@@ -1,10 +1,10 @@
 
 
 ///
-/// create_user: zhengzaihong
+/// author: zhengzaihong
 /// email:1096877329@qq.com
-/// create_date: 2021/6/9
-/// create_time: 15:57
+/// date: 2021/6/9
+/// time: 15:57
 /// describe: 封装请求返回格式统一基类bean
 /// 此字段需结合后端修改
 ///

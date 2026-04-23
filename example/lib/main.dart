@@ -1,49 +1,56 @@
+
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:rxnet_plus/adapters/dio_adapter.dart';
+import 'package:rxnet_plus/adapters/http_adapter.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
 import 'package:uikit_plus/toast/toast_utils.dart';
 import 'enhanced_example.dart';
-// import 'package:connectivity_plus/connectivity_plus.dart';
+
+
 
 void main() async {
+
+
+  final adapter = DioAdapter();
+  adapter.dio.httpClientAdapter = IOHttpClientAdapter(
+    createHttpClient: () {
+      final client = HttpClient();
+      client.badCertificateCallback = (cert, host, port) {
+        return true;
+      };
+      return client;
+    },
+  );
+
+
+  IOClient createPinnedClient() {
+    final HttpClient httpClient = HttpClient();
+    httpClient.badCertificateCallback =
+        (X509Certificate cert, String host, int port) {
+      // // 获取证书 DER
+      // final der = cert.der;
+      // final sha256 = sha256Convert(der);
+      // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
+      // return sha256 == trustedFingerprint;
+          return true;
+    };
+    return IOClient(httpClient);
+  }
+
+  final adapter2 = HttpAdapter(client: createPinnedClient());
+
+
   await RxNet.init(
       baseUrl: "http://t.weather.sojson.com/",
-      // cacheDir: "xxx",   ///缓存目录
-      // cacheName: "local_cache", ///缓存文件
       baseCacheMode: CacheMode.REQUEST_FAILED_READ_CACHE,
-      //请求失败读取缓存数据
       baseCheckNet: checkNet,
-      //全局检查网络，所有的请求都走这个方法
+      adapter: adapter,
       cacheInvalidationTime: 365 * 24 * 60 * 60 * 1000,
-      //缓存时效毫秒，默认时间
-      // baseUrlEnv: {  ///支持多环境 baseUrl调试，RxNet.setDefaultEnv("test") 方式切换;
-      //   "test": "http://t.weather.sojson1.com/",
-      //   "debug": "http://t.weather.sojson2.com/",
-      //   "release": "http://t.weather.sojson.com/",
-      // },
       interceptors: [
-        //TokenInterceptor // token拦截器，更多功能请自定义拦截器
-        ///日志拦截器
-        RxNetLogInterceptor()
-        //ResponseInterceptor() //响应拦截器，预处理结果
+        RxNetLogAdapterInterceptor()
       ]);
-  //
-  //   RxNet.getDefaultClient()?.httpClientAdapter = IOHttpClientAdapter(
-  //     createHttpClient: () {
-  //       final client = HttpClient();
-  //       // 在这里进行自定义配置，例如证书校验等：
-  //       // 设置为 false，表示默认拒绝所有无效证书
-  //       client.badCertificateCallback = (X509Certificate cert, String host, int port) {
-  //         // 你可以在这里添加更复杂的校验逻辑，例如校验证书指纹或颁发机构
-  //         // 你的可能是xx.pem 等文件，读取出来再校验
-  //         const trustedFingerprint = 'AB:CD:EF:12:34:56:78:90:AB:CD:EF:12:34:56:78:90:AB:CD:EF:12';
-  //         final certFingerprint = cert.sha1.toString().toUpperCase();
-  //         final isTrusted = certFingerprint == trustedFingerprint;
-  //         // 只有当证书可信时才允许请求
-  //         return isTrusted;
-  //       };
-  //       return client;
-  //     },
-  //   );
 
 
   RxNet.saveCache("name", "张三");
@@ -83,3 +90,4 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+

@@ -1,8 +1,8 @@
 ///
-/// create_user: zhengzaihong
+/// author: zhengzaihong
 /// email:1096877329@qq.com
-/// create_date: 2025/8/24
-/// create_time: 18:29
+/// date: 2025/8/24
+/// time: 18:29
 /// describe: Content-Type 类型
 ///
 class ContentTypes {

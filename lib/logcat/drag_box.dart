@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 ///
-/// create_user: zhengzaihong
+/// author: zhengzaihong
 /// email:1096877329@qq.com
-/// create_date: 2024/4/12
-/// create_time: 15:58
+/// date: 2024/4/12
+/// time: 15:58
 /// describe: 可在父组件中可拖动的组件
 ///
 class DragBox extends StatefulWidget {

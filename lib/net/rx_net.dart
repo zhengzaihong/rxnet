@@ -7,12 +7,16 @@ import 'package:hive/hive.dart';
 import '../logcat/debug_manager.dart';
 import '../src/cache/cache_manager.dart';
 import '../src/logging/log_manager.dart';
+import '../src/adapter/network_adapter.dart';
+import '../src/adapter/implementations/dio_adapter.dart';
+import '../src/adapter/interceptor/adapter_interceptor.dart';
+import 'package:dio/dio.dart' show BaseOptions, Headers, LogInterceptor;
 
 ///
-/// create_user: zhengzaihong
+/// author: zhengzaihong
 /// email:1096877329@qq.com
-/// create_date: 2025-08-12
-/// create_time: 16:48
+/// date: 2025-08-12
+/// time: 16:48
 /// describe:
 /// 此次变更较大，0.4版本之前为单例：
 /// 0.4.0版本开始支持多实例 RxNet 对象，用于多场景（如：一个请求业务API，一个请求日志API）
@@ -211,8 +215,12 @@ class RxNet {
   //Single instance-usually one RxNet instance per project is enough
   static final RxNet I = RxNet._internal();
 
-  Dio? _client;
-  Dio? get client => _client;
+  NetworkAdapter? _adapter;
+  NetworkAdapter? get adapter => _adapter;
+
+  // 存储 baseUrl，供 BuildRequest 使用
+  String _baseUrl = '';
+  String get baseUrl => _baseUrl;
 
   //网络检测到回调-外部自行实现
   //The network detects a callback-external implementation
@@ -242,9 +250,9 @@ class RxNet {
 
 
   RxNet._internal() {
-    final options = BaseOptions(
-        contentType: Headers.jsonContentType, responseType: ResponseType.json);
-    _client ??= Dio(options);
+    // 默认使用 DioAdapter
+    final options = BaseOptions(contentType: Headers.jsonContentType);
+    _adapter = DioAdapter(dio: Dio(options));
     cacheManager = CacheManager();
     logManager = LogManager();
     debugManager = DebugManager();
@@ -290,10 +298,11 @@ class RxNet {
 
   static Future<void> init(
       {required String baseUrl,
+      NetworkAdapter? adapter,
       Directory? cacheDir,
       String cacheName = 'app_local_data',
       CacheMode baseCacheMode = CacheMode.ONLY_REQUEST,
-      List<Interceptor>? interceptors,
+      List<AdapterInterceptor>? interceptors,
       BaseOptions? baseOptions,
       bool systemLog = false,
       CheckNetWork? baseCheckNet,
@@ -306,6 +315,7 @@ class RxNet {
       WidgetsFlutterBinding.ensureInitialized();
      await I.initNet(
         baseUrl: baseUrl,
+        adapter: adapter,
         cacheDir: cacheDir,
         cacheName: cacheName,
         baseCacheMode: baseCacheMode,
@@ -324,10 +334,11 @@ class RxNet {
 
   Future<void> initNet({
     required String baseUrl,
+    NetworkAdapter? adapter,
     Directory? cacheDir,
     String cacheName = 'app_local_data',
     CacheMode baseCacheMode = CacheMode.ONLY_REQUEST,
-    List<Interceptor>? interceptors,
+    List<AdapterInterceptor>? interceptors,
     BaseOptions? baseOptions,
     bool systemLog = false,
     bool isDebug = kDebugMode,
@@ -341,23 +352,49 @@ class RxNet {
 }) async {
     LogUtil.init(systemLog: systemLog,debug: isDebug);
 
+    // 存储 baseUrl
+    this._baseUrl = baseUrl;
     this._baseCheckNet = baseCheckNet;
     this._baseCacheMode = baseCacheMode;
     this._cacheInvalidationTime = cacheInvalidationTime;
     this._baseIgnoreCacheKeys = ignoreCacheKeys;
     debugWindow = ValueNotifier(Size(debugWindowWidth, debugWindowHeight));
 
-    if (baseOptions != null) {
-      _client?.options = baseOptions;
+    // 如果提供了自定义适配器，使用它；否则使用默认的 DioAdapter
+    if (adapter != null) {
+      _adapter = adapter;
+    } else {
+      // 确保使用 DioAdapter
+      if (_adapter is! DioAdapter) {
+        final options = baseOptions ?? BaseOptions(
+          contentType: Headers.jsonContentType,
+        );
+        _adapter = DioAdapter(dio: Dio(options));
+      }
     }
 
-    _client?.options.baseUrl = baseUrl;
-    if (interceptors != null) {
-      _client?.interceptors.addAll(interceptors);
+    // 如果是 DioAdapter，配置 Dio 选项
+    if (_adapter is DioAdapter) {
+      final dioAdapter = _adapter as DioAdapter;
+      
+      if (baseOptions != null) {
+        dioAdapter.dio.options = baseOptions;
+      }
+      
+      dioAdapter.dio.options.baseUrl = baseUrl;
     }
+    
+    // 添加适配器拦截器（适用于所有适配器）
+    if (interceptors != null && interceptors.isNotEmpty) {
+      for (var interceptor in interceptors) {
+        _adapter?.addInterceptor(interceptor);
+      }
+    }
+    
     if (baseUrlEnv != null && baseUrlEnv.isNotEmpty) {
       _baseUrlEnv.addAll(baseUrlEnv);
     }
+    
     if (RxNetPlatform.isWeb) {
       this._baseCacheMode = CacheMode.ONLY_REQUEST;
       LogUtil.v("RxNet does not support caching environments: web");
@@ -367,9 +404,26 @@ class RxNet {
     await cacheManager.init(cacheDir, cacheName, encryptionCipher);
   }
 
-  Dio? getClient() => _client;
+  NetworkAdapter? getAdapter() => _adapter;
 
-  static Dio? getDefaultClient() => I._client;
+  static NetworkAdapter? getDefaultAdapter() => I._adapter;
+
+  // 保持向后兼容性 - 已废弃，建议使用 getAdapter()
+  @Deprecated('Use getAdapter() instead')
+  Dio? getClient() {
+    if (_adapter is DioAdapter) {
+      return (_adapter as DioAdapter).dio;
+    }
+    return null;
+  }
+
+  @Deprecated('Use getDefaultAdapter() instead')
+  static Dio? getDefaultClient() {
+    if (I._adapter is DioAdapter) {
+      return (I._adapter as DioAdapter).dio;
+    }
+    return null;
+  }
 
   // baseUrlEnv: {
   // "test": "http://t.weather.sojson1.com/",
@@ -379,17 +433,36 @@ class RxNet {
   //支持多环境 baseUrl调试， RxNet.I.setEnv("test")方式切换;
   //Support multi-environment baseUrl debugging and switch between RxNet.I.setEnv("test")/RxNet.setDefaultEnv("test") methods;
   static void setDefaultEnv(String env) {
-    I._client?.options.baseUrl = I._baseUrlEnv[env];
+    final baseUrl = I._baseUrlEnv[env];
+    if (baseUrl != null && I._adapter is DioAdapter) {
+      (I._adapter as DioAdapter).dio.options.baseUrl = baseUrl;
+    }
   }
+  
   void setEnv(String env) {
-    _client?.options.baseUrl = _baseUrlEnv[env];
+    final baseUrl = _baseUrlEnv[env];
+    if (baseUrl != null && _adapter is DioAdapter) {
+      (_adapter as DioAdapter).dio.options.baseUrl = baseUrl;
+    }
   }
 
+  /// 将日志输出到文件
+  /// 
+  /// 注意：此方法仅在使用 DioAdapter 时有效
+  /// 对于其他适配器，请使用自定义的 AdapterInterceptor
+  @Deprecated('Use custom AdapterInterceptor for logging instead')
   void cacheLogToFile(String filePath) async {
-    var file = File(filePath);
-    var sink = file.openWrite();
-    _client?.interceptors.add(LogInterceptor(logPrint: sink.writeln));
-    await sink.close();
+    if (_adapter is DioAdapter) {
+      var file = File(filePath);
+      var sink = file.openWrite();
+      // 使用 Dio 的 LogInterceptor（仅限 DioAdapter）
+      final dioAdapter = _adapter as DioAdapter;
+      final logInterceptor = LogInterceptor(logPrint: sink.writeln);
+      dioAdapter.dio.interceptors.add(logInterceptor);
+      await sink.close();
+    } else {
+      LogUtil.v('cacheLogToFile is only supported for DioAdapter');
+    }
   }
 
   // ---- 提供的静态实例，用于全局使用，非多实例使用 ----
@@ -414,41 +487,63 @@ class RxNet {
     return I.patchRequest<T>().setPath(path);
   }
 
+  static BuildRequest head<T>({String path = ""}) {
+    return I.headRequest<T>().setPath(path);
+  }
+
+  static BuildRequest options<T>({String path = ""}) {
+    return I.optionsRequest<T>().setPath(path);
+  }
+
 
 
   //多实例情况：请使用实例对象:await newRxNet.xxxRequest() 方式请求
   //Multi-instance situation: Please use the instance object:await apiService.xxxRequest() method to request
   BuildRequest<T> getRequest<T>() {
     return BuildRequest(
-      HttpType.get,
+      HttpMethod.GET,
       this,
     );
   }
 
   BuildRequest<T> postRequest<T>() {
     return BuildRequest(
-      HttpType.post,
+      HttpMethod.POST,
       this,
     );
   }
 
   BuildRequest<T> deleteRequest<T>() {
     return BuildRequest(
-      HttpType.delete,
+      HttpMethod.DELETE,
       this,
     );
   }
 
   BuildRequest<T> putRequest<T>() {
     return BuildRequest(
-      HttpType.put,
+      HttpMethod.PUT,
       this,
     );
   }
 
   BuildRequest<T> patchRequest<T>() {
     return BuildRequest(
-      HttpType.patch,
+      HttpMethod.PATCH,
+      this,
+    );
+  }
+
+  BuildRequest<T> headRequest<T>() {
+    return BuildRequest(
+      HttpMethod.HEAD,
+      this,
+    );
+  }
+
+  BuildRequest<T> optionsRequest<T>() {
+    return BuildRequest(
+      HttpMethod.OPTIONS,
       this,
     );
   }

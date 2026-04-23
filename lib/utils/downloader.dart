@@ -3,10 +3,10 @@ import 'native_helper.dart'
     if (dart.library.html) 'web_helper.dart' as downloader;
 
 ///
-/// create_user: zhengzaihong
+/// author: zhengzaihong
 /// email:1096877329@qq.com
-/// create_date: 2023/9/26
-/// create_time: 12:17
+/// date: 2023/9/26
+/// time: 12:17
 /// describe: 只提供给 web端
 ///
 class Downloader {

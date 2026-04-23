@@ -6,10 +6,10 @@ import 'package:rxnet_plus/net/rx_net.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
 
 ///
-/// create_user: zhengzaihong
+/// author: zhengzaihong
 /// email:1096877329@qq.com
-/// create_date: 2025-08-12
-/// create_time: 15:56
+/// date: 2025-08-12
+/// time: 15:56
 /// describe: 优化调试界面
 ///
 class DebugManager {

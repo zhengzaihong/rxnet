@@ -3,10 +3,10 @@ import 'dart:developer';
 import 'package:rxnet_plus/rxnet_lib.dart';
 
 ///
-/// create_user: zhengzaihong
+/// author: zhengzaihong
 /// email:1096877329@qq.com
-/// create_date: 2021/6/9
-/// create_time: 15:48
+/// date: 2021/6/9
+/// time: 15:48
 /// describe: 日志输出
 ///
 class LogUtil {
@@ -32,9 +32,6 @@ class LogUtil {
   }
 
   static void v(Object object, {String? tag}) {
-    if (RxNet.I.logManager.collectLogs) {
-      RxNet.I.logManager.addLogs("${tag ?? tagDefault} ${object.toString()}");
-    }
     if (_debugMode) {
       if (_isSystemPrint) {
         print("${tag ?? tagDefault} ${object.toString()}");

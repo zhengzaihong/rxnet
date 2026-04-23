@@ -1,9 +1,9 @@
 
 ///
-/// create_user: zhengzaihong
+/// author: zhengzaihong
 /// email:1096877329@qq.com
-/// create_date: 2025-08-12
-/// create_time: 16:17
+/// date: 2025-08-12
+/// time: 16:17
 /// describe: 定义已知异常的基类
 /// The base class for all RxNet exceptions.
 ///

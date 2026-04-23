@@ -4,10 +4,10 @@ import 'package:rxnet_plus/utils/text_util.dart';
 import 'md5_util.dart';
 
 ///
-/// create_user: zhengzaihong
+/// author: zhengzaihong
 /// email:1096877329@qq.com
-/// create_date: 2025-08-12
-/// create_time: 15:59
+/// date: 2025-08-12
+/// time: 15:59
 /// describe: restful Url处理
 ///
 class NetUtils {

@@ -1,6 +1,6 @@
 ///
-/// create_user: optimization
-/// create_date: 2024-12-30
+/// author: zhengzaihong
+/// date: 2024-12-30
 /// describe: 请求体类型枚举，明确参数发送方式
 ///
 enum RequestBodyType {
