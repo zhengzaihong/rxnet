@@ -73,7 +73,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
             _buildSection("3. 测试适配器（MockAdapter）", _adapterExample3),
             _buildSection("4. 多实例不同适配器", _adapterExample4),
             _buildSection("5. 自定义拦截器", _adapterExample5),
-            
+
             const Divider(height: 40, thickness: 2),
             
             // ==================== 基础示例 ====================
@@ -350,6 +350,11 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         adapter: mockAdapter,
       );
 
+      debugPrint("mainApi:${mainApi.hashCode}");
+      debugPrint("analyticsApi:${analyticsApi.hashCode}");
+      debugPrint("testApi:${testApi.hashCode}");
+      debugPrint("RxNet:${RxNet.I.hashCode}");
+
       // 并发请求
       final results = await Future.wait([
         mainApi.getRequest().setPath('api/weather/city/101030100').request(),
@@ -362,6 +367,8 @@ class _EnhancedExampleState extends State<EnhancedExample> {
             "实例2（MockAdapter）：${results[1].isSuccess ? '成功' : '失败'}\n"
             "说明：不同实例可以使用不同的适配器，互不影响";
       });
+
+
     } catch (e) {
       setState(() {
         result = "❌ 错误：$e";
@@ -504,6 +511,12 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         .setJsonConvert(NewWeatherInfo.fromJson)
         .request<NewWeatherInfo>();
     // final weatherInfo = response.value;
+
+    final testApi = RxNet.create();
+    await testApi.initNet(baseUrl: "https://api.xxx.com");
+
+    debugPrint("apiService:${apiService.hashCode}");
+    debugPrint("testApi:${testApi.hashCode}");
   }
 
 
