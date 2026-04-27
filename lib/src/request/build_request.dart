@@ -1089,7 +1089,7 @@ class BuildRequest<T> {
         }
       }
 
-      // 构建 AdapterRequest，设置为 stream 响应类型
+      // 构建 AdapterRequest，外部通常需要将responseType设置为 stream 响应类型
       final adapterRequest = adapter_models.AdapterRequest(
         baseUrl: _rxNet.baseUrl,
         path: url,
@@ -1249,7 +1249,7 @@ class BuildRequest<T> {
       final headers = _buildHeaders();
       headers['Content-Range'] = 'bytes $progress-${fileSize - 1}/$fileSize';
 
-      // 构建 AdapterRequest，设置为 stream 响应类型
+      // 构建 AdapterRequest，外部通常需要将responseType设置为 stream 响应类型
       final adapterRequest = adapter_models.AdapterRequest(
         baseUrl: _rxNet.baseUrl,
         path: url,
