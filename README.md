@@ -79,7 +79,7 @@ RxNet 0.6.0 supports multiple HTTP client adapters. Choose the one that fits you
 | **HttpAdapter** | `http: ^1.2.0` | Light | Basic HTTP, interceptors | ⚠️ Pseudo (marks cancelled) | Lightweight apps |
 | **MockAdapter** | Built-in | Minimal | Testing, no network | ✅ Simulated | Unit/integration tests |
 
-**Default behavior:** If you don't specify an adapter, DioAdapter is used automatically (requires `dio` dependency).
+**Default behavior:** If you don't specify an adapter, DioAdapter is used automatically.
 
 **Cancellation Note:** 
 - **DioAdapter**: Provides true cancellation - aborts the HTTP connection immediately, saves bandwidth
