@@ -506,7 +506,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     final apiService = RxNet.create();
     await apiService.initNet(baseUrl: "https://api.xxx.com");
     // apiService.setHeaders(xxx)
-    final response = await apiService.getRequest()
+    await apiService.getRequest()
         .setPath("/users/1")
         .setJsonConvert(NewWeatherInfo.fromJson)
         .request<NewWeatherInfo>();
@@ -1099,7 +1099,7 @@ class ComparisonExample {
     //   .request();
 
     // ✅ 新方式
-    final newResult = await RxNet.get()
+    await RxNet.get()
       .setPath("/user/{id}")
       .setPathParam("id", "123")  // 自动检测RESTful
       .request();
@@ -1115,7 +1115,7 @@ class ComparisonExample {
     //   .request();
 
     // ✅ 新方式
-    final newResult = await RxNet.post()
+    await RxNet.post()
       .setPath("/api/user")
       .setBodyParams({"name": "张三", "age": 25})
       .asJson()  // 明确指定JSON格式
@@ -1135,7 +1135,7 @@ class ComparisonExample {
     //   .request();
 
     // ✅ 新方式：参数分离清晰
-    final newResult = await RxNet.post()
+    await RxNet.post()
       .setPath("/api/users/{userId}/profile")
       .setPathParam("userId", "123")  // 路径参数
       .setBodyParams({                // Body参数

@@ -25,22 +25,20 @@ void main() async {
   );
 
 
-  IOClient createPinnedClient() {
-    final HttpClient httpClient = HttpClient();
-    httpClient.badCertificateCallback =
-        (X509Certificate cert, String host, int port) {
-      // // 获取证书 DER
-      // final der = cert.der;
-      // final sha256 = sha256Convert(der);
-      // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
-      // return sha256 == trustedFingerprint;
-          return true;
-    };
-    return IOClient(httpClient);
-  }
-
-  final adapter2 = HttpAdapter(client: createPinnedClient());
-
+  // IOClient createPinnedClient() {
+  //   final HttpClient httpClient = HttpClient();
+  //   httpClient.badCertificateCallback =
+  //       (X509Certificate cert, String host, int port) {
+  //     // // 获取证书 DER
+  //     // final der = cert.der;
+  //     // final sha256 = sha256Convert(der);
+  //     // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
+  //     // return sha256 == trustedFingerprint;
+  //         return true;
+  //   };
+  //   return IOClient(httpClient);
+  // }
+  // final adapter2 = HttpAdapter(client: createPinnedClient());
 
   await RxNet.init(
       baseUrl: "http://t.weather.sojson.com/",
