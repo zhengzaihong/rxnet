@@ -1,4 +1,4 @@
-## 0.6.0 - 2025-01-XX
+## 0.6.0 
 
 ### Added
 - **Pluggable Adapter Architecture** - Choose the HTTP client that fits your needs
