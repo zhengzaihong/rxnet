@@ -80,6 +80,10 @@ import '../cancel_token.dart';
 /// - [AdapterResponse] for response structure
 /// - [NetworkAdapter.request] for making requests
 class AdapterRequest {
+  // true → 同一个对象.false → 不是同一个对象
+  // true → same object. false → not the same object
+  static const Object _unset = Object();
+
   /// Base URL of the API.
   ///
   /// Example: 'https://api.example.com'
@@ -217,7 +221,7 @@ class AdapterRequest {
     
     // 处理 RESTful 参数替换
     pathParams.forEach((key, value) {
-      url = url.replaceAll('{$key}', value.toString());
+      url = url.replaceAll('{$key}', Uri.encodeComponent(value.toString()));
     });
     
     // 如果 path 已经是完整 URL（以 http:// 或 https:// 开头），直接返回
@@ -267,14 +271,14 @@ class AdapterRequest {
     Map<String, dynamic>? pathParams,
     Map<String, dynamic>? queryParams,
     Map<String, dynamic>? bodyParams,
-    dynamic rawBody,
+    Object? rawBody = _unset,
     Map<String, dynamic>? headers,
-    String? contentType,
+    Object? contentType = _unset,
     ResponseType? responseType,
-    Duration? connectTimeout,
-    Duration? receiveTimeout,
-    Duration? sendTimeout,
-    CancelToken? cancelToken,
+    Object? connectTimeout = _unset,
+    Object? receiveTimeout = _unset,
+    Object? sendTimeout = _unset,
+    Object? cancelToken = _unset,
     Map<String, dynamic>? extra,
   }) {
     return AdapterRequest(
@@ -284,14 +288,24 @@ class AdapterRequest {
       pathParams: pathParams ?? this.pathParams,
       queryParams: queryParams ?? this.queryParams,
       bodyParams: bodyParams ?? this.bodyParams,
-      rawBody: rawBody ?? this.rawBody,
+      rawBody: identical(rawBody, _unset) ? this.rawBody : rawBody,
       headers: headers ?? this.headers,
-      contentType: contentType ?? this.contentType,
+      contentType: identical(contentType, _unset)
+          ? this.contentType
+          : contentType as String?,
       responseType: responseType ?? this.responseType,
-      connectTimeout: connectTimeout ?? this.connectTimeout,
-      receiveTimeout: receiveTimeout ?? this.receiveTimeout,
-      sendTimeout: sendTimeout ?? this.sendTimeout,
-      cancelToken: cancelToken ?? this.cancelToken,
+      connectTimeout: identical(connectTimeout, _unset)
+          ? this.connectTimeout
+          : connectTimeout as Duration?,
+      receiveTimeout: identical(receiveTimeout, _unset)
+          ? this.receiveTimeout
+          : receiveTimeout as Duration?,
+      sendTimeout: identical(sendTimeout, _unset)
+          ? this.sendTimeout
+          : sendTimeout as Duration?,
+      cancelToken: identical(cancelToken, _unset)
+          ? this.cancelToken
+          : cancelToken as CancelToken?,
       extra: extra ?? this.extra,
     );
   }

@@ -1,6 +1,6 @@
 name: rxnet_plus
 description: Flexible network request framework with pluggable adapters (Dio, http, or custom), supporting various caching strategies
-version: 0.6.0
+version: 0.6.1
 homepage: https://github.com/zhengzaihong/rxnet
 
 platforms:

@@ -11,12 +11,10 @@ import '../exceptions/adapter_exception.dart';
 import '../cancel_token.dart' as adapter_cancel;
 
 ///
-/// HttpAdapter - 基于 http 包的轻量级网络适配器 / Lightweight Network Adapter Based on http Package
-/// 
 /// author: ZhengZaiHong
 /// email: 1096877329@qq.com
 /// date: 2026-04-23
-/// 
+/// describe：HttpAdapter - 基于 http 包的轻量级网络适配器 / Lightweight Network Adapter Based on http Package
 /// ============================================================================
 /// 类说明 / Class Description
 /// ============================================================================

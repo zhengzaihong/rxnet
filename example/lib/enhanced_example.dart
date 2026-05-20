@@ -5,9 +5,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
-import 'package:rxnet_plus/adapters/dio_adapter.dart';
-import 'package:rxnet_plus/adapters/http_adapter.dart';
-import 'package:rxnet_plus/adapters/mock_adapter.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'bean/base_info.dart';
@@ -680,11 +677,11 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     String? appDocPath = "${appDocDir?.path}/test.jpg";
     RxNet.get()
         .setPath("https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg")
-        .download(
+        .breakPointDownload(
         savePath: appDocPath, success: (data,model){
-      setState(() {
-        this.result = "示例6：保存地址：$data";
-      });
+          setState(() {
+            this.result = "示例6：保存地址：$data";
+          });
     });
   }
 }

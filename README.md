@@ -58,11 +58,7 @@ RxNet 0.6.0 introduces a revolutionary pluggable adapter architecture that compl
 
 ```yaml
 dependencies:
-  rxnet_plus: ^0.6.0  # Latest version with pluggable adapters
-  
-  # Choose your adapter (DioAdapter is used by default if no adapter specified)
-  dio: ^5.8.0+1       # For DioAdapter (recommended, full-featured)
-  # http: ^1.2.0      # For HttpAdapter (lightweight alternative)
+  rxnet_plus: ^0.6.1  # Latest version with pluggable adapters
 ```
 
 **Upgrading?** 

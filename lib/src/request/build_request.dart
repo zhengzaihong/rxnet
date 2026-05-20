@@ -609,6 +609,9 @@ class BuildRequest<T> {
     required String url,
     Map<String, dynamic>? queryParams,
     dynamic data,
+    Map<String, String>? headers,
+    String? contentType,
+    rxnet_plus.ResponseType? responseType,
   }) {
     // 从 RxNet 获取 baseUrl
     final baseUrl = _rxNet.baseUrl;
@@ -619,10 +622,10 @@ class BuildRequest<T> {
       method: _HttpMethod,
       queryParams: queryParams ?? {},
       bodyParams: _bodyParams, // 传递 bodyParams 以便拦截器可以访问
-      headers: _buildHeaders(),
+      headers: headers ?? _buildHeaders(),
       rawBody: data,
-      contentType: _contentType,
-      responseType: _convertResponseType(),
+      contentType: contentType ?? _contentType,
+      responseType: responseType ?? _convertResponseType(),
       sendTimeout: _sendTimeout,
       receiveTimeout: _receiveTimeout,
       cancelToken: _cancelToken, // Use the actual cancel token
@@ -645,86 +648,197 @@ class BuildRequest<T> {
     }
   }
 
+  RequestBodyType _resolveEffectiveBodyType() {
+    if (_bodyType != RequestBodyType.auto || _rawBody != null) {
+      return _bodyType;
+    }
+
+    final hasFile = _bodyParams.values.any((element) =>
+        element is MultipartFile || element is File);
+    if (hasFile) {
+      return RequestBodyType.formData;
+    }
+
+    if (_HttpMethod == HttpMethod.GET || _HttpMethod == HttpMethod.DELETE) {
+      return RequestBodyType.query;
+    }
+
+    if (_HttpMethod == HttpMethod.POST ||
+        _HttpMethod == HttpMethod.PUT ||
+        _HttpMethod == HttpMethod.PATCH) {
+      return RequestBodyType.json;
+    }
+
+    return RequestBodyType.auto;
+  }
+
+  String? _resolveContentType(RequestBodyType bodyType) {
+    if (_contentType != null) {
+      return _contentType;
+    }
+
+    switch (bodyType) {
+      case RequestBodyType.formData:
+        return ContentTypes.multipartFormData;
+      case RequestBodyType.urlEncoded:
+        return ContentTypes.formUrlEncoded;
+      case RequestBodyType.json:
+        return _bodyType == RequestBodyType.json ? ContentTypes.json : null;
+      case RequestBodyType.auto:
+      case RequestBodyType.query:
+        return null;
+    }
+  }
+
+  _ResolvedRequestPayload _resolveRequestPayload({
+    Map<String, dynamic>? baseQueryParams,
+  }) {
+    final queryParams =
+        Map<String, dynamic>.from(baseQueryParams ?? _queryParams);
+    final effectiveBodyType = _resolveEffectiveBodyType();
+
+    dynamic requestBody = _rawBody;
+    if (_rawBody == null && _bodyParams.isNotEmpty) {
+      switch (effectiveBodyType) {
+        case RequestBodyType.query:
+          queryParams.addAll(_bodyParams);
+          requestBody = null;
+          break;
+        case RequestBodyType.json:
+        case RequestBodyType.formData:
+        case RequestBodyType.urlEncoded:
+        case RequestBodyType.auto:
+          requestBody = _bodyParams;
+          break;
+      }
+    }
+
+    return _ResolvedRequestPayload(
+      queryParams: queryParams,
+      body: requestBody,
+      contentType: _resolveContentType(effectiveBodyType),
+    );
+  }
+
+  adapter.NetworkAdapter _requireAdapter() {
+    final adapter = _rxNet.getAdapter();
+    if (adapter == null) {
+      throw NetworkException("NetworkAdapter is not initialized", null);
+    }
+    return adapter;
+  }
+
+  Stream<List<int>> _trackUploadProgress(
+    Stream<List<int>> source, {
+    required void Function(int chunkLength) onChunk,
+  }) async* {
+    await for (final chunk in source) {
+      onChunk(chunk.length);
+      yield chunk;
+    }
+  }
+
+  Stream<List<int>>? _extractByteStream(dynamic data) {
+    if (data is Stream<List<int>>) {
+      return data;
+    }
+    if (data is Stream<Uint8List>) {
+      return data;
+    }
+    if (data is Uint8List) {
+      return Stream<List<int>>.value(data);
+    }
+    if (data is List<int>) {
+      return Stream<List<int>>.value(data);
+    }
+    return null;
+  }
+
+  int? _parseContentRangeStart(String? contentRange) {
+    if (contentRange == null) {
+      return null;
+    }
+
+    final match = RegExp(r'bytes\s+(\d+)-(\d+)/(\d+|\*)')
+        .firstMatch(contentRange);
+    if (match == null) {
+      return null;
+    }
+
+    return int.tryParse(match.group(1)!);
+  }
+
+  int? _parseContentRangeTotal(String? contentRange) {
+    if (contentRange == null) {
+      return null;
+    }
+
+    final match = RegExp(r'bytes\s+(\d+)-(\d+)/(\d+|\*)')
+        .firstMatch(contentRange);
+    if (match == null) {
+      return null;
+    }
+
+    final total = match.group(3);
+    if (total == null || total == '*') {
+      return null;
+    }
+
+    return int.tryParse(total);
+  }
+
+  int _resolveBreakpointDownloadTotal(
+    AdapterResponse response, {
+    required bool isResumed,
+    required int downloaded,
+  }) {
+    final totalFromRange = _parseContentRangeTotal(
+      response.getHeader(HttpHeaders.contentRangeHeader),
+    );
+    if (totalFromRange != null && totalFromRange > 0) {
+      return totalFromRange;
+    }
+
+    final contentLength = int.tryParse(
+      response.getHeader(HttpHeaders.contentLengthHeader) ?? '',
+    );
+    if (contentLength != null && contentLength >= 0) {
+      return isResumed ? downloaded + contentLength : contentLength;
+    }
+
+    return -1;
+  }
+
+  bool _isCancelledStreamError(Object error) {
+    if (error is AdapterException) {
+      return error.type == AdapterExceptionType.cancel;
+    }
+    if (error is dio.DioException) {
+      return error.type == dio.DioExceptionType.cancel;
+    }
+    return false;
+  }
+
   // ==================== 核心请求方法 -  ====================
 
   /// 执行请求的核心方法
   Future<RxResult<T>> _doRequest<T>({bool cache = false}) async {
     final url = _buildFinalUrl();
-
-    // 准备查询参数
-    Map<String, dynamic> queryParameters = Map.from(_queryParams);
-
-    // 准备请求体
-    dynamic requestBody = _rawBody;
-
-    // 根据bodyType决定如何处理参数
-    if (_rawBody == null && _bodyParams.isNotEmpty) {
-      // 检测是否包含文件
-      bool hasFile = _bodyParams.values.any((element) =>
-      element is MultipartFile || element is File);
-
-      // 自动判断body类型
-      if (_bodyType == RequestBodyType.auto) {
-        if (hasFile) {
-          _bodyType = RequestBodyType.formData;
-        } else if (_HttpMethod == HttpMethod.POST ||
-            _HttpMethod == HttpMethod.PUT ||
-            _HttpMethod == HttpMethod.PATCH) {
-          _bodyType = RequestBodyType.json;
-        }
-      }
-
-      // 根据类型处理参数
-      switch (_bodyType) {
-        case RequestBodyType.query:
-          queryParameters.addAll(_bodyParams);
-          requestBody = null;
-          break;
-        case RequestBodyType.json:
-          requestBody = _bodyParams;
-          break;
-        case RequestBodyType.formData:
-          // 对于 FormData，我们需要转换为 Map<String, dynamic>
-          // 适配器会处理文件上传
-          requestBody = _bodyParams;
-          if (_contentType == null) {
-            _contentType = ContentTypes.multipartFormData;
-          }
-          break;
-        case RequestBodyType.urlEncoded:
-          requestBody = _bodyParams;
-          if (_contentType == null) {
-            _contentType = ContentTypes.formUrlEncoded;
-          }
-          break;
-        case RequestBodyType.auto:
-        // GET/DELETE默认用query
-          if (_HttpMethod == HttpMethod.GET || _HttpMethod == HttpMethod.DELETE) {
-            queryParameters.addAll(_bodyParams);
-            requestBody = null;
-          } else {
-            requestBody = _bodyParams;
-          }
-          break;
-      }
-    }
+    final payload = _resolveRequestPayload();
 
     try {
-      LogUtil.v("$url，JsonConvert：${_jsonTransformation != null}");
+      LogUtil.v('$url, jsonConvert: ${_jsonTransformation != null}');
 
       // 构建 AdapterRequest
       final adapterRequest = _buildAdapterRequest(
         url: url,
-        queryParams: queryParameters,
-        data: requestBody,
+        queryParams: payload.queryParams,
+        data: payload.body,
+        contentType: payload.contentType,
       );
 
       // 使用适配器发送请求
-      final adapter = _rxNet.getAdapter();
-      if (adapter == null) {
-        throw NetworkException("NetworkAdapter is not initialized", null);
-      }
-
+      final adapter = _requireAdapter();
       final AdapterResponse<dynamic> response = await adapter.request(adapterRequest);
 
       onResponse?.call(response);
@@ -755,14 +869,13 @@ class BuildRequest<T> {
         throw NetworkException("Request failed with status code ${response.statusCode}", null);
       }
     } on AdapterException catch (e) {
-      LogUtil.v("请求出错：$e");
-      // 转换 AdapterException 到 RxError
+      LogUtil.v('Request error: $e');
       if (e.type == AdapterExceptionType.cancel) {
         throw CancellationException("Request was cancelled", e);
       }
       throw NetworkException(e.message, e);
     } catch (e, s) {
-      LogUtil.v("请求出错：$e\n$s");
+      LogUtil.v('Request error: $e\n$s');
       if (e is RxError) {
         throw e;
       }
@@ -1002,54 +1115,45 @@ class BuildRequest<T> {
     }
 
     final url = _buildFinalUrl();
+    final payload = _resolveRequestPayload();
+    final file = File(savePath);
 
     try {
-      // 准备请求体
-      dynamic requestBody = _rawBody;
-      if (_rawBody == null && _bodyParams.isNotEmpty) {
-        if (_bodyType == RequestBodyType.formData) {
-          requestBody = _bodyParams;
-        } else if (_bodyType == RequestBodyType.json) {
-          requestBody = _bodyParams;
-        }
+      if (!file.parent.existsSync()) {
+        file.parent.createSync(recursive: true);
       }
 
       // 构建 AdapterRequest
       final adapterRequest = _buildAdapterRequest(
         url: url,
-        queryParams: _queryParams,
-        data: requestBody,
+        queryParams: payload.queryParams,
+        data: payload.body,
+        contentType: payload.contentType,
       );
 
       // 使用适配器下载文件
-      final adapter = _rxNet.getAdapter();
-      if (adapter == null) {
-        throw NetworkException("NetworkAdapter is not initialized", null);
-      }
-
+      final adapter = _requireAdapter();
       final response = await adapter.download(
         adapterRequest,
         savePath,
         onProgress: (received, total) {
-          if (total != -1) {
-            onReceiveProgress?.call(received, total);
-          }
-          if (received >= total) {
-            success?.call(savePath, SourcesType.net);
-          }
+          onReceiveProgress?.call(received, total > 0 ? total : received);
         },
       );
 
       onResponse?.call(response);
-      if (!response.isSuccess) {
+      if (response.isSuccess) {
+        success?.call(savePath, SourcesType.net);
+      } else {
         failure?.call(response.data);
       }
     } on AdapterException catch (e) {
       failure?.call(e);
     } catch (e) {
       failure?.call(e);
+    } finally {
+      completed?.call();
     }
-    completed?.call();
   }
 
   /// 断点下载
@@ -1065,101 +1169,102 @@ class BuildRequest<T> {
       return;
     }
 
-    int downloadStart = 0;
-    File file = File(savePath);
+    final file = File(savePath);
 
     try {
       final url = _buildFinalUrl();
+      final payload = _resolveRequestPayload();
 
-      if (file.existsSync()) {
-        downloadStart = file.lengthSync();
+      if (!file.parent.existsSync()) {
+        file.parent.createSync(recursive: true);
       }
 
-      // 添加 Range 头部
+      final requestedStart = file.existsSync() ? file.lengthSync() : 0;
       final headers = _buildHeaders();
-      headers["Range"] = "bytes=$downloadStart-";
-
-      // 准备请求体
-      dynamic requestBody = _rawBody;
-      if (_rawBody == null && _bodyParams.isNotEmpty) {
-        if (_bodyType == RequestBodyType.formData) {
-          requestBody = _bodyParams;
-        } else if (_bodyType == RequestBodyType.json) {
-          requestBody = _bodyParams;
-        }
+      if (requestedStart > 0) {
+        headers[HttpHeaders.rangeHeader] = 'bytes=$requestedStart-';
       }
 
-      // 构建 AdapterRequest，外部通常需要将responseType设置为 stream 响应类型
-      final adapterRequest = adapter_models.AdapterRequest(
-        baseUrl: _rxNet.baseUrl,
-        path: url,
-        method: _HttpMethod,
-        queryParams: _queryParams,
+      // 构建 AdapterRequest，内部会自动使用 stream 响应类型
+      final adapterRequest = _buildAdapterRequest(
+        url: url,
+        queryParams: payload.queryParams,
+        data: payload.body,
         headers: headers,
-        rawBody: requestBody,
-        contentType: _contentType,
-        responseType: _convertResponseType(),
-        sendTimeout: _sendTimeout,
-        receiveTimeout: _receiveTimeout,
-        cancelToken: _cancelToken, // Use the actual cancel token
+        contentType: payload.contentType,
+        responseType: rxnet_plus.ResponseType.stream,
       );
 
       // 使用适配器发送请求
-      final adapter = _rxNet.getAdapter();
-      if (adapter == null) {
-        throw NetworkException("NetworkAdapter is not initialized", null);
-      }
-
+      final adapter = _requireAdapter();
       final response = await adapter.request(adapterRequest);
       onResponse?.call(response);
 
-      // 处理流式响应
-      if (response.data is Stream<List<int>>) {
-        RandomAccessFile raf = file.openSync(mode: FileMode.append);
-        Stream<Uint8List> stream = (response.data as Stream<List<int>>).map((data) => Uint8List.fromList(data));
-
-        // 获取总大小
-        final contentRange = response.getHeader('content-range');
-        final total = int.tryParse(contentRange?.split('/').last ?? "0") ?? 0;
-
-        final subscription = stream.listen((data) {
-          raf.writeFromSync(data);
-          downloadStart = downloadStart + data.length;
-          if (total > 0 && total < downloadStart) {
-            onReceiveProgress?.call(total, total);
-            return;
-          }
-          onReceiveProgress?.call(downloadStart, total);
-        }, onDone: () async {
-          success?.call(file, SourcesType.net);
-          await raf.close();
-        }, onError: (e) async {
-          failure?.call(e);
-          await raf.close();
-        }, cancelOnError: true);
-
-        // 处理取消（简化版本，因为我们现在使用字符串标识）
-        // 实际的取消逻辑由适配器处理
-      } else {
-        // 如果不是流式响应，检查是否已完成
-        final contentRange = response.getHeader('content-range');
-        final total = int.tryParse(contentRange?.split('/').last ?? "0") ?? 0;
-        if (total <= downloadStart) {
-          onReceiveProgress?.call(total, total);
-          success?.call(file, SourcesType.net);
-        }
+      final stream = _extractByteStream(response.data);
+      if (stream == null) {
+        throw NetworkException('Breakpoint download requires a byte stream response', null);
       }
+
+      final contentRange = response.getHeader(HttpHeaders.contentRangeHeader);
+      final isResumed = requestedStart > 0 &&
+          response.statusCode == HttpStatus.partialContent &&
+          _parseContentRangeStart(contentRange) == requestedStart;
+      var downloaded = isResumed ? requestedStart : 0;
+      final total = _resolveBreakpointDownloadTotal(
+        response,
+        isResumed: isResumed,
+        downloaded: downloaded,
+      );
+
+      final raf = file.openSync(
+        mode: isResumed ? FileMode.append : FileMode.write,
+      );
+      try {
+        await for (final chunk in stream) {
+          raf.writeFromSync(chunk);
+          downloaded += chunk.length;
+          onReceiveProgress?.call(
+            downloaded,
+            total > 0 ? total : downloaded,
+          );
+        }
+      } catch (error) {
+        if (_isCancelledStreamError(error)) {
+          cancelCallback?.call();
+          return;
+        }
+        rethrow;
+      } finally {
+        await raf.close();
+      }
+
+      if (total > 0 && downloaded > total) {
+        onReceiveProgress?.call(total, total);
+      }
+      success?.call(file, SourcesType.net);
     } on AdapterException catch (error) {
       if (error.type == AdapterExceptionType.cancel) {
         cancelCallback?.call();
+      } else if (error.type == AdapterExceptionType.response &&
+          error.statusCode == HttpStatus.requestedRangeNotSatisfiable) {
+        final localLength = file.existsSync() ? file.lengthSync() : 0;
+        final total = _parseContentRangeTotal(
+          error.response?.getHeader(HttpHeaders.contentRangeHeader),
+        );
+        if (total != null && total == localLength) {
+          onReceiveProgress?.call(total, total);
+          success?.call(file, SourcesType.net);
+        } else {
+          failure?.call(error);
+        }
       } else {
         failure?.call(error);
       }
     } catch (e) {
       failure?.call(e);
+    } finally {
+      completed?.call();
     }
-
-    completed?.call();
   }
 
   /// 上传文件
@@ -1174,31 +1279,18 @@ class BuildRequest<T> {
     }
 
     final url = _buildFinalUrl();
+    final payload = _resolveRequestPayload();
 
     try {
-      // 准备请求体
-      dynamic requestBody = _rawBody;
-      if (_rawBody == null && _bodyParams.isNotEmpty) {
-        if (_bodyType == RequestBodyType.formData) {
-          requestBody = _bodyParams;
-        } else if (_bodyType == RequestBodyType.json) {
-          requestBody = _bodyParams;
-        }
-      }
-
-      // 构建 AdapterRequest
       final adapterRequest = _buildAdapterRequest(
         url: url,
-        queryParams: _queryParams,
-        data: requestBody,
+        queryParams: payload.queryParams,
+        data: payload.body,
+        contentType: payload.contentType,
       );
 
       // 使用适配器上传文件
-      final adapter = _rxNet.getAdapter();
-      if (adapter == null) {
-        throw NetworkException("NetworkAdapter is not initialized", null);
-      }
-
+      final adapter = _requireAdapter();
       final response = await adapter.upload(
         adapterRequest,
         onProgress: onSendProgress,
@@ -1214,8 +1306,9 @@ class BuildRequest<T> {
       failure?.call(e);
     } catch (e) {
       failure?.call(e);
+    } finally {
+      completed?.call();
     }
-    completed?.call();
   }
 
   /// 断点上传
@@ -1233,64 +1326,70 @@ class BuildRequest<T> {
     }
 
     final url = _buildFinalUrl();
-
-    var progress = start ?? 0;
-    int fileSize = 0;
-    File file = File(filePath);
-
-    if (file.existsSync()) {
-      fileSize = file.lengthSync();
-    }
-
-    var data = file.openRead(progress, fileSize);
+    final payload = _resolveRequestPayload();
+    final file = File(filePath);
 
     try {
+      if (!file.existsSync()) {
+        throw FileSystemException('Upload file does not exist', filePath);
+      }
+
+      final fileSize = file.lengthSync();
+      var progress = start ?? 0;
+      if (progress < 0 || progress > fileSize) {
+        throw RangeError.range(progress, 0, fileSize, 'start');
+      }
+
+      if (progress == fileSize) {
+        onSendProgress?.call(fileSize, fileSize);
+        success?.call(file, SourcesType.net);
+        return;
+      }
+
       // 添加 Content-Range 头部
       final headers = _buildHeaders();
+      headers[HttpHeaders.contentLengthHeader] = '${fileSize - progress}';
       headers['Content-Range'] = 'bytes $progress-${fileSize - 1}/$fileSize';
 
-      // 构建 AdapterRequest，外部通常需要将responseType设置为 stream 响应类型
-      final adapterRequest = adapter_models.AdapterRequest(
-        baseUrl: _rxNet.baseUrl,
-        path: url,
-        method: _HttpMethod,
-        queryParams: _queryParams,
+      final data = _trackUploadProgress(
+        file.openRead(progress, fileSize),
+        onChunk: (chunkLength) {
+          progress += chunkLength;
+          onSendProgress?.call(progress, fileSize);
+        },
+      );
+
+      // 构建 AdapterRequest，内部会复用统一参数解析逻辑
+      final adapterRequest = _buildAdapterRequest(
+        url: url,
+        queryParams: payload.queryParams,
+        data: data,
         headers: headers,
-        rawBody: data,
-        contentType: _contentType,
-        responseType: _convertResponseType(),
-        sendTimeout: _sendTimeout,
-        receiveTimeout: _receiveTimeout,
-        cancelToken: _cancelToken, // Use the actual cancel token
+        contentType: payload.contentType,
       );
 
       // 使用适配器发送请求
-      final adapter = _rxNet.getAdapter();
-      if (adapter == null) {
-        throw NetworkException("NetworkAdapter is not initialized", null);
-      }
-
+      final adapter = _requireAdapter();
       final response = await adapter.request(adapterRequest);
       onResponse?.call(response);
 
-      // 处理流式响应
-      if (response.data is Stream<List<int>>) {
-        Stream<Uint8List> stream = (response.data as Stream<List<int>>).map((d) => Uint8List.fromList(d));
-
-        final subscription = stream.listen((d) {
-          progress = progress + d.length;
-          onSendProgress?.call(progress, fileSize);
-        }, onDone: () async {
-          success?.call(file, SourcesType.net);
-        }, onError: (e) async {
-          failure?.call(e);
-        }, cancelOnError: true);
-      } else {
-        // 如果不是流式响应，检查是否已完成
-        if (progress <= fileSize) {
-          onSendProgress?.call(progress, fileSize);
-          success?.call(file, SourcesType.net);
+      final responseStream = _extractByteStream(response.data);
+      if (responseStream != null) {
+        try {
+          await responseStream.drain<void>();
+        } catch (error) {
+          if (_isCancelledStreamError(error)) {
+            cancelCallback?.call();
+            return;
+          }
+          rethrow;
         }
+      }
+
+      if (response.isSuccess) {
+        success?.call(file, SourcesType.net);
+      } else {
+        failure?.call(response.data);
       }
     } on AdapterException catch (error) {
       if (error.type == AdapterExceptionType.cancel) {
@@ -1300,9 +1399,9 @@ class BuildRequest<T> {
       }
     } catch (e) {
       failure?.call(e);
+    } finally {
+      completed?.call();
     }
-
-    completed?.call();
   }
 
   /// 获取内容长度（兼容方法）
@@ -1313,4 +1412,16 @@ class BuildRequest<T> {
       return null;
     }
   }
+}
+
+class _ResolvedRequestPayload {
+  const _ResolvedRequestPayload({
+    required this.queryParams,
+    required this.body,
+    required this.contentType,
+  });
+
+  final Map<String, dynamic> queryParams;
+  final dynamic body;
+  final String? contentType;
 }

@@ -1,7 +1,5 @@
 
 
-import 'package:dio/dio.dart';
-
 import '../type/sources_type.dart';
 
 typedef JsonTransformation<E> = E Function(Map<String, dynamic> data);

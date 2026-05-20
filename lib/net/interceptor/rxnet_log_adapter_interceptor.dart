@@ -65,7 +65,7 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
     final uri = request.buildFullUrl();
     _requestMaps[uri] = DateTime.now();
     
-    printKV('uri', uri);
+    printKV('Request uri start', uri);
     
     if (this.request) {
       printKV('method', request.method.toString());
@@ -96,7 +96,7 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
       logPrint("queryParams:");
       printAll(jsonEncode(request.queryParams));
     }
-    
+    printKV('Request uri end', uri);
     logPrint('***************** Request End *****************');
     
     // 继续请求
@@ -143,6 +143,8 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
   }
 
   void _printResponse(AdapterResponse response) {
+    final uri = response.request.buildFullUrl();
+    logPrint('Response url start: $uri');
     if (responseHeader) {
       printKV('statusCode', response.statusCode);
       printKV('statusMessage', response.statusMessage ?? "");
@@ -168,13 +170,13 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
       }
     }
 
-    final uri = response.request.buildFullUrl();
+
     DateTime oldTime = _requestMaps[uri] ?? DateTime.now();
     DateTime responseTime = DateTime.now();
     Duration duration = responseTime.difference(oldTime);
     
     logPrint('useTime:${duration.inMinutes}分 | ${duration.inSeconds}秒 | ${duration.inMilliseconds}毫秒');
-    logPrint('Response url: $uri');
+    logPrint('Response url end: $uri');
     
     logPrint("***************** Response End *****************");
   }

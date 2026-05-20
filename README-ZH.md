@@ -56,11 +56,8 @@ RxNet 0.6.0 引入了革命性的可插拔适配器架构，完全解耦框架�
 
 ```yaml
 dependencies:
-  rxnet_plus: ^0.6.0  # 最新版本，可插拔适配器架构
+  rxnet_plus: ^0.6.1  # 最新版本，可插拔适配器架构
   
-  # 选择您的适配器（如果未指定适配器，默认使用 DioAdapter）
-  dio: ^5.8.0+1       # 用于 DioAdapter（推荐，全功能）
-  # http: ^1.2.0      # 用于 HttpAdapter（轻量级替代方案）
 ```
 
 **升级？** 

@@ -1,9 +1,6 @@
 
 import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:rxnet_plus/adapters/dio_adapter.dart';
-import 'package:rxnet_plus/adapters/http_adapter.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
 import 'package:uikit_plus/toast/toast_utils.dart';
 import 'enhanced_example.dart';
@@ -18,6 +15,11 @@ void main() async {
     createHttpClient: () {
       final client = HttpClient();
       client.badCertificateCallback = (cert, host, port) {
+        // // 获取证书 DER
+        // final der = cert.der;
+        // final sha256 = sha256Convert(der);
+        // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
+        // return sha256 == trustedFingerprint;
         return true;
       };
       return client;

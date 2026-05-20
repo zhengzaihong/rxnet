@@ -1,3 +1,26 @@
+## 0.6.1
+
+### Fixed
+- **Code Quality Improvements** - Removed unused imports and deprecated code
+  - Fixed design flaws in the breakpoint download and resume method
+  - Removed unused `_DioInterceptorBridge` class (deprecated in 0.6.0)
+  - Cleaned up unnecessary imports in `fun_apply.dart` and `rx_net.dart`
+  - Improved code maintainability and reduced warnings
+
+### Documentation
+- **Updated Documentation** - Clarified interceptor execution flow
+  - Added comments explaining why `_DioInterceptorBridge` was removed
+  - Improved inline documentation for adapter architecture
+
+### Security
+- **Certificate Validation Examples** - Enhanced security guidance
+  - Added warnings about proper certificate validation in production
+  - Improved examples to prevent security misconfigurations
+
+### Performance
+- Minor performance improvements from code cleanup
+- Reduced package analysis warnings from 14 to 0
+
 ## 0.6.0 
 
 ### Added

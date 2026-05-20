@@ -1,49 +1,62 @@
 import '../models/adapter_response.dart';
 
 /// 适配器异常类型
+/// Adapter exception type
 enum AdapterExceptionType {
   /// 连接超时
+  /// connection timeout
   connectTimeout,
   
   /// 发送超时
+  /// Send timeout
   sendTimeout,
   
   /// 接收超时
+  /// receive timeout
   receiveTimeout,
   
   /// 响应错误（4xx, 5xx）
+  /// Response error (4xx, 5xx)
   response,
   
   /// 请求被取消
+  /// Request canceled
   cancel,
   
   /// 连接错误（网络不可用等）
+  /// Connection error (network unavailable, etc.)
   connectionError,
   
   /// 未知错误
+  /// unknown error
   unknown,
 }
 
-/// 适配器异常基类
-/// 
-/// 统一不同网络库的异常类型
+/// 适配器异常基类，统一不同网络库的异常类型
+/// Adapter exception base class, which unifies exception types for different network libraries
 class AdapterException implements Exception {
   /// 错误消息
+  /// error message
   final String message;
   
   /// 异常类型
+  /// exception type
   final AdapterExceptionType type;
   
   /// HTTP 状态码（如果有）
+  /// HTTP status code (if any)
   final int? statusCode;
   
   /// 响应对象（如果有）
+  /// Responding object (if any)
   final AdapterResponse? response;
   
   /// 原始错误对象
+  /// Original error object
   final dynamic originalError;
   
   /// 堆栈跟踪
+  /// stack trace
   final StackTrace? stackTrace;
   
   AdapterException({
@@ -56,6 +69,7 @@ class AdapterException implements Exception {
   });
   
   /// 创建连接超时异常
+  /// Create connection timeout exception
   factory AdapterException.connectTimeout({
     String? message,
     dynamic originalError,
@@ -70,6 +84,7 @@ class AdapterException implements Exception {
   }
   
   /// 创建发送超时异常
+  /// Create send timeout exception
   factory AdapterException.sendTimeout({
     String? message,
     dynamic originalError,
@@ -84,6 +99,7 @@ class AdapterException implements Exception {
   }
   
   /// 创建接收超时异常
+  /// Create receive timeout exception
   factory AdapterException.receiveTimeout({
     String? message,
     dynamic originalError,
@@ -98,6 +114,7 @@ class AdapterException implements Exception {
   }
   
   /// 创建响应错误异常
+  /// Create response error exception
   factory AdapterException.response({
     required int statusCode,
     String? message,
@@ -116,6 +133,7 @@ class AdapterException implements Exception {
   }
   
   /// 创建取消异常
+  /// Create cancellation exception
   factory AdapterException.cancel({
     String? message,
     dynamic originalError,
@@ -130,6 +148,7 @@ class AdapterException implements Exception {
   }
   
   /// 创建连接错误异常
+  /// Create connection error exception
   factory AdapterException.connectionError({
     String? message,
     dynamic originalError,
@@ -144,6 +163,7 @@ class AdapterException implements Exception {
   }
   
   /// 创建未知错误异常
+  /// Create unknown error exception
   factory AdapterException.unknown({
     String? message,
     dynamic originalError,

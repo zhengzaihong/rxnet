@@ -2,8 +2,10 @@ import '../models/adapter_request.dart';
 import '../models/adapter_response.dart';
 import '../exceptions/adapter_exception.dart';
 
-/// 请求拦截器处理器
-///
+/// author: ZhengZaiHong
+/// email:1096877329@qq.com
+/// date: 2026-04-21 16:04
+/// describe: 请求拦截器处理器
 /// 用于在拦截器中控制请求流程
 class RequestInterceptorHandler {
   bool _isCompleted = false;

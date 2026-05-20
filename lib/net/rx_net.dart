@@ -7,10 +7,7 @@ import 'package:hive/hive.dart';
 import '../logcat/debug_manager.dart';
 import '../src/cache/cache_manager.dart';
 import '../src/logging/log_manager.dart';
-import '../src/adapter/network_adapter.dart';
 import '../src/adapter/implementations/dio_adapter.dart';
-import '../src/adapter/interceptor/adapter_interceptor.dart';
-import 'package:dio/dio.dart' show BaseOptions, Headers, LogInterceptor;
 
 ///
 /// RxNet Plus - Flutter 网络请求库 / Flutter Network Request Library

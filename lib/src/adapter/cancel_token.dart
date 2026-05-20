@@ -1,4 +1,6 @@
-
+/// author: ZhengZaiHong
+/// email:1096877329@qq.com
+/// date: 2026-04-23 11:17
 /// Token for cancelling network requests.
 /// 
 /// 用于取消网络请求的令牌。
@@ -28,10 +30,7 @@
 /// See also / 另见:
 /// - [AdapterRequest.cancelToken] for using cancel tokens in requests
 /// - [NetworkAdapter.cancel] for adapter-level cancellation
-/// 
-/// author: ZhengZaiHong
-/// email:1096877329@qq.com
-/// date: 2026-04-23 11:17
+
 class CancelToken {
   bool _isCancelled = false;
   String? _cancelReason;

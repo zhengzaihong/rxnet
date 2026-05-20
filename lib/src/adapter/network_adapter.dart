@@ -4,6 +4,11 @@ import 'models/adapter_response.dart';
 import 'interceptor/adapter_interceptor.dart';
 import 'cancel_token.dart';
 
+/// author:ZhengZaiHong
+/// email:1096877329@qq.com
+/// date:2026-05-20 13:58
+/// describe: Really requesting an adapter for the network
+
 /// Progress callback function type for file upload/download operations.
 ///
 /// The callback receives two parameters:
