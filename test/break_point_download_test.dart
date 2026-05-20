@@ -5,12 +5,10 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart' as dio;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:rxnet_plus/rxnet_lib.dart';
-import 'package:rxnet_plus/src/adapter/implementations/dio_adapter.dart';
-import 'package:rxnet_plus/src/adapter/implementations/http_adapter.dart';
+import 'package:rxnet_plus/utils/rx_net_database.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -23,13 +21,13 @@ void main() {
     });
 
     tearDown(() async {
-      await Hive.close();
+      await RxNetDataBase.close();
       await Future<void>.delayed(const Duration(milliseconds: 50));
       if (await tempDir.exists()) {
         try {
           await tempDir.delete(recursive: true);
         } on FileSystemException {
-          // Hive may still be releasing file handles on Windows.
+          // Database may still be releasing file handles on Windows.
         }
       }
     });
@@ -75,7 +73,7 @@ void main() {
         await api.initNet(
           baseUrl: 'https://unit.test',
           adapter: adapter,
-          cacheDir: tempDir,
+          cachePath: tempDir.path,
         );
 
         final file = File(p.join(tempDir.path, 'dio_resume.bin'));
@@ -138,7 +136,7 @@ void main() {
               );
             }),
           ),
-          cacheDir: tempDir,
+          cachePath: tempDir.path,
         );
 
         final file = File(p.join(tempDir.path, 'http_restart.bin'));
@@ -176,13 +174,13 @@ void main() {
     });
 
     tearDown(() async {
-      await Hive.close();
+      await RxNetDataBase.close();
       await Future<void>.delayed(const Duration(milliseconds: 50));
       if (await tempDir.exists()) {
         try {
           await tempDir.delete(recursive: true);
         } on FileSystemException {
-          // Hive may still be releasing file handles on Windows.
+          // Database may still be releasing file handles on Windows.
         }
       }
     });
@@ -210,7 +208,7 @@ void main() {
       await api.initNet(
         baseUrl: 'https://unit.test',
         adapter: adapter,
-        cacheDir: tempDir,
+        cachePath: tempDir.path,
       );
 
       final savePath = p.join(tempDir.path, 'nested', 'download.bin');
@@ -270,7 +268,7 @@ void main() {
               );
             }),
           ),
-          cacheDir: tempDir,
+          cachePath: tempDir.path,
         );
 
         final file = File(p.join(tempDir.path, 'resume_upload.bin'));

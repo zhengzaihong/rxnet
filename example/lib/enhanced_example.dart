@@ -190,7 +190,6 @@ class _EnhancedExampleState extends State<EnhancedExample> {
           .request();
 
 
-
       setState(() {
         this.result = "✅ 默认适配器示例\n"
             "适配器：DioAdapter（默认）\n"
@@ -247,6 +246,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     } catch (e) {
       setState(() {
         result = "❌ 错误：$e";
+        LogUtil.v(result);
       });
     }
   }

@@ -136,8 +136,6 @@ Future.delayed(const Duration(seconds: 5),() async{
 });
 ```
 
-#### 注意：Web端不支持额外数据存储。
-
 #### 执行请求的几种方式，请结合场景使用：
 ```dart
 

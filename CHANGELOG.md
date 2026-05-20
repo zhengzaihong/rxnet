@@ -1,25 +1,72 @@
 ## 0.6.1
 
+### Breaking Changes
+- **Replaced Hive with Sembast** - Complete migration to pure Dart database solution
+  - ⚠️ **Important:** Cache data will be reset after upgrade (old Hive data will not be migrated)
+  - ✅ True cross-platform support including Web (IndexedDB) and HarmonyOS
+  - ✅ Pure Dart implementation - no native dependencies
+  - ✅ Better Web platform support with automatic IndexedDB backend
+  - ✅ Simplified API with same interface as before
+
 ### Fixed
 - **Code Quality Improvements** - Removed unused imports and deprecated code
   - Fixed design flaws in the breakpoint download and resume method
   - Removed unused `_DioInterceptorBridge` class (deprecated in 0.6.0)
-  - Cleaned up unnecessary imports in `fun_apply.dart` and `rx_net.dart`
   - Improved code maintainability and reduced warnings
+- **Web Platform Support** - Fixed adapters on Web platform
+  - Web platform now uses HttpAdapter by default (Dio has Platform._version issues)
+  - Fixed HttpAdapter: Used conditional import for dart:io
+  - Fixed "Unsupported operation: Platform._version" error
+  - Users can still explicitly use DioAdapter on Web if needed
+  - Automatic platform detection, no user code changes required
+
+### Changed
+- **Database Backend** - Migrated from Hive to Sembast
+  - `RxNetDataBase` now uses Sembast for all platforms
+  - Web platform automatically uses IndexedDB
+  - Other platforms use file system storage
+  - API remains the same - no code changes needed for users
+  - Added new methods: `getAllKeys()`, `count()`, `close()`
+- **Architecture Simplification** - Removed CacheManager middleware
+  - RxNet now directly uses RxNetDataBase instance
+  - Simplified architecture with fewer abstraction layers
+  - Better performance with reduced method call overhead
+  - Added `getDatabase()` and `getDefaultDatabase()` methods
 
 ### Documentation
 - **Updated Documentation** - Clarified interceptor execution flow
   - Added comments explaining why `_DioInterceptorBridge` was removed
   - Improved inline documentation for adapter architecture
+  - Added detailed comments for Sembast implementation
+  - Removed outdated "Web platform does not support cache" notes
+  - Created comprehensive migration guides
 
-### Security
-- **Certificate Validation Examples** - Enhanced security guidance
-  - Added warnings about proper certificate validation in production
-  - Improved examples to prevent security misconfigurations
+### Migration Guide
+If you were using custom database configuration:
+
+**Before (0.6.0):**
+```dart
+await RxNet.init(
+  baseUrl: "...",
+  // Hive-specific parameters (no longer supported)
+);
+```
+
+**After (0.6.1):**
+```dart
+await RxNet.init(
+  baseUrl: "...",
+  // Sembast works automatically - no configuration needed
+  // Cache data will be stored in platform-appropriate location
+);
+```
+
+**Note:** Existing cache data from Hive will not be automatically migrated. The cache will be rebuilt on first use.
 
 ### Performance
 - Minor performance improvements from code cleanup
 - Reduced package analysis warnings from 14 to 0
+- Sembast provides comparable or better performance than Hive on most platforms
 
 ## 0.6.0 
 

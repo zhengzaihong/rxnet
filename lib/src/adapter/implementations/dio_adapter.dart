@@ -10,13 +10,15 @@ import '../interceptor/adapter_interceptor.dart' as adapter_interceptor;
 import '../exceptions/adapter_exception.dart';
 import '../cancel_token.dart' as adapter_cancel;
 
+// 条件导入：Web 平台导入 web 辅助文件，其他平台导入 io 辅助文件
+// Conditional import: web helper for Web, io helper for other platforms
+import 'dio_adapter_io.dart' if (dart.library.html) 'dio_adapter_web.dart';
+
 ///
-/// DioAdapter - 基于 Dio 的网络适配器 / Dio-based Network Adapter
-/// 
 /// author: ZhengZaiHong
 /// email: 1096877329@qq.com
 /// date: 2026-04-23
-/// 
+/// describe: DioAdapter - 基于 Dio 的网络适配器 / Dio-based Network Adapter
 /// ============================================================================
 /// 类说明 / Class Description
 /// ============================================================================
@@ -255,7 +257,16 @@ class DioAdapter implements NetworkAdapter {
   /// final dio = Dio(BaseOptions(connectTimeout: Duration(seconds: 30)));
   /// final adapter = DioAdapter(dio: dio);
   /// ```
-  DioAdapter({Dio? dio}) : _dio = dio ?? Dio();
+  /// 
+  /// Note / 注意:
+  /// On Web platform, BrowserHttpClientAdapter is automatically configured.
+  /// 
+  /// 在 Web 平台上，会自动配置 BrowserHttpClientAdapter。
+  DioAdapter({Dio? dio}) : _dio = dio ?? Dio() {
+    // 配置平台特定的适配器
+    // Configure platform-specific adapter
+    configureDioAdapter(_dio);
+  }
   
   /// Gets the underlying Dio instance.
   /// 

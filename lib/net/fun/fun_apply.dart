@@ -2,6 +2,7 @@
 
 import '../type/sources_type.dart';
 
+///json转实体店回调
 typedef JsonTransformation<E> = E Function(Map<String, dynamic> data);
 
 ///http请求成功回调

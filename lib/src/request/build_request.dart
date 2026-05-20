@@ -11,14 +11,12 @@ import '../../utils/rx_net_database.dart';
 import '../adapter/network_adapter.dart' as adapter;
 import '../adapter/models/adapter_request.dart' as adapter_models;
 import '../adapter/cancel_token.dart' as rxnet_cancel;
-
 ///
-/// BuildRequest - 网络请求构建器 / Network Request Builder
-/// 
 /// author: zhengzaihong
 /// email: 1096877329@qq.com
 /// date: 2025-08-12
-/// 
+/// describe: BuildRequest - 网络请求构建器 / Network Request Builder
+///
 /// ============================================================================
 /// 类说明 / Class Description
 /// ============================================================================
@@ -509,9 +507,6 @@ class BuildRequest<T> {
 
   BuildRequest<T> setCacheMode(CacheMode cacheMode) {
     _cacheMode = cacheMode;
-    if (RxNetPlatform.isWeb) {
-      _cacheMode = CacheMode.ONLY_REQUEST;
-    }
     return this;
   }
 
@@ -860,7 +855,7 @@ class BuildRequest<T> {
         }
 
         // 缓存处理 - 优化：使用更清晰的缓存键生成
-        if (cache && !RxNetPlatform.isWeb) {
+        if (cache) {
           _saveCacheData(responseData);
         }
 
@@ -904,12 +899,12 @@ class BuildRequest<T> {
       'timestamp': DateTime.now().millisecondsSinceEpoch,
       'data': responseData
     };
-    _rxNet.cacheManager.saveCache(cacheKey, jsonEncode(map));
+    _rxNet.getDatabase()?.put(cacheKey, jsonEncode(map));
   }
 
   /// 读取缓存
   Future<RxResult<T>> _readCache<T>() async {
-    if (RxNetPlatform.isWeb || !await RxNetDataBase.isDatabaseReady) {
+    if (!RxNetDataBase.isDatabaseReady) {
       throw CacheException("Cache not available");
     }
 
@@ -927,7 +922,7 @@ class BuildRequest<T> {
       ..addAll(_bodyParams);
 
     final cacheKey = NetUtils.getCacheKeyFromPath(_path, allParams, allIgnoreKeys);
-    final cacheData = await _rxNet.cacheManager.readCache(cacheKey);
+    final cacheData = await _rxNet.getDatabase()?.get(cacheKey);
 
     if (TextUtil.isEmpty(cacheData)) {
       throw CacheException("Cache is empty");

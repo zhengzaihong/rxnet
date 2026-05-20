@@ -135,7 +135,6 @@ enum CacheMode {
     });
     
 ```
-#### Note: Web platform does not support additional data storage.
 
 #### Several ways to execute requests, use according to scenario:
 

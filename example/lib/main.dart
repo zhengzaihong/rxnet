@@ -44,7 +44,7 @@ void main() async {
 
   await RxNet.init(
       baseUrl: "http://t.weather.sojson.com/",
-      baseCacheMode: CacheMode.REQUEST_FAILED_READ_CACHE,
+      baseCacheMode: CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST,
       baseCheckNet: checkNet,
       adapter: adapter,
       cacheInvalidationTime: 365 * 24 * 60 * 60 * 1000,
@@ -55,14 +55,13 @@ void main() async {
 
   RxNet.saveCache("name", "张三");
   RxNet.readCache("name").then((value) {
-    LogUtil.v(value); //输出：张三
+    LogUtil.v("callback:value:$value"); //输出：张三
   });
   //或者
   Future.delayed(const Duration(seconds: 5), () async {
     final result = await RxNet.readCache("name");
-    LogUtil.v(result); //输出：张三
+    LogUtil.v("result:$result"); //输出：张三
   });
-
   runApp(const MyApp());
 }
 

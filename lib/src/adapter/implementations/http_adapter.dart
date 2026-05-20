@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import '../../../net/type/http_method.dart';
 import '../network_adapter.dart';
@@ -9,6 +9,10 @@ import '../models/adapter_response.dart';
 import '../interceptor/adapter_interceptor.dart';
 import '../exceptions/adapter_exception.dart';
 import '../cancel_token.dart' as adapter_cancel;
+
+// 条件导入：仅在非 Web 平台导入 dart:io
+// Conditional import: Only import dart:io on non-Web platforms
+import 'dart:io' if (dart.library.html) 'http_adapter_web_stub.dart';
 
 ///
 /// author: ZhengZaiHong
@@ -570,12 +574,18 @@ class HttpAdapter implements NetworkAdapter {
     dynamic data;
     try {
       final contentType = httpResponse.headers['content-type'] ?? '';
+      // 使用 bodyBytes 和 utf8 解码，避免中文乱码
+      // Use bodyBytes with utf8 decoding to avoid Chinese garbled text
+      final responseBody = utf8.decode(httpResponse.bodyBytes);
+      
       if (contentType.contains('application/json')) {
-        data = jsonDecode(httpResponse.body);
+        data = jsonDecode(responseBody);
       } else {
-        data = httpResponse.body;
+        data = responseBody;
       }
     } catch (e) {
+      // 如果解码失败，尝试使用原始 body
+      // If decoding fails, try using original body
       data = httpResponse.body;
     }
     
@@ -596,9 +606,16 @@ class HttpAdapter implements NetworkAdapter {
   
   /// 转换异常
   AdapterException _convertException(Object error, StackTrace stackTrace) {
-    if (error is SocketException) {
+    // 使用字符串检查而不是类型检查，以支持 Web 平台
+    // Use string checking instead of type checking to support Web platform
+    final errorString = error.toString();
+    
+    if (errorString.contains('SocketException') || 
+        errorString.contains('Failed host lookup') ||
+        errorString.contains('Connection refused') ||
+        errorString.contains('Connection error')) {
       return AdapterException(
-        message: 'Connection error: ${error.message}',
+        message: 'Connection error: $errorString',
         type: AdapterExceptionType.connectionError,
         originalError: error,
         stackTrace: stackTrace,
@@ -610,16 +627,17 @@ class HttpAdapter implements NetworkAdapter {
         originalError: error,
         stackTrace: stackTrace,
       );
-    } else if (error is HttpException) {
+    } else if (errorString.contains('HttpException') || 
+               errorString.contains('HTTP error')) {
       return AdapterException(
-        message: 'HTTP error: ${error.message}',
+        message: 'HTTP error: $errorString',
         type: AdapterExceptionType.response,
         originalError: error,
         stackTrace: stackTrace,
       );
-    } else if (error.toString().contains('SocketException') || 
-               error.toString().contains('Failed host lookup') ||
-               error.toString().contains('Connection refused')) {
+    } else if (errorString.contains('SocketException') || 
+               errorString.contains('Failed host lookup') ||
+               errorString.contains('Connection refused')) {
       // 处理包装的 SocketException
       return AdapterException(
         message: 'Connection error: ${error.toString()}',
@@ -663,6 +681,15 @@ class HttpAdapter implements NetworkAdapter {
           message: 'HTTP ${streamedResponse.statusCode}',
           type: AdapterExceptionType.response,
           statusCode: streamedResponse.statusCode,
+        );
+      }
+      
+      // Web 平台不支持文件下载到本地文件系统
+      // Web platform does not support downloading to local file system
+      if (kIsWeb) {
+        throw AdapterException(
+          message: 'File download is not supported on Web platform. Use browser download API instead.',
+          type: AdapterExceptionType.unknown,
         );
       }
       
@@ -726,7 +753,9 @@ class HttpAdapter implements NetworkAdapter {
       
       // 添加字段和文件
       for (final entry in request.bodyParams.entries) {
-        if (entry.value is File) {
+        // Web 平台不支持 File 类型，只支持 MultipartFile
+        // Web platform does not support File type, only MultipartFile
+        if (!kIsWeb && entry.value is File) {
           final file = entry.value as File;
           multipartRequest.files.add(
             await http.MultipartFile.fromPath(entry.key, file.path),
@@ -742,7 +771,10 @@ class HttpAdapter implements NetworkAdapter {
       final streamedResponse = await multipartRequest.send();
       
       // 读取响应
-      final responseBody = await streamedResponse.stream.bytesToString();
+      // 使用 utf8 解码，避免中文乱码
+      // Use utf8 decoding to avoid Chinese garbled text
+      final responseBytes = await streamedResponse.stream.toBytes();
+      final responseBody = utf8.decode(responseBytes);
       
       // 解析响应数据
       dynamic data;

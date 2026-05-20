@@ -3,11 +3,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
-import 'package:hive/hive.dart';
 import '../logcat/debug_manager.dart';
-import '../src/cache/cache_manager.dart';
 import '../src/logging/log_manager.dart';
-import '../src/adapter/implementations/dio_adapter.dart';
+import '../utils/rx_net_database.dart';
 
 ///
 /// RxNet Plus - Flutter 网络请求库 / Flutter Network Request Library
@@ -388,16 +386,19 @@ class RxNet {
   //Basic service addresses for multiple environments
   Map<String, dynamic> _baseUrlEnv = {};
 
-  late final CacheManager cacheManager;
+  // 数据库实例 - 直接使用 RxNetDataBase
+  // Database instance - directly use RxNetDataBase
+  RxNetDataBase? _database;
+  
   late final LogManager logManager;
   late final DebugManager debugManager;
 
 
   RxNet._internal() {
-    // 默认使用 DioAdapter
-    final options = BaseOptions(contentType: Headers.jsonContentType);
-    _adapter = DioAdapter(dio: Dio(options));
-    cacheManager = CacheManager();
+    // Web 平台使用 HttpAdapter，其他平台使用 DioAdapter
+    // Use HttpAdapter on Web, DioAdapter on other platforms
+    // 适配器将在 init/initNet 时创建
+    // Adapter will be created during init/initNet
     logManager = LogManager();
     debugManager = DebugManager();
   }
@@ -443,15 +444,14 @@ class RxNet {
   static Future<void> init(
       {required String baseUrl,
       NetworkAdapter? adapter,
-      Directory? cacheDir,
-      String cacheName = 'app_local_data',
+      String? cachePath,
+      String cacheName = 'rxnet_cache.db',
       CacheMode baseCacheMode = CacheMode.ONLY_REQUEST,
       List<AdapterInterceptor>? interceptors,
       BaseOptions? baseOptions,
       bool systemLog = false,
       CheckNetWork? baseCheckNet,
       List<String>? ignoreCacheKeys,
-      HiveCipher? encryptionCipher,
       Map<String, dynamic>? baseUrlEnv,
       int cacheInvalidationTime = 365 * 24 * 60 * 60 * 1000,
       double debugWindowWidth = 800,
@@ -460,7 +460,7 @@ class RxNet {
      await I.initNet(
         baseUrl: baseUrl,
         adapter: adapter,
-        cacheDir: cacheDir,
+        cachePath: cachePath,
         cacheName: cacheName,
         baseCacheMode: baseCacheMode,
         interceptors: interceptors,
@@ -468,7 +468,6 @@ class RxNet {
         systemLog: systemLog,
         baseCheckNet: baseCheckNet,
         ignoreCacheKeys: ignoreCacheKeys,
-        encryptionCipher: encryptionCipher,
         baseUrlEnv: baseUrlEnv,
         cacheInvalidationTime: cacheInvalidationTime,
         debugWindowWidth: debugWindowWidth,
@@ -479,8 +478,9 @@ class RxNet {
   Future<void> initNet({
     required String baseUrl,
     NetworkAdapter? adapter,
-    Directory? cacheDir,
-    String cacheName = 'app_local_data',
+    String? cachePath,
+    String cacheName = 'network_cache',
+    String databaseName = 'rxnet_cache.db',
     CacheMode baseCacheMode = CacheMode.ONLY_REQUEST,
     List<AdapterInterceptor>? interceptors,
     BaseOptions? baseOptions,
@@ -488,7 +488,6 @@ class RxNet {
     bool isDebug = kDebugMode,
     CheckNetWork? baseCheckNet,
     List<String>? ignoreCacheKeys,
-    HiveCipher? encryptionCipher,
     Map<String, dynamic>? baseUrlEnv,
     int cacheInvalidationTime = 365 * 24 * 60 * 60 * 1000,
     double debugWindowWidth = 800,
@@ -505,16 +504,16 @@ class RxNet {
     debugWindow = ValueNotifier(Size(debugWindowWidth, debugWindowHeight));
 
     // 如果提供了自定义适配器，使用它；否则使用默认的 DioAdapter
+    // If custom adapter provided, use it; otherwise use default DioAdapter
     if (adapter != null) {
       _adapter = adapter;
-    } else {
-      // 确保使用 DioAdapter
-      if (_adapter is! DioAdapter) {
-        final options = baseOptions ?? BaseOptions(
-          contentType: Headers.jsonContentType,
-        );
-        _adapter = DioAdapter(dio: Dio(options));
-      }
+    } else if (_adapter == null) {
+      // 只在 _adapter 为 null 时创建默认适配器
+      // Only create default adapter when _adapter is null
+      final options = baseOptions ?? BaseOptions(
+        contentType: Headers.jsonContentType,
+      );
+      _adapter = DioAdapter(dio: Dio(options));
     }
 
     // 如果是 DioAdapter，配置 Dio 选项
@@ -528,6 +527,9 @@ class RxNet {
       dioAdapter.dio.options.baseUrl = baseUrl;
     }
     
+    // 如果是 HttpAdapter，baseUrl 将在请求构建时处理
+    // If HttpAdapter, baseUrl will be handled during request building
+    
     // 添加适配器拦截器（适用于所有适配器）
     if (interceptors != null && interceptors.isNotEmpty) {
       for (var interceptor in interceptors) {
@@ -539,13 +541,12 @@ class RxNet {
       _baseUrlEnv.addAll(baseUrlEnv);
     }
     
-    if (RxNetPlatform.isWeb) {
-      this._baseCacheMode = CacheMode.ONLY_REQUEST;
-      LogUtil.v("RxNet does not support caching environments: web");
-      LogUtil.v("RxNet 不支持缓存的环境：web");
-      return;
-    }
-    await cacheManager.init(cacheDir, cacheName, encryptionCipher);
+    _database = RxNetDataBase();
+    await RxNetDataBase.initDatabase(
+      databasePath: cachePath,
+      databaseName: databaseName,
+      cacheName: cacheName,
+    );
   }
 
   NetworkAdapter? getAdapter() => _adapter;
@@ -695,13 +696,25 @@ class RxNet {
   //键值对存储数据
   //Key-value pairs store data
   static void saveCache(String key, dynamic value) {
-    I.cacheManager.saveCache(key, value);
+    I._database?.put(key, value);
   }
 
   //通过key获取缓存数据
   //Get cached data through key
   static Future<dynamic> readCache(String key) async{
-    return I.cacheManager.readCache(key);
+    return await I._database?.get(key);
+  }
+  
+  //获取数据库实例
+  //Get database instance
+  RxNetDataBase? getDatabase() {
+    return _database;
+  }
+  
+  //获取默认数据库实例
+  //Get default database instance
+  static RxNetDataBase? getDefaultDatabase() {
+    return I._database;
   }
 
   //默认实列的全局请求头，你也可以在拦截器中进行处理
