@@ -327,17 +327,12 @@ class DioAdapter implements NetworkAdapter {
       // 转换 CancelToken
       final dioCancelToken = _convertCancelToken(interceptedRequest.cancelToken);
       
-      // 处理 RESTful 参数
-      String path = interceptedRequest.path;
-      interceptedRequest.pathParams.forEach((key, value) {
-        path = path.replaceAll('{$key}', value.toString());
-      });
-      
-      // 直接使用 path，Dio 会自动处理：
-      // - 如果 path 是完整 URL (http:// 或 https://)，Dio 直接使用
-      // - 如果 path 是相对路径，Dio 会拼接 dio.options.baseUrl
+      // 构建完整 URL，统一处理 baseUrl/path 斜杠和 RESTful 参数替换。
+      // 这避免了 `baseUrl` 无尾斜杠且 `path` 无前导斜杠时，
+      // Dio 将它们拼成 `hostpath` 的问题。
+      final requestUrl = interceptedRequest.buildFullUrl();
       final response = await _dio.request(
-        path,
+        requestUrl,
         data: requestBody,
         queryParameters: interceptedRequest.queryParams,
         options: options,
@@ -609,17 +604,9 @@ class DioAdapter implements NetworkAdapter {
       final requestBody = _buildRequestBody(request);
       final dioCancelToken = _convertCancelToken(request.cancelToken);
       
-      // 处理 RESTful 参数
-      String path = request.path;
-      request.pathParams.forEach((key, value) {
-        path = path.replaceAll('{$key}', value.toString());
-      });
-      
-      // 直接使用 path，Dio 会自动处理：
-      // - 如果 path 是完整 URL (http:// 或 https://)，Dio 直接使用
-      // - 如果 path 是相对路径，Dio 会拼接 dio.options.baseUrl
+      // 下载与普通请求保持一致，统一使用规范化后的完整 URL。
       final response = await _dio.download(
-        path,
+        request.buildFullUrl(),
         savePath,
         queryParameters: request.queryParams,
         data: requestBody,

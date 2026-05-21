@@ -695,14 +695,14 @@ class RxNet {
 
   //键值对存储数据
   //Key-value pairs store data
-  static void saveCache(String key, dynamic value) {
-    I._database?.put(key, value);
+  static Future<void> saveCache(String key, dynamic value) async {
+    await I._database?.put(key, value);
   }
 
   //通过key获取缓存数据
   //Get cached data through key
-  static Future<dynamic> readCache(String key) async{
-    return await I._database?.get(key);
+  static Future<T?> readCache<T>(String key) async {
+    return await I._database?.get<T>(key);
   }
   
   //获取数据库实例

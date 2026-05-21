@@ -1,5 +1,4 @@
 
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
 import 'package:uikit_plus/toast/toast_utils.dart';
@@ -51,19 +50,13 @@ void main() async {
       interceptors: [
         RxNetLogAdapterInterceptor(),
       ]);
-  RxNet.getDefaultDatabase()?.setDataBaseReadListener((flag){
-    if(!flag){
-      return;
-    }
-    RxNet.saveCache("name", "张三");
-    RxNet.readCache("name").then((value) {
-      LogUtil.v("callback:value:$value"); //输出：张三
-    });
-    //或者
-    Future.delayed(const Duration(seconds: 5), () async {
-      final result = await RxNet.readCache("name");
-      LogUtil.v("result:$result"); //输出：张三
-    });
+  await RxNet.saveCache("name", "张三");
+  final value = await RxNet.readCache<String>("name");
+  LogUtil.v("value:$value"); //输出：张三
+  //或者
+  Future.delayed(const Duration(seconds: 5), () async {
+    final result = await RxNet.readCache<String>("name");
+    LogUtil.v("result:$result"); //输出：张三
   });
 
   runApp(const MyApp());

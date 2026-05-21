@@ -7,7 +7,6 @@ import 'package:rxnet_plus/rxnet_lib.dart';
 import 'package:rxnet_plus/src/request/request_body_type.dart';
 import '../../net/type/response_type.dart' as rxnet_plus;
 import '../../utils/net_utils.dart';
-import '../../utils/rx_net_database.dart';
 import '../adapter/network_adapter.dart' as adapter;
 import '../adapter/models/adapter_request.dart' as adapter_models;
 import '../adapter/cancel_token.dart' as rxnet_cancel;
@@ -910,8 +909,15 @@ class BuildRequest<T> {
 
   /// 读取缓存
   Future<RxResult<T>> _readCache<T>() async {
-    if (!RxNetDataBase.isDatabaseReady) {
+    final database = _rxNet.getDatabase();
+    if (database == null) {
       throw CacheException("Cache not available");
+    }
+
+    try {
+      await database.ready;
+    } catch (error) {
+      throw CacheException("Cache not available", error);
     }
 
     // 合并全局和本地忽略键
@@ -929,7 +935,7 @@ class BuildRequest<T> {
 
     final cacheKey =
         NetUtils.getCacheKeyFromPath(_path, allParams, allIgnoreKeys);
-    final cacheData = await _rxNet.getDatabase()?.get(cacheKey);
+    final cacheData = await database.get(cacheKey);
 
     if (TextUtil.isEmpty(cacheData)) {
       throw CacheException("Cache is empty");

@@ -16,13 +16,9 @@ RxNet 0.6.1 builds on the 0.6.0 pluggable adapter architecture with a pure Dart 
 
 🌟 New in 0.6.1:
 
-🗄️ **Sembast Storage Backend**: Replaced Hive with a pure Dart database for better Web, HarmonyOS, and cross-platform support
-
 🔁 **Breakpoint Download Fixes**: `breakPointDownload()` now works correctly with adapter responses, including `HttpAdapter`
 
 📦 **HttpAdapter Improvements**: Better multipart upload handling, stream response support, and more accurate content-length/progress behavior
-
-🌐 **Safer Web Default**: Web now uses `HttpAdapter` by default to avoid Dio `Platform._version` issues
 
 ### 0.6.0 Major Update - Pluggable Adapter Architecture
 
@@ -98,7 +94,6 @@ RxNet 0.6.0 supports multiple HTTP client adapters. Choose the one that fits you
 
 **0.6.1 note:** `HttpAdapter` now supports regular upload/download workflows more completely, including stream responses and resumed downloads. Cancellation semantics are still cooperative.
 
-See [Adapter Guide](lib/adapters/README.md) and [CancelToken Analysis](.kiro/specs/network-adapter-decoupling/CANCEL_TOKEN_ANALYSIS.md) for detailed comparison.
 
 ## Common Parameters:
 
@@ -136,20 +131,17 @@ enum CacheMode {
 #### Additional Feature: Small amounts of data support RxNet data storage, more efficient:
 
 ```dart
-    // Store data key-value
-    RxNet.saveCache("name", "John Doe");
+// After await RxNet.init(...)
+await RxNet.saveCache("name", "John Doe");
 
-    // Read data
-    RxNet.readCache("name").then((value) {
-      LogUtil.v(value);  // Output: John Doe
-    });
+final value = await RxNet.readCache<String>("name");
+LogUtil.v(value);  // Output: John Doe
 
-    // Or
-    Future.delayed(const Duration(seconds: 5),() async{
-      final result = await RxNet.readCache("name");
-      LogUtil.v(result);  // Output: John Doe
-    });
-    
+// Or
+Future.delayed(const Duration(seconds: 5), () async {
+  final result = await RxNet.readCache<String>("name");
+  LogUtil.v(result);  // Output: John Doe
+});
 ```
 
 #### Several ways to execute requests, use according to scenario:

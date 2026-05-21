@@ -14,13 +14,9 @@ RxNet 0.6.1 在 0.6.0 可插拔适配器架构的基础上，补上了纯 Dart �
 
 🌟 0.6.1 新特性：
 
-🗄️ **Sembast 存储后端**：用纯 Dart 数据库替换 Hive，提升 Web、HarmonyOS 和跨平台兼容性
-
 🔁 **断点下载修复**：`breakPointDownload()` 现在可以正确处理适配器响应，包括 `HttpAdapter`
-
 📦 **HttpAdapter 增强**：补齐 multipart 上传、流式响应和内容长度/进度统计行为
 
-🌐 **更安全的 Web 默认适配器**：Web 平台默认使用 `HttpAdapter`，规避 Dio 的 `Platform._version` 问题
 
 ### 0.6.0 重大更新 - 可插拔适配器架构
 
@@ -97,8 +93,6 @@ RxNet 0.6.0 支持多个 HTTP 客户端适配器。选择适合您需求的：
 
 **0.6.1 补充说明：** `HttpAdapter` 现在已经更完整地支持常规上传下载流程，包括流式响应和断点下载；但取消语义仍然是协作式的。
 
-详见[适配器指南](lib/adapters/README.md)和[取消令牌分析](.kiro/specs/network-adapter-decoupling/CANCEL_TOKEN_ANALYSIS.md)。
-
 
 ## 常用参数：
 
@@ -136,18 +130,15 @@ enum CacheMode {
 #### 额外功能：小量数据支持 RxNet 数据来存储,效率更高效：
 
 ```dart
-  
-//存储数据 key-value
-RxNet.saveCache("name", "张三");
+// 在 await RxNet.init(...) 之后调用
+await RxNet.saveCache("name", "张三");
 
-//读取数据
-RxNet.readCache("name").then((value) {
-  LogUtil.v(value);  //输出：张三
-});
+final value = await RxNet.readCache<String>("name");
+LogUtil.v(value);  //输出：张三
 
 //或者
 Future.delayed(const Duration(seconds: 5),() async{
-  final result = await RxNet.readCache("name");
+  final result = await RxNet.readCache<String>("name");
   LogUtil.v(result);  //输出：张三
 });
 ```

@@ -424,12 +424,11 @@ class _EnhancedExampleState extends State<EnhancedExample> {
 
     RxNet.get()
         .setPath('api/weather/city/{id}')
-        .setPathParam("id",
-            "101030100") //RESTFul时，这里的参数名称需要和路径中占位符--保持一直: http://t.weather.sojson.com/api/weather/city/101030100
+        .setPathParam("id", "101030100") //RESTFul时，这里的参数名称需要和路径中占位符--保持一直: http://t.weather.sojson.com/api/weather/city/101030100
         .setCancelToken(pageRequestToken) //取消请求的CancelToken
         .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
         // .setRetryCount(2, interval: const Duration(seconds: 7))  //失败重试，重试2次,每次间隔7秒
-        .setLoop(true) // 定时请求
+        // .setLoop(true) // 循环
         .setContentType(ContentTypes.json) //application/json
         .setResponseType(ResponseType.json) //json
         .setCacheInvalidationTime(1000 * 5) //本次请求的缓存失效时间-毫秒
