@@ -4,11 +4,10 @@
 
 import 'package:dio/dio.dart';
 
-/// 配置 Dio 适配器（IO 平台）
-/// Configure Dio adapter (IO platforms)
-void configureDioAdapter(Dio dio) {
-  // IO 平台不需要特殊配置，使用默认的 IOHttpClientAdapter
-  // IO platforms don't need special configuration, use default IOHttpClientAdapter
-  // Dio 会自动使用 IOHttpClientAdapter
-  // Dio will automatically use IOHttpClientAdapter
+/// 创建配置好的 Dio 实例（IO 平台）
+/// Create configured Dio instance (IO platforms)
+Dio createConfiguredDio() {
+  // IO 平台：Dio 会自动使用 IOHttpClientAdapter
+  // IO platforms: Dio will automatically use IOHttpClientAdapter
+  return Dio(BaseOptions());
 }

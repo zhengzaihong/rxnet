@@ -674,7 +674,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     }
 
     Directory? appDocDir = await getDownloadsDirectory();
-    String? appDocPath = "${appDocDir?.path}/test.jpg";
+    String? appDocPath = "${appDocDir?.absolute.path}/test.jpg";
     RxNet.get()
         .setPath("https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg")
         .breakPointDownload(

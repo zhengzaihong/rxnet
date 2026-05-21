@@ -11,20 +11,20 @@ void main() async {
 
 
   final adapter = DioAdapter();
-  adapter.dio.httpClientAdapter = IOHttpClientAdapter(
-    createHttpClient: () {
-      final client = HttpClient();
-      client.badCertificateCallback = (cert, host, port) {
-        // // 获取证书 DER
-        // final der = cert.der;
-        // final sha256 = sha256Convert(der);
-        // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
-        // return sha256 == trustedFingerprint;
-        return true;
-      };
-      return client;
-    },
-  );
+  // adapter.dio.httpClientAdapter = IOHttpClientAdapter(
+  //   createHttpClient: () {
+  //     final client = HttpClient();
+  //     client.badCertificateCallback = (cert, host, port) {
+  //       // // 获取证书 DER
+  //       // final der = cert.der;
+  //       // final sha256 = sha256Convert(der);
+  //       // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
+  //       // return sha256 == trustedFingerprint;
+  //       return true;
+  //     };
+  //     return client;
+  //   },
+  // );
 
 
   // IOClient createPinnedClient() {

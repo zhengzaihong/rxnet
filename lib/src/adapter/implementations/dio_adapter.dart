@@ -12,7 +12,7 @@ import '../cancel_token.dart' as adapter_cancel;
 
 // 条件导入：Web 平台导入 web 辅助文件，其他平台导入 io 辅助文件
 // Conditional import: web helper for Web, io helper for other platforms
-import 'dio_adapter_io.dart' if (dart.library.html) 'dio_adapter_web.dart';
+import 'dio_adapter_io.dart' if (dart.library.html) 'dio_adapter_web.dart' show createConfiguredDio;
 
 ///
 /// author: ZhengZaiHong
@@ -244,9 +244,9 @@ class DioAdapter implements NetworkAdapter {
   /// 创建 DioAdapter。
   /// 
   /// Parameters / 参数:
-  /// - [dio]: Optional custom Dio instance. If not provided, a default
-  ///          instance will be created.
-  ///          可选的自定义 Dio 实例。如果不提供，将创建默认实例。
+  /// - [dio]: Optional custom Dio instance. If not provided, a platform-specific
+  ///          default instance will be created.
+  ///          可选的自定义 Dio 实例。如果不提供，将创建平台特定的默认实例。
   /// 
   /// Example / 示例:
   /// ```dart
@@ -259,13 +259,37 @@ class DioAdapter implements NetworkAdapter {
   /// ```
   /// 
   /// Note / 注意:
-  /// On Web platform, BrowserHttpClientAdapter is automatically configured.
+  /// On Web platform, the Dio instance is automatically configured for Web.
   /// 
-  /// 在 Web 平台上，会自动配置 BrowserHttpClientAdapter。
-  DioAdapter({Dio? dio}) : _dio = dio ?? Dio() {
-    // 配置平台特定的适配器
-    // Configure platform-specific adapter
-    configureDioAdapter(_dio);
+  /// 在 Web 平台上，Dio 实例会自动配置为 Web 平台。
+  DioAdapter({Dio? dio}) : _dio = dio ?? createConfiguredDio();
+  
+  /// Creates a DioAdapter with BaseOptions.
+  /// 
+  /// 使用 BaseOptions 创建 DioAdapter。
+  /// 
+  /// This factory method creates a platform-specific Dio instance with the
+  /// provided BaseOptions.
+  /// 
+  /// 此工厂方法使用提供的 BaseOptions 创建平台特定的 Dio 实例。
+  /// 
+  /// Parameters / 参数:
+  /// - [options]: BaseOptions for configuring Dio
+  ///              用于配置 Dio 的 BaseOptions
+  /// 
+  /// Example / 示例:
+  /// ```dart
+  /// final adapter = DioAdapter.withOptions(
+  ///   BaseOptions(
+  ///     baseUrl: "https://api.example.com",
+  ///     connectTimeout: Duration(seconds: 30),
+  ///   ),
+  /// );
+  /// ```
+  factory DioAdapter.withOptions(BaseOptions options) {
+    final dio = createConfiguredDio();
+    dio.options = options;
+    return DioAdapter(dio: dio);
   }
   
   /// Gets the underlying Dio instance.

@@ -513,7 +513,7 @@ class RxNet {
       final options = baseOptions ?? BaseOptions(
         contentType: Headers.jsonContentType,
       );
-      _adapter = DioAdapter(dio: Dio(options));
+      _adapter = DioAdapter.withOptions(options);
     }
 
     // 如果是 DioAdapter，配置 Dio 选项
