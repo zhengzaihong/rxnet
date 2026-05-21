@@ -130,7 +130,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         children: [
           Text(title,
               style:
-                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+              const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
           const SizedBox(height: 6),
           ElevatedButton(
             onPressed: onPressed,
@@ -150,7 +150,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         children: [
           Text(title,
               style:
-                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+              const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
           const SizedBox(height: 6),
           Row(
             children: [
@@ -427,24 +427,24 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         .setPathParam("id", "101030100") //RESTFul时，这里的参数名称需要和路径中占位符--保持一直: http://t.weather.sojson.com/api/weather/city/101030100
         .setCancelToken(pageRequestToken) //取消请求的CancelToken
         .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
-        // .setRetryCount(2, interval: const Duration(seconds: 7))  //失败重试，重试2次,每次间隔7秒
-        // .setLoop(true) // 循环
+    // .setRetryCount(2, interval: const Duration(seconds: 7))  //失败重试，重试2次,每次间隔7秒
+    // .setLoop(true) // 循环
         .setContentType(ContentTypes.json) //application/json
         .setResponseType(ResponseType.json) //json
         .setCacheInvalidationTime(1000 * 5) //本次请求的缓存失效时间-毫秒
-        // .setRequestIgnoreCacheTime(true)  // 是否直接忽略缓存失效时间
-        // .setJsonConvert(NewWeatherInfo.fromJson) //解析成NewWeatherInfo对象
-        // .setJsonConvert((data)=> BaseBean<Data>.fromJson(data).data) // 如果你只关心data实体部分
+    // .setRequestIgnoreCacheTime(true)  // 是否直接忽略缓存失效时间
+    // .setJsonConvert(NewWeatherInfo.fromJson) //解析成NewWeatherInfo对象
+    // .setJsonConvert((data)=> BaseBean<Data>.fromJson(data).data) // 如果你只关心data实体部分
         .setJsonConvert((data) =>
-            BaseInfo<Data>.fromJson(data, Data.fromJson)) //如果你想要 code 等信息
-        // .setJsonConvert((data)=>BaseInfo<Data>.fromJson(data, Data.fromJson).data) //如果你只关心data实体部分
-        // .setResponseType(ResponseType.stream)
+    BaseInfo<Data>.fromJson(data, Data.fromJson)) //如果你想要 code 等信息
+    // .setJsonConvert((data)=>BaseInfo<Data>.fromJson(data, Data.fromJson).data) //如果你只关心data实体部分
+    // .setResponseType(ResponseType.stream)
         .execute<BaseInfo<Data>>(success: (data, source) {
       //刷新UI
       count++;
       setState(() {
         result =
-            "${sourcesType == SourcesType.net ? "网络请求" : "缓存请求"}-$count : ${jsonEncode(data)}";
+        "${sourcesType == SourcesType.net ? "网络请求" : "缓存请求"}-$count : ${jsonEncode(data)}";
         sourcesType = source;
       });
     }, failure: (e) {
@@ -474,7 +474,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         count++;
         if (data.isSuccess) {
           result =
-              "${sourcesType == SourcesType.net ? "网络请求" : "缓存请求"}-$count : ${jsonEncode(data.value)}";
+          "${sourcesType == SourcesType.net ? "网络请求" : "缓存请求"}-$count : ${jsonEncode(data.value)}";
           sourcesType = data.model;
         } else {
           result = data.error.toString();
@@ -498,7 +498,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     setState(() {
       count++;
       result =
-          "${sourcesType == SourcesType.net ? "网络请求" : "缓存请求"}-$count : ${jsonEncode(data.value)}";
+      "${sourcesType == SourcesType.net ? "网络请求" : "缓存请求"}-$count : ${jsonEncode(data.value)}";
       sourcesType = data.model;
     });
   }
@@ -536,7 +536,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     final response = await RxNet.get()
         .setPath("/api/weather/city/{id}")
         .setPathParam("id", "101030100") // 自动替换 {id}
-        // 无需 setRestfulUrl，框架自动检测
+    // 无需 setRestfulUrl，框架自动检测
         .request();
 
     setState(() {
@@ -583,7 +583,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     final response = await RxNet.post()
         .setPath("/api/user")
         .setBodyParams(
-            {"name": "张三", "age": 25, "email": "zhangsan@example.com"})
+        {"name": "张三", "age": 25, "email": "zhangsan@example.com"})
         .asJson() // 明确指定JSON格式
         .request();
 
@@ -635,15 +635,15 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         .setPath("/api/categories/{categoryId}/products")
         .setPathParam("categoryId", "electronics") // 路径参数
         .setQueryParams({
-          // 查询参数
-          "keyword": "手机",
-          "minPrice": 1000,
-          "maxPrice": 5000,
-          "brand": "Apple",
-          "sort": "price_asc",
-          "page": 1,
-          "size": 20
-        })
+      // 查询参数
+      "keyword": "手机",
+      "minPrice": 1000,
+      "maxPrice": 5000,
+      "brand": "Apple",
+      "sort": "price_asc",
+      "page": 1,
+      "size": 20
+    })
         .setIgnoreCacheKey("page") // 忽略page参数生成缓存键
         .setCacheMode(CacheMode.FIRST_USE_CACHE_THEN_REQUEST)
         .request();
@@ -658,7 +658,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     if (RxNetPlatform.isWeb) {
       Downloader.downloadFile(
           url:
-              "https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg");
+          "https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg");
       return;
     }
     List<Permission> permissions = <Permission>[Permission.storage];
@@ -676,14 +676,14 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     String? appDocPath = "${appDocDir?.absolute.path}/test.jpg";
     RxNet.get()
         .setPath(
-            "https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg")
+        "https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg")
         .breakPointDownload(
-            savePath: appDocPath,
-            success: (data, model) {
-              setState(() {
-                result = "示例6：保存地址：$data";
-              });
-            });
+        savePath: appDocPath,
+        success: (data, model) {
+          setState(() {
+            result = "示例6：保存地址：$data";
+          });
+        });
   }
 }
 
@@ -694,9 +694,9 @@ class _EnhancedExampleState extends State<EnhancedExample> {
 class CustomLoggingInterceptor extends AdapterInterceptor {
   @override
   void onRequest(
-    AdapterRequest request,
-    RequestInterceptorHandler handler,
-  ) {
+      AdapterRequest request,
+      RequestInterceptorHandler handler,
+      ) {
     debugPrint('🚀 [请求] ${request.method.name} ${request.buildFullUrl()}');
     debugPrint('📤 [请求头] ${request.headers}');
     if (request.bodyParams.isNotEmpty) {
@@ -761,9 +761,9 @@ class CustomLoggingInterceptor extends AdapterInterceptor {
 
   @override
   void onResponse(
-    AdapterResponse response,
-    ResponseInterceptorHandler handler,
-  ) {
+      AdapterResponse response,
+      ResponseInterceptorHandler handler,
+      ) {
     debugPrint(
         '✅ [响应] ${response.statusCode} ${response.request.buildFullUrl()}');
     debugPrint('📥 [响应头] ${response.headers}');
@@ -773,9 +773,9 @@ class CustomLoggingInterceptor extends AdapterInterceptor {
 
   @override
   void onError(
-    AdapterException error,
-    ErrorInterceptorHandler handler,
-  ) {
+      AdapterException error,
+      ErrorInterceptorHandler handler,
+      ) {
     debugPrint('❌ [错误] ${error.type} - ${error.message}');
     handler.next(error); // 继续错误
   }
@@ -805,9 +805,9 @@ class UserApiExample {
         .getRequest()
         .setPath("/api/users")
         .setQueryParams(
-            {"page": 1, "size": 20, "status": "active", "role": "admin"})
+        {"page": 1, "size": 20, "status": "active", "role": "admin"})
         .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
-        // .setJsonConvert(UserListResponse.fromJson)
+    // .setJsonConvert(UserListResponse.fromJson)
         .request();
 
     if (result.isSuccess) {
@@ -823,7 +823,7 @@ class UserApiExample {
         .getRequest()
         .setPath("/api/users/{id}")
         .setPathParam("id", userId)
-        // .setJsonConvert(UserDetail.fromJson)
+    // .setJsonConvert(UserDetail.fromJson)
         .request();
 
     if (result.isSuccess) {
@@ -838,7 +838,7 @@ class UserApiExample {
         .setPath("/api/users")
         .setBodyParams(userData)
         .asJson()
-        // .setJsonConvert(User.fromJson)
+    // .setJsonConvert(User.fromJson)
         .request();
 
     if (result.isSuccess) {
@@ -982,7 +982,7 @@ class ProductApiExample {
         .setQueryParams(queryParams)
         .setIgnoreCacheKey("page") // 忽略page参数生成缓存键
         .setCacheMode(CacheMode.FIRST_USE_CACHE_THEN_REQUEST)
-        // .setJsonConvert(ProductListResponse.fromJson)
+    // .setJsonConvert(ProductListResponse.fromJson)
         .request();
 
     if (result.isSuccess) {
@@ -1128,10 +1128,10 @@ class ComparisonExample {
         .setPath("/api/users/{userId}/profile")
         .setPathParam("userId", "123") // 路径参数
         .setBodyParams({
-          // Body参数
-          "name": "张三",
-          "age": 25
-        })
+      // Body参数
+      "name": "张三",
+      "age": 25
+    })
         .asJson()
         .request();
   }

@@ -852,13 +852,16 @@ class HttpAdapter implements NetworkAdapter {
     // 使用字符串检查而不是类型检查，以支持 Web 平台
     // Use string checking instead of type checking to support Web platform
     final errorString = error.toString();
+    final formattedError = _formatWebConnectionError(errorString);
 
     if (errorString.contains('SocketException') ||
         errorString.contains('Failed host lookup') ||
         errorString.contains('Connection refused') ||
-        errorString.contains('Connection error')) {
+        errorString.contains('Connection error') ||
+        errorString.contains('XMLHttpRequest') ||
+        errorString.contains('ClientException: XMLHttpRequest')) {
       return AdapterException(
-        message: 'Connection error: $errorString',
+        message: 'Connection error: $formattedError',
         type: AdapterExceptionType.connectionError,
         originalError: error,
         stackTrace: stackTrace,
@@ -883,7 +886,7 @@ class HttpAdapter implements NetworkAdapter {
         errorString.contains('Connection refused')) {
       // 处理包装的 SocketException
       return AdapterException(
-        message: 'Connection error: ${error.toString()}',
+        message: 'Connection error: $formattedError',
         type: AdapterExceptionType.connectionError,
         originalError: error,
         stackTrace: stackTrace,
@@ -896,6 +899,23 @@ class HttpAdapter implements NetworkAdapter {
         stackTrace: stackTrace,
       );
     }
+  }
+
+  String _formatWebConnectionError(String errorString) {
+    if (!kIsWeb) {
+      return errorString;
+    }
+
+    final normalized = errorString.toLowerCase();
+    final looksLikeBrowserError = normalized.contains('xmlhttprequest') ||
+        normalized.contains('failed to fetch') ||
+        normalized.contains('networkerror');
+
+    if (!looksLikeBrowserError) {
+      return errorString;
+    }
+
+    return '$errorString On Web this usually means the browser blocked the request because of CORS, mixed content (an HTTP request from an HTTPS page), or a TLS/HTTPS problem on the target URL.';
   }
 
   @override

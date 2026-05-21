@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../net/type/http_method.dart';
 import '../../../net/type/response_type.dart' as adapter_model;
 import '../network_adapter.dart' hide ProgressCallback;
@@ -488,9 +489,10 @@ class DioAdapter implements NetworkAdapter {
   /// 转换 DioException 到 AdapterException
   AdapterException _convertException(DioException e) {
     final type = _convertExceptionType(e.type);
+    final message = _formatExceptionMessage(e);
     
     return AdapterException(
-      message: e.message ?? 'Unknown error',
+      message: message,
       type: type,
       statusCode: e.response?.statusCode,
       response: e.response != null 
@@ -506,6 +508,26 @@ class DioAdapter implements NetworkAdapter {
       originalError: e,
       stackTrace: e.stackTrace,
     );
+  }
+
+  String _formatExceptionMessage(DioException e) {
+    final message = e.message ?? 'Unknown error';
+
+    if (kIsWeb &&
+        e.type == DioExceptionType.connectionError &&
+        _looksLikeBrowserNetworkError(message)) {
+      return '$message On Web this usually means the browser blocked the request because of CORS, mixed content (an HTTP request from an HTTPS page), or a TLS/HTTPS problem on the target URL.';
+    }
+
+    return message;
+  }
+
+  bool _looksLikeBrowserNetworkError(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('xmlhttprequest onerror') ||
+        normalized.contains('xmlhttprequest') ||
+        normalized.contains('failed to fetch') ||
+        normalized.contains('network layer');
   }
   
   /// 转换 CancelToken

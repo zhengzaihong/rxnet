@@ -39,7 +39,7 @@ class NetUtils {
       scheme = resultUrl.substring(0, schemeEndIndex + 3);
       rest = resultUrl.substring(schemeEndIndex + 3);
     }
-    
+     //替换掉路径部分的所有多 //or///等等 到 /
     rest = rest.replaceAll(RegExp(r'/+'), '/');
     return scheme + rest;
   }

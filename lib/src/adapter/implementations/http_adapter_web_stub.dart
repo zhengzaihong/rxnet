@@ -11,12 +11,37 @@
 // Stub class for File (not used on Web)
 class File {
   File(String path);
+
+  Directory get parent => Directory('');
   
   dynamic openWrite() {
     throw UnsupportedError('File operations are not supported on Web platform');
   }
   
   String get path => throw UnsupportedError('File.path is not supported on Web platform');
+}
+
+// Stub class for Directory (not used on Web)
+class Directory {
+  Directory(String path);
+
+  bool existsSync() {
+    throw UnsupportedError(
+      'Directory operations are not supported on Web platform',
+    );
+  }
+
+  void createSync({bool recursive = false}) {
+    throw UnsupportedError(
+      'Directory operations are not supported on Web platform',
+    );
+  }
+}
+
+// Stub class for HttpHeaders constants used in shared code
+class HttpHeaders {
+  static const String contentTypeHeader = 'content-type';
+  static const String contentLengthHeader = 'content-length';
 }
 
 // Stub class for SocketException (not used on Web)
