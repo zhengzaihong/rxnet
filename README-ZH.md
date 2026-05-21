@@ -8,9 +8,23 @@ Language: [English](README.md) | 简体中文
 
 🚀 RxNet：极简易用、强大、原生风格的 Flutter 网络通信框架，贴合原生开发习惯，几乎零学习成本即可上手。可轻松实现开屏即有数据特性，支持丰富的功能组合，助你构建高性能、可维护的应用程序。
 
-## 🎉 0.6.0 重大更新 - 可插拔适配器架构
+## 🎉 0.6.1 更新 - 适配器稳定性 + 跨平台存储
 
-RxNet 0.6.0 引入了革命性的可插拔适配器架构，完全解耦框架与特定 HTTP 客户端库！
+RxNet 0.6.1 在 0.6.0 可插拔适配器架构的基础上，补上了纯 Dart 缓存后端和一轮适配器兼容性修复。
+
+🌟 0.6.1 新特性：
+
+🗄️ **Sembast 存储后端**：用纯 Dart 数据库替换 Hive，提升 Web、HarmonyOS 和跨平台兼容性
+
+🔁 **断点下载修复**：`breakPointDownload()` 现在可以正确处理适配器响应，包括 `HttpAdapter`
+
+📦 **HttpAdapter 增强**：补齐 multipart 上传、流式响应和内容长度/进度统计行为
+
+🌐 **更安全的 Web 默认适配器**：Web 平台默认使用 `HttpAdapter`，规避 Dio 的 `Platform._version` 问题
+
+### 0.6.0 重大更新 - 可插拔适配器架构
+
+RxNet 0.6.0 引入了可插拔适配器架构，完全解耦框架与特定 HTTP 客户端库。
 
 📖 **迁移指南：** [MIGRATION_GUIDE_0.6.0.md](MIGRATION_GUIDE_0.6.0.md) | [迁移指南_0.6.0.md](迁移指南_0.6.0.md) | [0.5.0 指南](迁移指南_0.5.0.md)
 
@@ -71,7 +85,7 @@ RxNet 0.6.0 支持多个 HTTP 客户端适配器。选择适合您需求的：
 | 适配器 | 包 | 大小 | 功能 | 取消 | 最适合 |
 |--------|-----|------|------|------|--------|
 | **DioAdapter** | `dio: ^5.8.0+1` | 完整 | 所有功能、拦截器 | ✅ 真正取消（中止连接） | 生产应用（默认） |
-| **HttpAdapter** | `http: ^1.2.0` | 轻量 | 基础 HTTP、拦截器 | ⚠️ 伪取消（标记已取消） | 轻量级应用 |
+| **HttpAdapter** | `http: ^1.2.0` | 轻量 | 基础 HTTP、拦截器、multipart 上传、流式/下载支持 | ⚠️ 伪取消（标记已取消） | 轻量级应用 |
 | **MockAdapter** | 内置 | 最小 | 测试、无网络 | ✅ 模拟 | 单元/集成测试 |
 
 **默认行为：** 如果您不指定适配器，将自动使用 DioAdapter。
@@ -80,6 +94,8 @@ RxNet 0.6.0 支持多个 HTTP 客户端适配器。选择适合您需求的：
 - **DioAdapter**：提供真正的取消 - 立即中止 HTTP 连接，节省带宽
 - **HttpAdapter**：提供伪取消 - 标记为已取消但 HTTP 请求在后台继续
 - 对于需要真正取消的场景（大文件、长请求），使用 DioAdapter
+
+**0.6.1 补充说明：** `HttpAdapter` 现在已经更完整地支持常规上传下载流程，包括流式响应和断点下载；但取消语义仍然是协作式的。
 
 详见[适配器指南](lib/adapters/README.md)和[取消令牌分析](.kiro/specs/network-adapter-decoupling/CANCEL_TOKEN_ANALYSIS.md)。
 
@@ -363,8 +379,7 @@ void testStreamRequest(){
 RxNet.get() 
     .setPath("https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg")
     .setParam(xx,xx)
-     //breakPointDownload() 断点下载
-    .download(
+    .breakPointDownload(
       savePath:"${appDocPath}/55.jpg",
       onReceiveProgress: (len,total){
         print("len:$len,total:$total");
@@ -377,8 +392,7 @@ RxNet.get()
 
 RxNet.post()
     .setPath("xxxxx/xxx.jpg")
-    // breakPointUpload() 断点续传
-    .upload(
+    .breakPointUpload(
         success: (data, sourcesType) {},
         failure: (e) {},
         onSendProgress: (len, total) {});

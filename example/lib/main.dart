@@ -51,17 +51,21 @@ void main() async {
       interceptors: [
         RxNetLogAdapterInterceptor(),
       ]);
-
-
-  RxNet.saveCache("name", "张三");
-  RxNet.readCache("name").then((value) {
-    LogUtil.v("callback:value:$value"); //输出：张三
+  RxNet.getDefaultDatabase()?.setDataBaseReadListener((flag){
+    if(!flag){
+      return;
+    }
+    RxNet.saveCache("name", "张三");
+    RxNet.readCache("name").then((value) {
+      LogUtil.v("callback:value:$value"); //输出：张三
+    });
+    //或者
+    Future.delayed(const Duration(seconds: 5), () async {
+      final result = await RxNet.readCache("name");
+      LogUtil.v("result:$result"); //输出：张三
+    });
   });
-  //或者
-  Future.delayed(const Duration(seconds: 5), () async {
-    final result = await RxNet.readCache("name");
-    LogUtil.v("result:$result"); //输出：张三
-  });
+
   runApp(const MyApp());
 }
 

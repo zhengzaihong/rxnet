@@ -11,6 +11,7 @@ import '../../utils/rx_net_database.dart';
 import '../adapter/network_adapter.dart' as adapter;
 import '../adapter/models/adapter_request.dart' as adapter_models;
 import '../adapter/cancel_token.dart' as rxnet_cancel;
+
 ///
 /// author: zhengzaihong
 /// email: 1096877329@qq.com
@@ -20,94 +21,94 @@ import '../adapter/cancel_token.dart' as rxnet_cancel;
 /// ============================================================================
 /// 类说明 / Class Description
 /// ============================================================================
-/// 
+///
 /// BuildRequest 是 RxNet Plus 的核心请求构建器，提供流畅的 API 来配置和执行网络请求。
 /// 它将请求配置与 RxNet 主类分离，使代码更加清晰和易于维护。
-/// 
+///
 /// BuildRequest is the core request builder of RxNet Plus, providing a fluent API
 /// to configure and execute network requests. It separates request configuration
 /// from the main RxNet class, making the code clearer and easier to maintain.
-/// 
+///
 /// ============================================================================
 /// 版本历史 / Version History
 /// ============================================================================
-/// 
+///
 /// 📦 Version 0.6.0 (2026-04-20) - 适配器架构支持 / Adapter Architecture Support
 /// ----------------------------------------------------------------------------
-/// 
+///
 /// 🎯 核心变更 / Core Changes:
-/// 
+///
 /// 1. **适配器集成 / Adapter Integration**
 ///    - 重构为使用 NetworkAdapter 接口
 ///    - Refactored to use NetworkAdapter interface
 ///    - 支持多种网络库（Dio、http、自定义）
 ///    - Support for multiple network libraries (Dio, http, custom)
-/// 
+///
 /// 2. **统一的取消令牌 / Unified Cancel Token**
 ///    - 使用 RxNet 的 CancelToken 替代 Dio 的 CancelToken
 ///    - Use RxNet's CancelToken instead of Dio's CancelToken
 ///    - 跨适配器的取消支持
 ///    - Cross-adapter cancellation support
-/// 
+///
 /// 3. **改进的拦截器支持 / Improved Interceptor Support**
 ///    - 拦截器通过适配器执行
 ///    - Interceptors executed through adapters
 ///    - 支持请求、响应、错误拦截
 ///    - Support for request, response, and error interception
-/// 
+///
 /// 📦 Version 0.5.0 (2025-10-03) - API 优化 / API Optimization
 /// ----------------------------------------------------------------------------
-/// 
+///
 /// 🎯 核心改进 / Core Improvements:
-/// 
+///
 /// 1. **参数类型明确化 / Explicit Parameter Types**
 ///    - 引入 RequestBodyType 枚举
 ///    - Introduced RequestBodyType enum
 ///    - 分离路径参数、查询参数、Body 参数
 ///    - Separated path params, query params, and body params
-/// 
+///
 /// 2. **RESTful 自动检测 / RESTful Auto-Detection**
 ///    - 自动识别路径中的 {placeholder}
 ///    - Automatically recognize {placeholder} in paths
 ///    - 无需手动调用 setRestfulUrl(true)
 ///    - No need to manually call setRestfulUrl(true)
-/// 
+///
 /// 3. **请求体类型清晰化 / Clear Request Body Types**
 ///    - asJson() - JSON 格式
 ///    - asFormData() - FormData 格式
 ///    - asUrlEncoded() - URL 编码格式
-/// 
+///
 /// 4. **改进的缓存键生成 / Improved Cache Key Generation**
 ///    - 更智能的缓存键生成逻辑
 ///    - Smarter cache key generation logic
 ///    - 支持忽略特定参数
 ///    - Support for ignoring specific parameters
-/// 
+///
 /// 5. **统一的错误处理 / Unified Error Handling**
 ///    - 标准化的异常类型
 ///    - Standardized exception types
 ///    - 更清晰的错误信息
 ///    - Clearer error messages
-/// 
+///
 /// 📦 Version 0.4.x - 初始版本 / Initial Version
 /// ----------------------------------------------------------------------------
-/// 
+///
 /// - 基础请求功能 / Basic request functionality
 /// - 缓存支持 / Cache support
 /// - 重试和轮询 / Retry and polling
 /// - JSON 转换 / JSON conversion
-/// 
+///
 /// ============================================================================
 /// 使用示例 / Usage Examples
 /// ============================================================================
-/// 
+///
 /// 1. 基础 GET 请求 / Basic GET Request:
 /// ```dart
 /// final result = await RxNet.get()
 ///   .setPath("/api/users")
 ///   .request();
 /// ```
-/// 
+///
 /// 2. RESTful 请求 / RESTful Request:
 /// ```dart
 /// final result = await RxNet.get()
@@ -116,7 +117,7 @@ import '../adapter/cancel_token.dart' as rxnet_cancel;
 ///   .setQueryParam("page", 1)
 ///   .request();
 /// ```
-/// 
+///
 /// 3. POST JSON 数据 / POST JSON Data:
 /// ```dart
 /// final result = await RxNet.post()
@@ -125,7 +126,7 @@ import '../adapter/cancel_token.dart' as rxnet_cancel;
 ///   .asJson()
 ///   .request();
 /// ```
-/// 
+///
 /// 4. 文件上传 / File Upload:
 /// ```dart
 /// final file = await MultipartFile.fromFile("path/to/file.jpg");
@@ -135,7 +136,7 @@ import '../adapter/cancel_token.dart' as rxnet_cancel;
 ///   .asFormData()
 ///   .request();
 /// ```
-/// 
+///
 /// 5. 带缓存的请求 / Request with Cache:
 /// ```dart
 /// final result = await RxNet.get()
@@ -144,7 +145,7 @@ import '../adapter/cancel_token.dart' as rxnet_cancel;
 ///   .setCacheInvalidationTime(60000) // 60 seconds
 ///   .request();
 /// ```
-/// 
+///
 /// 6. 带重试的请求 / Request with Retry:
 /// ```dart
 /// final result = await RxNet.get()
@@ -152,86 +153,86 @@ import '../adapter/cancel_token.dart' as rxnet_cancel;
 ///   .setRetryCount(3, interval: Duration(seconds: 2))
 ///   .request();
 /// ```
-/// 
+///
 /// 7. 取消请求 / Cancel Request:
 /// ```dart
 /// final cancelToken = CancelToken();
-/// 
+///
 /// RxNet.get()
 ///   .setPath("/api/data")
 ///   .setCancelToken(cancelToken)
 ///   .request();
-/// 
+///
 /// // Later...
 /// cancelToken.cancel("User cancelled");
 /// ```
-/// 
+///
 /// ============================================================================
 /// 参数类型说明 / Parameter Types
 /// ============================================================================
-/// 
+///
 /// 1. **路径参数 / Path Parameters** (setPathParam/setPathParams)
 ///    - 用于 RESTful URL 中的占位符替换
 ///    - Used for placeholder replacement in RESTful URLs
 ///    - 例如：/users/{id} -> /users/123
 ///    - Example: /users/{id} -> /users/123
-/// 
+///
 /// 2. **查询参数 / Query Parameters** (setQueryParam/setQueryParams)
 ///    - 拼接在 URL 后面的参数
 ///    - Parameters appended to the URL
 ///    - 例如：/users?page=1&size=20
 ///    - Example: /users?page=1&size=20
-/// 
+///
 /// 3. **Body 参数 / Body Parameters** (setBodyParam/setBodyParams)
 ///    - POST/PUT/PATCH 请求的请求体参数
 ///    - Request body parameters for POST/PUT/PATCH
 ///    - 根据 bodyType 决定编码方式
 ///    - Encoding method determined by bodyType
-/// 
+///
 /// 4. **原始 Body / Raw Body** (setRawBody)
 ///    - 自定义的原始请求体数据
 ///    - Custom raw request body data
 ///    - 优先级高于 bodyParams
 ///    - Takes precedence over bodyParams
-/// 
+///
 /// ============================================================================
 /// 请求体类型 / Request Body Types
 /// ============================================================================
-/// 
+///
 /// - **RequestBodyType.auto** - 自动判断（默认）/ Auto-detect (default)
 /// - **RequestBodyType.json** - JSON 格式 / JSON format
 /// - **RequestBodyType.formData** - FormData 格式 / FormData format
 /// - **RequestBodyType.urlEncoded** - URL 编码 / URL-encoded
 /// - **RequestBodyType.query** - 查询参数 / Query parameters
-/// 
+///
 /// ============================================================================
 /// 缓存模式 / Cache Modes
 /// ============================================================================
-/// 
+///
 /// - **ONLY_REQUEST** - 仅请求网络 / Network only
 /// - **FIRST_USE_CACHE_THEN_REQUEST** - 先缓存后网络 / Cache first, then network
 /// - **REQUEST_FAILED_READ_CACHE** - 请求失败读缓存 / Read cache on failure
 /// - **CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST** - 缓存为空或过期时请求 / Request when cache is empty or expired
 /// - **ONLY_CACHE** - 仅读缓存 / Cache only
-/// 
+///
 /// ============================================================================
 /// 注意事项 / Notes
 /// ============================================================================
-/// 
+///
 /// 1. BuildRequest 实例是一次性的，每次请求都会创建新实例
 ///    BuildRequest instances are disposable, a new instance is created for each request
-/// 
+///
 /// 2. 参数设置方法可以链式调用
 ///    Parameter setting methods can be chained
-/// 
+///
 /// 3. 请求执行后，BuildRequest 实例不应被重用
 ///    After request execution, BuildRequest instances should not be reused
-/// 
+///
 /// 4. 缓存功能在 Web 平台不可用
 ///    Cache functionality is not available on Web platform
-/// 
+///
 /// ============================================================================
-/// 
+///
 class BuildRequest<T> {
   final HttpMethod _HttpMethod;
   final RxNet _rxNet;
@@ -243,10 +244,11 @@ class BuildRequest<T> {
 
   // 参数管理 / Parameter Management
   // 优化：分离路径参数和查询参数 / Optimization: Separate path and query parameters
-  Map<String, dynamic> _pathParams = {};  // RESTful 路径参数 / RESTful path parameters
+  Map<String, dynamic> _pathParams =
+      {}; // RESTful 路径参数 / RESTful path parameters
   Map<String, dynamic> _queryParams = {}; // URL 查询参数 / URL query parameters
-  Map<String, dynamic> _bodyParams = {};  // Body 参数 / Body parameters
-  dynamic _rawBody;  // 原始 body 数据（用于自定义 body）/ Raw body data (for custom body)
+  Map<String, dynamic> _bodyParams = {}; // Body 参数 / Body parameters
+  dynamic _rawBody; // 原始 body 数据（用于自定义 body）/ Raw body data (for custom body)
 
   // 请求体类型 / Request Body Type
   // 新增：明确的类型控制 / New: Explicit type control
@@ -478,7 +480,7 @@ class BuildRequest<T> {
   }
 
   /// 设置取消令牌
-  /// 
+  ///
   /// 支持两种方式：
   /// 1. 使用 RxNet 的 CancelToken（推荐）
   /// 2. 使用 Dio 的 CancelToken（向后兼容）
@@ -495,7 +497,8 @@ class BuildRequest<T> {
       });
       _cancelToken = rxnetToken;
     } else {
-      throw ArgumentError('cancelToken must be either CancelToken or dio.CancelToken');
+      throw ArgumentError(
+          'cancelToken must be either CancelToken or dio.CancelToken');
     }
     return this;
   }
@@ -546,13 +549,13 @@ class BuildRequest<T> {
     return this;
   }
 
-
   BuildRequest<T> setCheckNetwork(CheckNetWork checkNetWork) {
     this.checkNetWork = checkNetWork;
     return this;
   }
 
-  BuildRequest<T> setResponseCallBack(Function(AdapterResponse response) responseCallBack) {
+  BuildRequest<T> setResponseCallBack(
+      Function(AdapterResponse response) responseCallBack) {
     this.onResponse = responseCallBack;
     return this;
   }
@@ -579,23 +582,22 @@ class BuildRequest<T> {
     return null;
   }
 
-
   /// 构建请求头
   Map<String, String> _buildHeaders() {
     final headers = <String, String>{};
-    
+
     // 添加全局请求头
     if (_enableGlobalHeader) {
       _rxNet.getHeaders().forEach((key, value) {
         headers[key] = value.toString();
       });
     }
-    
+
     // 添加自定义请求头
     _headers.forEach((key, value) {
       headers[key] = value.toString();
     });
-    
+
     return headers;
   }
 
@@ -610,7 +612,7 @@ class BuildRequest<T> {
   }) {
     // 从 RxNet 获取 baseUrl
     final baseUrl = _rxNet.baseUrl;
-    
+
     return adapter_models.AdapterRequest(
       baseUrl: baseUrl,
       path: url,
@@ -638,8 +640,6 @@ class BuildRequest<T> {
         return rxnet_plus.ResponseType.plain;
       case ResponseType.bytes:
         return rxnet_plus.ResponseType.bytes;
-      default:
-        return rxnet_plus.ResponseType.json;
     }
   }
 
@@ -648,8 +648,8 @@ class BuildRequest<T> {
       return _bodyType;
     }
 
-    final hasFile = _bodyParams.values.any((element) =>
-        element is MultipartFile || element is File);
+    final hasFile = _bodyParams.values
+        .any((element) => element is MultipartFile || element is File);
     if (hasFile) {
       return RequestBodyType.formData;
     }
@@ -740,6 +740,9 @@ class BuildRequest<T> {
     if (data is Stream<Uint8List>) {
       return data;
     }
+    if (data is dio.ResponseBody) {
+      return data.stream;
+    }
     if (data is Uint8List) {
       return Stream<List<int>>.value(data);
     }
@@ -754,8 +757,8 @@ class BuildRequest<T> {
       return null;
     }
 
-    final match = RegExp(r'bytes\s+(\d+)-(\d+)/(\d+|\*)')
-        .firstMatch(contentRange);
+    final match =
+        RegExp(r'bytes\s+(\d+)-(\d+)/(\d+|\*)').firstMatch(contentRange);
     if (match == null) {
       return null;
     }
@@ -768,8 +771,8 @@ class BuildRequest<T> {
       return null;
     }
 
-    final match = RegExp(r'bytes\s+(\d+)-(\d+)/(\d+|\*)')
-        .firstMatch(contentRange);
+    final match =
+        RegExp(r'bytes\s+(\d+)-(\d+)/(\d+|\*)').firstMatch(contentRange);
     if (match == null) {
       return null;
     }
@@ -834,7 +837,8 @@ class BuildRequest<T> {
 
       // 使用适配器发送请求
       final adapter = _requireAdapter();
-      final AdapterResponse<dynamic> response = await adapter.request(adapterRequest);
+      final AdapterResponse<dynamic> response =
+          await adapter.request(adapterRequest);
 
       onResponse?.call(response);
       var responseData = response.data;
@@ -861,7 +865,8 @@ class BuildRequest<T> {
 
         return RxResult(value: data, model: SourcesType.net);
       } else {
-        throw NetworkException("Request failed with status code ${response.statusCode}", null);
+        throw NetworkException(
+            "Request failed with status code ${response.statusCode}", null);
       }
     } on AdapterException catch (e) {
       LogUtil.v('Request error: $e');
@@ -893,7 +898,8 @@ class BuildRequest<T> {
       ..addAll(_queryParams)
       ..addAll(_bodyParams);
 
-    String cacheKey = NetUtils.getCacheKeyFromPath(_path, allParams, allIgnoreKeys);
+    String cacheKey =
+        NetUtils.getCacheKeyFromPath(_path, allParams, allIgnoreKeys);
 
     final map = <String, dynamic>{
       'timestamp': DateTime.now().millisecondsSinceEpoch,
@@ -921,7 +927,8 @@ class BuildRequest<T> {
       ..addAll(_queryParams)
       ..addAll(_bodyParams);
 
-    final cacheKey = NetUtils.getCacheKeyFromPath(_path, allParams, allIgnoreKeys);
+    final cacheKey =
+        NetUtils.getCacheKeyFromPath(_path, allParams, allIgnoreKeys);
     final cacheData = await _rxNet.getDatabase()?.get(cacheKey);
 
     if (TextUtil.isEmpty(cacheData)) {
@@ -941,7 +948,8 @@ class BuildRequest<T> {
 
     final now = DateTime.now().millisecondsSinceEpoch;
     // LogUtil.v("缓存数据时效:${_cacheInvalidationTime} || now - timestamp ：${now - timestamp }");
-    if (now - timestamp > (_cacheInvalidationTime ?? _rxNet.getCacheInvalidationTime())) {
+    if (now - timestamp >
+        (_cacheInvalidationTime ?? _rxNet.getCacheInvalidationTime())) {
       LogUtil.v("缓存数据:超时效");
       throw CacheException("Cache expired");
     }
@@ -981,7 +989,8 @@ class BuildRequest<T> {
   // ==================== 公共请求方法 ====================
 
   /// 使用回调的方式
-  void execute<T>({Success<T>? success, Failure? failure, Completed? completed}) {
+  void execute<T>(
+      {Success<T>? success, Failure? failure, Completed? completed}) {
     executeStream<T>().listen((result) {
       if (result.isSuccess) {
         success?.call(result.value as T, result.model);
@@ -1001,7 +1010,8 @@ class BuildRequest<T> {
   /// Stream方式（支持轮询）
   Stream<RxResult<T>> executeStream<T>() async* {
     if (TextUtil.isEmpty(_path)) {
-      yield RxResult.error(Exception("The request path cannot be empty path:$_path"));
+      yield RxResult.error(
+          Exception("The request path cannot be empty path:$_path"));
       return;
     }
 
@@ -1030,7 +1040,8 @@ class BuildRequest<T> {
           break;
         case CacheMode.REQUEST_FAILED_READ_CACHE:
           bool networkSucceeded = false;
-          await for (final netResult in _networkRequestStream<T>(shouldCache: true)) {
+          await for (final netResult
+              in _networkRequestStream<T>(shouldCache: true)) {
             if (netResult.isSuccess) {
               networkSucceeded = true;
             }
@@ -1076,7 +1087,8 @@ class BuildRequest<T> {
     } while (keepLooping);
   }
 
-  Stream<RxResult<T>> _networkRequestStream<T>({required bool shouldCache}) async* {
+  Stream<RxResult<T>> _networkRequestStream<T>(
+      {required bool shouldCache}) async* {
     int attempt = 0;
     bool success = false;
     do {
@@ -1197,7 +1209,8 @@ class BuildRequest<T> {
 
       final stream = _extractByteStream(response.data);
       if (stream == null) {
-        throw NetworkException('Breakpoint download requires a byte stream response', null);
+        throw NetworkException(
+            'Breakpoint download requires a byte stream response', null);
       }
 
       final contentRange = response.getHeader(HttpHeaders.contentRangeHeader);
@@ -1335,6 +1348,10 @@ class BuildRequest<T> {
         throw RangeError.range(progress, 0, fileSize, 'start');
       }
 
+      if (progress > 0) {
+        onSendProgress?.call(progress, fileSize);
+      }
+
       if (progress == fileSize) {
         onSendProgress?.call(fileSize, fileSize);
         success?.call(file, SourcesType.net);
@@ -1402,7 +1419,8 @@ class BuildRequest<T> {
   /// 获取内容长度（兼容方法）
   Future<String?> getContentLength(AdapterResponse<dynamic> response) async {
     try {
-      return response.getHeader(HttpHeaders.contentRangeHeader);
+      return response.getHeader(HttpHeaders.contentRangeHeader) ??
+          response.getHeader(HttpHeaders.contentLengthHeader);
     } catch (e) {
       return null;
     }

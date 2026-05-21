@@ -10,9 +10,23 @@ Language: English | [简体中文](README-ZH.md)
 
 RxNet is a cross-platform network request tool specially built for Flutter. It is based on deep encapsulation of Dio and conforms to native development habits. It can be started with almost zero learning cost. It can easily implement the feature of having data on the screen, supports rich function combinations, and helps you build high-performance, maintainable applications.
 
-## 🎉 0.6.0 Major Update - Pluggable Adapter Architecture
+## 🎉 0.6.1 Update - Adapter Stability + Cross-Platform Storage
 
-RxNet 0.6.0 introduces a revolutionary pluggable adapter architecture that completely decouples the framework from specific HTTP client libraries!
+RxNet 0.6.1 builds on the 0.6.0 pluggable adapter architecture with a pure Dart cache backend and a round of adapter compatibility fixes.
+
+🌟 New in 0.6.1:
+
+🗄️ **Sembast Storage Backend**: Replaced Hive with a pure Dart database for better Web, HarmonyOS, and cross-platform support
+
+🔁 **Breakpoint Download Fixes**: `breakPointDownload()` now works correctly with adapter responses, including `HttpAdapter`
+
+📦 **HttpAdapter Improvements**: Better multipart upload handling, stream response support, and more accurate content-length/progress behavior
+
+🌐 **Safer Web Default**: Web now uses `HttpAdapter` by default to avoid Dio `Platform._version` issues
+
+### 0.6.0 Major Update - Pluggable Adapter Architecture
+
+RxNet 0.6.0 introduced a pluggable adapter architecture that completely decouples the framework from specific HTTP client libraries.
 
 📖 **Migration Guide:** [MIGRATION_GUIDE_0.6.0.md](MIGRATION_GUIDE_0.6.0.md) | [迁移指南_0.6.0.md](迁移指南_0.6.0.md) | [0.5.0 Guide](迁移指南_0.5.0.md)
 
@@ -72,7 +86,7 @@ RxNet 0.6.0 supports multiple HTTP client adapters. Choose the one that fits you
 | Adapter | Package | Size | Features | Cancellation | Best For |
 |---------|---------|------|----------|--------------|----------|
 | **DioAdapter** | `dio: ^5.8.0+1` | Full | All features, interceptors | ✅ True (aborts connection) | Production apps (default) |
-| **HttpAdapter** | `http: ^1.2.0` | Light | Basic HTTP, interceptors | ⚠️ Pseudo (marks cancelled) | Lightweight apps |
+| **HttpAdapter** | `http: ^1.2.0` | Light | Basic HTTP, interceptors, multipart upload, stream/download support | ⚠️ Pseudo (marks cancelled) | Lightweight apps |
 | **MockAdapter** | Built-in | Minimal | Testing, no network | ✅ Simulated | Unit/integration tests |
 
 **Default behavior:** If you don't specify an adapter, DioAdapter is used automatically.
@@ -81,6 +95,8 @@ RxNet 0.6.0 supports multiple HTTP client adapters. Choose the one that fits you
 - **DioAdapter**: Provides true cancellation - aborts the HTTP connection immediately, saves bandwidth
 - **HttpAdapter**: Provides pseudo-cancellation - marks as cancelled but HTTP request continues in background
 - For scenarios requiring true cancellation (large files, long requests), use DioAdapter
+
+**0.6.1 note:** `HttpAdapter` now supports regular upload/download workflows more completely, including stream responses and resumed downloads. Cancellation semantics are still cooperative.
 
 See [Adapter Guide](lib/adapters/README.md) and [CancelToken Analysis](.kiro/specs/network-adapter-decoupling/CANCEL_TOKEN_ANALYSIS.md) for detailed comparison.
 
@@ -362,8 +378,7 @@ To get all response results, you must use execute() or directly listen to execut
 RxNet.get() 
     .setPath("https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg")
     .setParam(xx, xx)
-     // breakPointDownload() Breakpoint download
-    .download(
+    .breakPointDownload(
       savePath: "${appDocPath}/55.jpg",
       onReceiveProgress: (len, total){
         print("len:$len, total:$total");
@@ -376,8 +391,7 @@ RxNet.get()
 
 RxNet.post()
     .setPath("xxxxx/xxx.jpg")
-    // breakPointUpload() Breakpoint resume upload
-    .upload(
+    .breakPointUpload(
         success: (data, sourcesType) {},
         failure: (e) {},
         onSendProgress: (len, total) {});

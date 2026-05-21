@@ -106,7 +106,7 @@ class RxNetDataBase {
   /// 数据库还没初始完成，可能已经存在网络请求，先将其缓存；等待数据库完成后并返回数据后，将其全部回调全部清除。
   /// The database has not yet been initially completed, and there may already be network requests.
   /// Cache them first; wait for the database to complete and return data, and clear all their callbacks.
-  static void setDataBaseReadListener(Function(bool isOk) function) {
+  void setDataBaseReadListener(Function(bool isOk) function) {
     if (!isDatabaseReady) {
       _checkDataBaseListener.add(function);
     } else {

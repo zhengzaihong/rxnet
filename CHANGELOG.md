@@ -10,7 +10,9 @@
 
 ### Fixed
 - **Code Quality Improvements** - Removed unused imports and deprecated code
-  - Fixed design flaws in the breakpoint download and resume method
+  - Fixed breakpoint download flow to correctly consume adapter responses and streamed payloads
+  - Fixed `breakPointDownload()` so resumed downloads work with `HttpAdapter`
+  - Fixed request-body length detection for string/byte payloads in the generic request builder
   - Removed unused `_DioInterceptorBridge` class (deprecated in 0.6.0)
   - Improved code maintainability and reduced warnings
 - **Web Platform Support** - Fixed adapters on Web platform
@@ -19,6 +21,11 @@
   - Fixed "Unsupported operation: Platform._version" error
   - Users can still explicitly use DioAdapter on Web if needed
   - Automatic platform detection, no user code changes required
+- **HttpAdapter Compatibility** - Closed several behavior gaps in the lightweight adapter
+  - Added multipart upload support for regular `upload()` flows
+  - Preserved `ResponseType.stream` instead of forcing it through bytes-only handling
+  - Improved upload/download progress accounting and header handling
+  - Kept cancellation behavior cooperative while aligning request/response handling with DioAdapter expectations
 
 ### Changed
 - **Database Backend** - Migrated from Hive to Sembast
@@ -37,6 +44,8 @@
 - **Updated Documentation** - Clarified interceptor execution flow
   - Added comments explaining why `_DioInterceptorBridge` was removed
   - Improved inline documentation for adapter architecture
+  - Updated README adapter capability notes and breakpoint upload/download examples
+  - Corrected `HttpAdapter` limitation notes to match current behavior
   - Added detailed comments for Sembast implementation
   - Removed outdated "Web platform does not support cache" notes
   - Created comprehensive migration guides
