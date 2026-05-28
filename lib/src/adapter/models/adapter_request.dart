@@ -225,8 +225,9 @@ class AdapterRequest {
     });
     
     // 如果 path 已经是完整 URL（以 http:// 或 https:// 开头），直接返回
+    // 但仍需要规范化多斜杠
     if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
+      return _normalizeUrl(url);
     }
     
     // 智能拼接 baseUrl 和 path，处理斜杠
@@ -243,7 +244,33 @@ class AdapterRequest {
       url = '/$url';
     }
     
-    return fullUrl + url;
+    // 拼接后规范化 URL，移除多余的斜杠
+    return _normalizeUrl(fullUrl + url);
+  }
+  
+  /// 规范化 URL，移除路径中的多余斜杠
+  /// 
+  /// 例如：
+  /// - `https://example.com//api///users` -> `https://example.com/api/users`
+  /// - `http://example.com/api//v1/` -> `http://example.com/api/v1/`
+  /// 
+  /// 注意：协议后的双斜杠（`://`）会被保留
+  String _normalizeUrl(String url) {
+    // 分离协议和路径
+    final protocolEndIndex = url.indexOf('://');
+    if (protocolEndIndex == -1) {
+      // 没有协议，直接处理整个 URL
+      return url.replaceAll(RegExp(r'/+'), '/');
+    }
+    
+    // 保留协议部分（包括 ://）
+    final protocol = url.substring(0, protocolEndIndex + 3);
+    final pathPart = url.substring(protocolEndIndex + 3);
+    
+    // 替换路径部分的多斜杠为单斜杠
+    final normalizedPath = pathPart.replaceAll(RegExp(r'/+'), '/');
+    
+    return protocol + normalizedPath;
   }
   
   /// Creates a copy of this request with some fields replaced.

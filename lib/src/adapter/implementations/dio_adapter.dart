@@ -330,7 +330,6 @@ class DioAdapter implements NetworkAdapter {
       
       // 构建完整 URL，统一处理 baseUrl/path 斜杠和 RESTful 参数替换。
       // 这避免了 `baseUrl` 无尾斜杠且 `path` 无前导斜杠时，
-      // Dio 将它们拼成 `hostpath` 的问题。
       final requestUrl = interceptedRequest.buildFullUrl();
       final response = await _dio.request(
         requestUrl,

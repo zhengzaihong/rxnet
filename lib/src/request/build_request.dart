@@ -576,9 +576,8 @@ class BuildRequest<T> {
     return this;
   }
 
-  dio.CancelToken? getCancelToken() {
-    // 为了兼容旧API，返回 null（因为我们现在使用字符串标识）
-    return null;
+  CancelToken? getCancelToken() {
+    return _cancelToken;
   }
 
   /// 构建请求头

@@ -15,11 +15,17 @@
   - Fixed request-body length detection for string/byte payloads in the generic request builder
   - Removed unused `_DioInterceptorBridge` class (deprecated in 0.6.0)
   - Improved code maintainability and reduced warnings
+- **URL Path Normalization** - Fixed multiple slashes in request URLs
+  - Fixed issue where `baseUrl` ending with `/` and `path` starting with `/` caused double slashes
+  - Automatically removes multiple consecutive slashes in paths (e.g., `//api///v1` → `/api/v1`)
+  - Preserves protocol double slashes (`://`) correctly
+  - Works with both regular and RESTful paths
+  - No user code changes required - automatic normalization
 - **Web Platform Support** - Fixed adapters on Web platform
-  - Web platform now uses HttpAdapter by default (Dio has Platform._version issues)
+  - Fixed DioAdapter on Web platform using platform-specific factory functions
   - Fixed HttpAdapter: Used conditional import for dart:io
   - Fixed "Unsupported operation: Platform._version" error
-  - Users can still explicitly use DioAdapter on Web if needed
+  - Fixed Chinese character encoding in HttpAdapter using utf8.decode
   - Automatic platform detection, no user code changes required
 - **HttpAdapter Compatibility** - Closed several behavior gaps in the lightweight adapter
   - Added multipart upload support for regular `upload()` flows
