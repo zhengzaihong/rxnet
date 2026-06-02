@@ -1,4 +1,34 @@
+## 0.6.2
+
+### Improved
+  
+### Fixed
+- **ZipRequest Code Quality** - Improved implementation and maintainability
+  - Simplified `invokeRequest` method by removing unnecessary try-catch blocks
+  - Optimized `_waitWithPartialSuccess` to use fixed-size lists for better performance
+  - Removed code duplication: `operator[]` now delegates to `getRequestByIndex`
+  - Simplified callback creation functions (no longer need to handle user callbacks)
+
+### Changed
+- **ZipRequest API Simplification** - Breaking change with clear migration path
+  - Constructor parameters reduced: `ZipRequest({request, tag, params})` (removed: success, failure, completed)
+  - Factory method `from()` parameters reduced: removed callback parameters
+  - Factory method `withParams()` parameters reduced: removed callback parameters
+  - Migration: Move custom callback logic from outer parameters into the `request` closure
+
 ## 0.6.1
+
+### New Features
+- **Concurrent Callback Requests** - Execute multiple callback-based requests in parallel
+  - ✅ `RxNet.zipRequest()` API for concurrent execution of callback-style requests
+  - ✅ Type-safe result aggregation with `ZipResults` container
+  - ✅ Support for both index-based and tag-based result access
+  - ✅ Flexible error handling: eager failure or partial success mode
+  - ✅ Cancellation support with `CancelToken`
+  - ✅ Order preservation: results maintain submission order regardless of completion order
+  - ✅ Custom callbacks for logging, analytics, and UI updates
+  - ✅ Performance: Total time ≈ max(individual requests), not sum
+  - 📖 See README "Concurrent Callback Requests" section for examples
 
 ### Breaking Changes
 - **Replaced Hive with Sembast** - Complete migration to pure Dart database solution

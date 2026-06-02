@@ -1,5 +1,5 @@
 ///
-/// author: zhengzaihong
+/// author: ZhengZaiHong
 /// date: 2024-12-30
 /// describe: 请求体类型枚举，明确参数发送方式
 ///

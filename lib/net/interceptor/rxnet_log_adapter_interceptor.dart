@@ -6,7 +6,7 @@ import '../../src/adapter/exceptions/adapter_exception.dart';
 import '../../utils/log_util.dart';
 
 ///
-/// author: zhengzaihong
+/// author: ZhengZaiHong
 /// email:1096877329@qq.com
 /// date: 2026-04-20
 /// describe: 适配器版本的日志拦截器

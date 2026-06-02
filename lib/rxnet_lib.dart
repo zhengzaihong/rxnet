@@ -66,4 +66,14 @@ export 'package:rxnet_plus/utils/md5_util.dart';
 export 'package:rxnet_plus/utils/text_util.dart';
 export 'package:rxnet_plus/utils/rx_net_platform.dart';
 
+// ==================== Concurrent Requests ====================
+
+// Concurrent callback-based request support
+// export 'package:rxnet_plus/net/concurrent/zip_request.dart';
+// export 'package:rxnet_plus/net/concurrent/zip_results.dart';
+// export 'package:rxnet_plus/net/concurrent/zip_request_error.dart';
+// export 'package:rxnet_plus/net/concurrent/request_state.dart';
+
+export 'package:rxnet_plus/net/concurrent/concurrent.dart';
+
 

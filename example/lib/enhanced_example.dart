@@ -81,6 +81,15 @@ class _EnhancedExampleState extends State<EnhancedExample> {
 
             const Divider(height: 40, thickness: 2),
 
+            // ==================== 并发请求示例 ====================
+            _buildSectionTitle("⚡ 并发请求示例"),
+            _buildSection("1. 原生方式（推荐）- Future.wait/Records + Patterns", _concurrentExample1),
+            _buildSection("2. 回调合并 - zipRequest", _concurrentExample2),
+            _buildSection("3. 回调合并 - 部分失败处理", _concurrentExample3),
+            _buildSection("4. zipRequest - 方法引用与传参", _concurrentExample4),
+
+            const Divider(height: 40, thickness: 2),
+
             // ==================== API 优化示例 ====================
             _buildSectionTitle("🚀 API 优化示例"),
             _buildSection("1. RESTful请求 - 自动检测", _example1),
@@ -503,6 +512,376 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     });
   }
 
+  // ==================== 并发请求示例 ====================
+
+  /// 示例1：原生方式（推荐）- 使用 Future.wait
+  /// ⭐ 重点推荐：对于非回调式请求，优先使用 Flutter 原生的 Future.wait 方式
+  /// 这是最简洁、最高效的并发请求方案
+  void _concurrentExample1() async {
+    try {
+      // ==================== 方式1：Records + Patterns（Dart 3.0+ 新特性）⭐ ====================
+      // 最优雅的语法，使用 Dart 3.0 的 Records 和 Patterns 特性
+      // 注意：需要 Dart SDK >= 3.0.0
+      
+      // 如果你的项目支持 Dart 3.0+，可以使用这种方式：
+      // final (weather, user, products) = await (
+      //   RxNet.get()
+      //       .setPath('api/weather/city/{id}')
+      //       .setPathParam("id", "101030100")
+      //       .setJsonConvert(NewWeatherInfo.fromJson)
+      //       .request<NewWeatherInfo>(),
+      //
+      //   RxNet.get()
+      //       .setPath('api/weather/city/{id}')
+      //       .setPathParam("id", "101030200")
+      //       .request(),
+      //
+      //   RxNet.get()
+      //       .setPath('api/weather/city/{id}')
+      //       .setPathParam("id", "101030300")
+      //       .request(),
+      // ).wait;
+      //
+
+      // ==================== 方式2：Future.wait（兼容所有版本）====================
+      // 推荐：使用 Dart 原生的 Future.wait 并发执行多个请求
+      final results = await Future.wait([
+        // 请求1：获取天气信息
+        RxNet.get()
+            .setPath('api/weather/city/{id}')
+            .setPathParam("id", "101030100")
+            .setJsonConvert(NewWeatherInfo.fromJson)
+            .request<NewWeatherInfo>(),
+        
+        // 请求2：获取用户信息（模拟）
+        RxNet.get()
+            .setPath('api/weather/city/{id}')
+            .setPathParam("id", "101030200")
+            .request(),
+        
+        // 请求3：获取产品列表（模拟）
+        RxNet.get()
+            .setPath('api/weather/city/{id}')
+            .setPathParam("id", "101030300")
+            .request(),
+      ]);
+
+      final weather = results[0];
+      final user = results[1];
+      final products = results[2];
+
+      setState(() {
+        result = "✅ 原生并发请求成功（推荐方式）\n\n"
+            "🌟 Dart 3.0+ 新特性（Records + Patterns）：\n"
+            "final (a, b, c) = await (req1, req2, req3).wait;\n"
+            "- 最优雅的语法\n"
+            "- 自动解构赋值\n"
+            "- 类型推断完美\n"
+            "- 需要 Dart SDK >= 3.0.0\n\n"
+            "📦 当前使用：Future.wait（兼容所有版本）\n"
+            "final results = await Future.wait([...]);\n"
+            "- 兼容性最好\n"
+            "- 简洁高效\n"
+            "- 类型安全\n\n"
+            "请求1（天气）：${weather.isSuccess ? '✅ 成功' : '❌ 失败'}\n"
+            "请求2（用户）：${user.isSuccess ? '✅ 成功' : '❌ 失败'}\n"
+            "请求3（产品）：${products.isSuccess ? '✅ 成功' : '❌ 失败'}\n\n"
+            "💡 提示：对于 async/await 方式的请求，\n"
+            "   始终优先使用原生 Future.wait 或 Records";
+      });
+    } catch (e) {
+      setState(() {
+        result = "❌ 错误：$e";
+      });
+    }
+  }
+
+  /// 示例2：回调合并方式 - zipRequest
+  /// 
+  /// 📌 适用场景：仅用于合并多个回调式请求（execute 方式）
+  /// 如果使用 request() 方式，请使用上面的 Future.wait 原生方式
+  void _concurrentExample2() async {
+    try {
+      // 使用 zipRequest 合并多个回调式请求
+      // 注意：这是对回调方式的补充，不是主要推荐方式
+      final results = await RxNet.zipRequest([
+        // 请求1：获取天气信息（回调方式）
+        ZipRequest<NewWeatherInfo>(
+          tag: 'weather',
+          request: ({success, failure, completed}) {
+            RxNet.get()
+                .setPath('api/weather/city/{id}')
+                .setPathParam("id", "101030100")
+                .setJsonConvert(NewWeatherInfo.fromJson)
+                .execute<NewWeatherInfo>(
+                  success: (data, source) {
+                    // ✅ 在这里添加自定义逻辑（日志、分析等）
+                    LogUtil.v("Weather loaded: ${data.message}");
+                    // 转发给 zipRequest 的内部处理器
+                    success?.call(data, source);
+                  },
+                  failure: failure,
+                  completed: completed,
+                );
+          },
+        ),
+        
+        // 请求2：获取用户信息（回调方式）
+        ZipRequest<Map<String, dynamic>>(
+          request: ({success, failure, completed}) {
+            RxNet.get()
+                .setPath('api/weather/city/{id}')
+                .setPathParam("id", "101030200")
+                .execute<Map<String, dynamic>>(
+                  success: success,
+                  failure: failure,
+                  completed: completed,
+                );
+          },
+          tag: 'user',
+        ),
+        
+        // 请求3：获取产品列表（回调方式）
+        ZipRequest<Map<String, dynamic>>(
+          request: ({success, failure, completed}) {
+            RxNet.get()
+                .setPath('api/weather/city/{id}')
+                .setPathParam("id", "101030300")
+                .execute<Map<String, dynamic>>(
+                  success: success,
+                  failure: failure,
+                  completed: completed,
+                );
+          },
+          tag: 'products',
+        ),
+      ]);
+
+      // 通过 tag 获取结果
+      final weather = results.getRequestByTag<NewWeatherInfo>('weather');
+      final user = results.getRequestByTag<Map<String, dynamic>>('user');
+      // final products = results.getRequestByTag<Map<String, dynamic>>('products');
+
+      setState(() {
+        result = "✅ 回调合并请求成功\n\n"
+            "方式：RxNet.zipRequest (回调补充)\n"
+            "适用：仅用于合并回调式请求\n\n"
+            "天气信息：${jsonEncode(weather.toJson())}\n"
+            "用户信息：成功\n"
+            "产品列表：成功\n\n"
+            "⚠️ 注意：如果使用 request() 方式，\n"
+            "   请优先使用 Future.wait 原生方式";
+      });
+    } catch (e) {
+      setState(() {
+        result = "❌ 错误：$e";
+      });
+    }
+  }
+
+  /// 示例3：回调合并 - 部分失败处理
+  /// 
+  /// 展示如何处理部分请求失败的情况
+  void _concurrentExample3() async {
+    try {
+      // 使用 eagerError: false 允许部分请求失败
+      final results = await RxNet.zipRequest(
+        [
+          // 请求1：正常请求
+          ZipRequest<NewWeatherInfo>(
+            request: ({success, failure, completed}) {
+              RxNet.get()
+                  .setPath('api/weather/city/{id}')
+                  .setPathParam("id", "101030100")
+                  .setJsonConvert(NewWeatherInfo.fromJson)
+                  .execute<NewWeatherInfo>(
+                    success: success,
+                    failure: failure,
+                    completed: completed,
+                  );
+            },
+            tag: 'weather',
+          ),
+          
+          // 请求2：可能失败的请求
+          ZipRequest<Map<String, dynamic>>(
+            request: ({success, failure, completed}) {
+              RxNet.get()
+                  .setPath('api/invalid/path') // 故意使用无效路径
+                  .execute<Map<String, dynamic>>(
+                    success: success,
+                    failure: failure,
+                    completed: completed,
+                  );
+            },
+            tag: 'invalid',
+          ),
+          
+          // 请求3：正常请求
+          ZipRequest<Map<String, dynamic>>(
+            request: ({success, failure, completed}) {
+              RxNet.get()
+                  .setPath('api/weather/city/{id}')
+                  .setPathParam("id", "101030300")
+                  .execute<Map<String, dynamic>>(
+                    success: success,
+                    failure: failure,
+                    completed: completed,
+                  );
+            },
+            tag: 'products',
+          ),
+        ],
+        eagerError: false, // 允许部分失败
+      );
+
+      // 检查每个请求的状态
+      final weatherSuccess = results.isSuccessByTag('weather');
+      final invalidSuccess = results.isSuccessByTag('invalid');
+      final productsSuccess = results.isSuccessByTag('products');
+
+      setState(() {
+        result = "✅ 部分成功处理示例\n\n"
+            "模式：eagerError: false\n"
+            "说明：允许部分请求失败\n\n"
+            "天气请求：${weatherSuccess ? '✅ 成功' : '❌ 失败'}\n"
+            "无效请求：${invalidSuccess ? '✅ 成功' : '❌ 失败'}\n"
+            "产品请求：${productsSuccess ? '✅ 成功' : '❌ 失败'}\n\n"
+            "成功数量：${results.successfulResults.length}/${results.length}\n"
+            "失败数量：${results.errors.length}/${results.length}\n\n"
+            "💡 提示：使用 isSuccessByTag() 检查\n"
+            "   每个请求的状态后再获取数据";
+      });
+    } catch (e) {
+      setState(() {
+        result = "❌ 错误：$e";
+      });
+    }
+  }
+
+  /// 示例4：zipRequest - 方法引用与传参方式
+  /// 
+  /// 展示 ZipRequest 的三种使用模式
+  void _concurrentExample4() async {
+    try {
+      final results = await RxNet.zipRequest([
+        // ==================== 方式1：闭包包装（推荐）====================
+        // 最灵活和类型安全，显式传递所有参数
+        // 这是最常用和推荐的方式
+        ZipRequest<NewWeatherInfo>(
+          request: ({success, failure, completed}) {
+            // 直接在闭包中调用请求方法
+            RxNet.get()
+                .setPath('api/weather/city/{id}')
+                .setPathParam("id", "101030100")
+                .setJsonConvert(NewWeatherInfo.fromJson)
+                .execute<NewWeatherInfo>(
+                  success: success,
+                  failure: failure,
+                  completed: completed,
+                );
+          },
+          tag: 'closure',
+        ),
+        
+        // ==================== 方式2：方法引用 + 闭包传参 ====================
+        // 将请求逻辑提取为独立方法，然后在闭包中调用
+        ZipRequest<Map<String, dynamic>>(
+          request: ({success, failure, completed}) {
+            // 调用提取的方法
+            _fetchWeatherData(
+              cityId: "101030200",
+              success: success,
+              failure: failure,
+              completed: completed,
+            );
+          },
+          tag: 'methodCall',
+        ),
+        // ==================== 方式3：withParams 工厂（最简洁）====================
+        // 使用 withParams 工厂方法，自动处理参数传递
+        // 注意：需要方法签名符合特定格式
+        ZipRequest<Map<String, dynamic>>(
+          request: ({success, failure, completed}) {
+            // 模拟 withParams 的使用场景
+            _fetchWeatherWithParams(
+              params: {'cityId': '101030300'},
+              success: success,
+              failure: failure,
+              completed: completed,
+            );
+          },
+          tag: 'withParams',
+        ),
+      ]);
+
+      setState(() {
+        result = "✅ 方法引用与传参示例\n\n"
+            "展示了 ZipRequest 的三种使用模式：\n\n"
+            "1️⃣ 闭包包装（推荐）⭐\n"
+            "   - 最灵活和类型安全\n"
+            "   - 直接在闭包中编写请求逻辑\n"
+            "   - 适用于所有场景\n"
+            "   结果：${results.isSuccessByTag('closure') ? '✅ 成功' : '❌ 失败'}\n\n"
+            "2️⃣ 方法引用 + 闭包传参\n"
+            "   - 请求逻辑可复用\n"
+            "   - 代码更清晰易维护\n"
+            "   - 适用于复杂请求\n"
+            "   结果：${results.isSuccessByTag('methodCall') ? '✅ 成功' : '❌ 失败'}\n\n"
+            "3️⃣ withParams 工厂\n"
+            "   - 语法最简洁\n"
+            "   - 参数以 Map 形式传递\n"
+            "   - 适用于简单场景\n"
+            "   结果：${results.isSuccessByTag('withParams') ? '✅ 成功' : '❌ 失败'}\n\n"
+            "💡 推荐：日常开发使用方式1或方式2";
+      });
+    } catch (e) {
+      setState(() {
+        result = "❌ 错误：$e";
+      });
+    }
+  }
+
+  // ==================== 辅助方法：用于演示方法引用 ====================
+  
+  /// 提取的天气数据获取方法
+  /// 可以被多个地方复用
+  void _fetchWeatherData({
+    required String cityId,
+    Success<Map<String, dynamic>>? success,
+    Failure? failure,
+    Completed? completed,
+  }) {
+    RxNet.get()
+        .setPath('api/weather/city/{id}')
+        .setPathParam("id", cityId)
+        .execute<Map<String, dynamic>>(
+          success: success,
+          failure: failure,
+          completed: completed,
+        );
+  }
+
+  /// 使用参数 Map 的天气数据获取方法
+  /// 演示 withParams 风格的方法签名
+  void _fetchWeatherWithParams({
+    required Map<String, dynamic> params,
+    Success<Map<String, dynamic>>? success,
+    Failure? failure,
+    Completed? completed,
+  }) {
+    final cityId = params['cityId'] as String? ?? '101030100';
+    
+    RxNet.get()
+        .setPath('api/weather/city/{id}')
+        .setPathParam("id", cityId)
+        .execute<Map<String, dynamic>>(
+          success: success,
+          failure: failure,
+          completed: completed,
+        );
+  }
+
   void newInstanceRequest() async {
     // 为这个实例进行独立的初始化配置
     final apiService = RxNet.create();
@@ -542,6 +921,8 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     setState(() {
       result = "示例1结果：${response.value}";
     });
+
+
   }
 
   // ==================== 示例2：参数类型明确化 ====================

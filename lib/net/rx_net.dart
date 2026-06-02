@@ -6,11 +6,14 @@ import 'package:rxnet_plus/rxnet_lib.dart';
 import '../logcat/debug_manager.dart';
 import '../src/logging/log_manager.dart';
 import '../utils/rx_net_database.dart';
+import 'concurrent/zip_request.dart';
+import 'concurrent/zip_results.dart';
+import 'concurrent/zip_request_impl.dart' as zip_impl;
 
 ///
 /// RxNet Plus - Flutter 网络请求库 / Flutter Network Request Library
 /// 
-/// author: zhengzaihong
+/// author: ZhengZaiHong
 /// email: 1096877329@qq.com
 /// date: 2025-08-12
 /// ============================================================================
@@ -394,10 +397,6 @@ class RxNet {
 
 
   RxNet._internal() {
-    // Web 平台使用 HttpAdapter，其他平台使用 DioAdapter
-    // Use HttpAdapter on Web, DioAdapter on other platforms
-    // 适配器将在 init/initNet 时创建
-    // Adapter will be created during init/initNet
     logManager = LogManager();
     debugManager = DebugManager();
   }
@@ -762,4 +761,48 @@ class RxNet {
   }
 
   static ValueNotifier<Size> debugWindow = ValueNotifier(const Size(800, 600));
+
+  /// 并发执行多个基于回调的请求并返回聚合结果。
+  /// Executes multiple callback-based requests concurrently and returns aggregated results.
+  static Future<ZipResults> zipRequest(
+    List<ZipRequest> requests, {
+    bool eagerError = true,
+    CancelToken? cancelToken,
+    Duration? timeout,
+  }) {
+    return I.zipRequestInstance(requests, 
+      eagerError: eagerError, 
+      cancelToken: cancelToken,
+      timeout: timeout,
+    );
+  }
+  
+  /// 实例方法,用于执行具有多实例支持的并发请求。
+  /// Instance method for executing concurrent requests with multi-instance support.
+  /// 
+  /// final results = await userService.zipRequestInstance([
+  ///   ZipRequest<UserInfo>(request: getUserAsync, tag: 'user'),
+  ///   ZipRequest<UserSettings>(request: getSettingsAsync, tag: 'settings'),
+  /// ]);
+  /// Parameters:
+  /// - [requests]: List of [ZipRequest] instances to execute
+  /// - [eagerError]: If `true`, fail immediately on first error (default: true)
+  /// - [cancelToken]: Optional [CancelToken] to cancel all requests
+  /// - [timeout]: Optional timeout duration for all requests
+  ///
+  /// See also:
+  /// - [zipRequest] for the static method
+  /// - [getInstance] for creating named instances
+  Future<ZipResults> zipRequestInstance(
+    List<ZipRequest> requests, {
+    bool eagerError = true,
+    CancelToken? cancelToken,
+    Duration? timeout,
+  }) async {
+    return zip_impl.zipRequest(requests, 
+      eagerError: eagerError, 
+      cancelToken: cancelToken,
+      timeout: timeout,
+    );
+  }
 }

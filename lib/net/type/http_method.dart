@@ -1,5 +1,5 @@
 ///
-/// author: zhengzaihong
+/// author: ZhengZaiHong
 /// email:1096877329@qq.com
 /// date: 2025-01-31
 /// describe: HTTP 请求方法枚举

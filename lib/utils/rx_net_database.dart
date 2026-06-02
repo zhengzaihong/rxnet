@@ -8,7 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'log_util.dart';
 
 ///
-/// author: zhengzaihong
+/// author: ZhengZaiHong
 /// email:1096877329@qq.com
 /// date: 2023/9/9
 /// time: 12:41

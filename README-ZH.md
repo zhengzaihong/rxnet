@@ -1,8 +1,8 @@
 # RxNet
 
 [![pub package](https://img.shields.io/pub/v/rxnet_plus.svg)](https://pub.dev/packages/rxnet_plus)
-[![GitHub stars](https://img.shields.io/github/stars/zhengzaihong/rxnet.svg?style=social)](https://github.com/zhengzaihong/rxnet)
-[![license](https://img.shields.io/github/license/zhengzaihong/rxnet)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/ZhengZaiHong/rxnet.svg?style=social)](https://github.com/ZhengZaiHong/rxnet)
+[![license](https://img.shields.io/github/license/ZhengZaiHong/rxnet)](LICENSE)
 
 Language: [English](README.md) | 简体中文
 
@@ -66,7 +66,7 @@ RxNet 0.6.0 引入了可插拔适配器架构，完全解耦框架与特定 HTTP
 
 ```yaml
 dependencies:
-  rxnet_plus: ^0.6.1  # 最新版本，可插拔适配器架构
+  rxnet_plus: ^0.6.2  # 最新版本，可插拔适配器架构
   
 ```
 
@@ -363,6 +363,234 @@ void testStreamRequest(){
  3.当页面需要退出时，或者不在关系请求结果时，可通过设置的CancelToken取消请求。
 
 
+### 并发请求
+
+> **⭐ 重要提示：对于非回调式请求（使用 `request()` || `async/await`），始终优先使用 Dart 原生的并发模式：**
+> 
+> **方式1：Records + Patterns（Dart 3.0+ - 最优雅）🌟**
+> ```dart
+> // ✅ 最佳：Dart 3.0+ Records 和 Patterns 特性（需要 Dart SDK >= 3.0.0）
+> final (weather, user, products) = await (
+>   RxNet.get().setPath('/weather').request<Weather>(),
+>   RxNet.get().setPath('/user').request<User>(),
+>   RxNet.get().setPath('/products').request<List<Product>>(),
+> ).wait;
+> 
+> // 自动解构赋值，完美的类型推断
+> // weather 是 Weather 类型，user 是 User 类型，products 是 List<Product> 类型
+> ```
+> 
+> **方式2：Future.wait（所有 Dart 版本 - 最兼容）✅**
+> ```dart
+> // ✅ 推荐：适用于所有 Dart 版本
+> final results = await Future.wait([
+>   RxNet.get().setPath('/weather').request<Weather>(),
+>   RxNet.get().setPath('/user').request<User>(),
+>   RxNet.get().setPath('/products').request<List<Product>>(),
+> ]);
+> 
+> final weather = results[0];
+> final user = results[1];
+> final products = results[2];
+> ```
+> 
+> **下面的 `zipRequest()` API 仅用于合并回调式请求（使用 `execute()`）。**
+> 这是对回调风格代码的补充功能，不是主要推荐方式。
+
+#### 并发回调式请求
+
+RxNet 支持并发执行多个回调式请求，并提供类型安全的结果聚合。当你需要并行加载多个资源并在所有请求完成后一次性更新 UI 时，这非常有用。
+
+**使用场景：**
+- ✅ 合并多个回调式 `execute()` 请求
+- ❌ 不适用于 `request()` 方式 - 请使用 `Future.wait`（见上方）
+
+
+#### 基本示例
+
+```dart
+import 'package:rxnet_plus/net/concurrent/concurrent.dart';
+
+// 并发执行多个请求
+final results = await RxNet.zipRequest([
+  ZipRequest<UserInfo>(
+    request: ({success, failure, completed}) {
+      getUserAsync(
+        userId: '123',
+        success: success,
+        failure: failure,
+        completed: completed,
+      );
+    },
+    tag: 'user',
+  ),
+  ZipRequest<List<Product>>(
+    request: ({success, failure, completed}) {
+      getProductsAsync(
+        categoryId: 'electronics',
+        success: success,
+        failure: failure,
+        completed: completed,
+      );
+    },
+    tag: 'products',
+  ),
+  ZipRequest<AppSettings>(
+    request: ({success, failure, completed}) {
+      getSettingsAsync(
+        success: success,
+        failure: failure,
+        completed: completed,
+      );
+    },
+    tag: 'settings',
+  ),
+]);
+
+// 通过 tag 访问结果，类型安全
+final user = results.getRequestByTag<UserInfo>('user');
+final products = results.getRequestByTag<List<Product>>('products');
+final settings = results.getRequestByTag<AppSettings>('settings');
+
+// 或通过索引访问
+final firstResult = results.getRequestByIndex<UserInfo>(0);
+
+// 一次性更新 UI
+setState(() {
+  this.user = user;
+  this.products = products;
+  this.settings = settings;
+});
+```
+
+#### 使用 withParams 简化语法
+
+对于简单情况，使用 `withParams` 工厂方法：
+
+```dart
+final results = await RxNet.zipRequest([
+  ZipRequest.withParams<UserInfo>(
+    getUserAsync,
+    {'userId': '123', 'phone': '13800138000'},
+    tag: 'user',
+  ),
+  ZipRequest.withParams<List<Product>>(
+    getProductsAsync,
+    {'categoryId': 'electronics', 'page': 1},
+    tag: 'products',
+  ),
+]);
+```
+
+#### 方法引用与传参方式
+
+ZipRequest 支持三种使用模式：
+
+**模式1：闭包包装（推荐）⭐**
+
+最灵活和类型安全，直接在闭包中编写请求逻辑：
+
+```dart
+ZipRequest<UserInfo>(
+  request: ({success, failure, completed}) {
+    RxNet.get()
+        .setPath('/user/{id}')
+        .setPathParam('id', '123')
+        .execute<UserInfo>(
+          success: success,
+          failure: failure,
+          completed: completed,
+        );
+  },
+  tag: 'user',
+)
+```
+
+**模式2：方法引用 + 闭包**
+
+将请求逻辑提取为可复用的方法：
+
+```dart
+// 定义可复用的方法
+void fetchUserData({
+  required String userId,
+  Success<UserInfo>? success,
+  Failure? failure,
+  Completed? completed,
+}) {
+  RxNet.get()
+      .setPath('/user/{id}')
+      .setPathParam('id', userId)
+      .execute<UserInfo>(
+        success: success,
+        failure: failure,
+        completed: completed,
+      );
+}
+
+// 在 ZipRequest 中使用
+ZipRequest<UserInfo>(
+  request: ({success, failure, completed}) {
+    fetchUserData(
+      userId: '123',
+      success: success,
+      failure: failure,
+      completed: completed,
+    );
+  },
+  tag: 'user',
+)
+```
+
+**模式3：withParams 工厂**
+
+最简洁的语法，适用于简单场景：
+
+```dart
+ZipRequest.withParams<UserInfo>(
+  fetchUserAsync,
+  {'userId': '123', 'phone': '13800138000'},
+  tag: 'user',
+)
+```
+
+**推荐：** 使用模式1处理内联请求，或使用模式2处理可复用的请求逻辑。
+
+#### 部分成功处理
+
+默认情况下，`zipRequest()` 在第一个错误时立即失败。使用 `eagerError: false` 等待所有请求并处理部分成功：
+
+```dart
+final results = await RxNet.zipRequest(
+  [request1, request2, request3],
+  eagerError: false, // 不在第一个错误时失败
+);
+
+// 检查每个请求的状态
+if (results.isSuccessByTag('user')) {
+  final user = results.getRequestByTag<UserInfo>('user');
+} else {
+  // 处理错误
+  print('用户请求失败: ${results.errors[0]}');
+}
+```
+
+#### 取消并发请求
+
+```dart
+final cancelToken = CancelToken();
+
+// 启动并发请求
+final future = RxNet.zipRequest(
+  [request1, request2, request3],
+  cancelToken: cancelToken,
+);
+
+// 需要时取消所有请求
+cancelToken.cancel('用户取消');
+```
+
+
  ### 上传下载(支持断点上传下载)：注意移动终端的文件读写权限。
 
 ```dart
@@ -639,10 +867,10 @@ await RxNet.init(
 ```
 
 ## 调试窗口：
-![调试窗口](https://github.com/zhengzaihong/rxnet/blob/master/images/app_logcat.jpg) 
+![调试窗口](https://github.com/ZhengZaiHong/rxnet/blob/master/images/app_logcat.jpg) 
 
 ## 对HarmonyOS也支持：
-![HarmonyOS-example.gif](https://github.com/zhengzaihong/rxnet/blob/master/images/HarmonyOS-example.gif)
+![HarmonyOS-example.gif](https://github.com/ZhengZaiHong/rxnet/blob/master/images/HarmonyOS-example.gif)
 
 
 

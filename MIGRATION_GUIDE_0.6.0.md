@@ -813,7 +813,7 @@ If you encounter any issues during migration:
 
 1. Check the [FAQ](#faq) section above
 2. Review the [Adapter Usage Guide](lib/adapters/README.md)
-3. Open an issue on [GitHub](https://github.com/zhengzaihong/rxnet/issues)
+3. Open an issue on [GitHub](https://github.com/ZhengZaiHong/rxnet/issues)
 4. Check existing issues for similar problems
 
 ---

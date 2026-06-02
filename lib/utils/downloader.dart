@@ -3,7 +3,7 @@ import 'native_helper.dart'
     if (dart.library.html) 'web_helper.dart' as downloader;
 
 ///
-/// author: zhengzaihong
+/// author: ZhengZaiHong
 /// email:1096877329@qq.com
 /// date: 2023/9/26
 /// time: 12:17

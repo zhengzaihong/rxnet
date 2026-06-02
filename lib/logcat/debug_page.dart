@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
 
 ///
-/// author: zhengzaihong
+/// author: ZhengZaiHong
 /// email:1096877329@qq.com
 /// date: 2024/9/10
 /// time: 14:53

@@ -4,7 +4,7 @@ import 'package:rxnet_plus/utils/text_util.dart';
 import 'md5_util.dart';
 
 ///
-/// author: zhengzaihong
+/// author: ZhengZaiHong
 /// email:1096877329@qq.com
 /// date: 2025-08-12
 /// time: 15:59

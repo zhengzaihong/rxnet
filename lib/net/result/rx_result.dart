@@ -1,7 +1,7 @@
 import 'package:rxnet_plus/net/type/sources_type.dart';
 
 ///
-/// author: zhengzaihong
+/// author: ZhengZaiHong
 /// email:1096877329@qq.com
 /// date: 2023/9/14
 /// time: 16:21

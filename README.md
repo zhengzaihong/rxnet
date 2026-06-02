@@ -1,8 +1,8 @@
 # RxNet
 
 [![pub package](https://img.shields.io/pub/v/rxnet_plus.svg)](https://pub.dev/packages/rxnet_plus)
-[![GitHub stars](https://img.shields.io/github/stars/zhengzaihong/rxnet.svg?style=social)](https://github.com/zhengzaihong/rxnet)
-[![license](https://img.shields.io/github/license/zhengzaihong/rxnet)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/ZhengZaiHong/rxnet.svg?style=social)](https://github.com/ZhengZaiHong/rxnet)
+[![license](https://img.shields.io/github/license/ZhengZaiHong/rxnet)](LICENSE)
 
 Language: English | [简体中文](README-ZH.md)
 
@@ -68,7 +68,7 @@ RxNet 0.6.0 introduced a pluggable adapter architecture that completely decouple
 
 ```yaml
 dependencies:
-  rxnet_plus: ^0.6.1  # Latest version with pluggable adapters
+  rxnet_plus: ^0.6.2  # Latest version with pluggable adapters
 ```
 
 **Upgrading?** 
@@ -361,6 +361,319 @@ To get all response results, you must use execute() or directly listen to execut
 2. When using Method Three, cancel the subscription in time when not needed: _subscription?.cancel()
 
 3. When the page needs to exit, or when no longer interested in the request result, the request can be canceled through the set CancelToken.
+
+### Concurrent Requests
+
+> **⭐ IMPORTANT: For non-callback requests (using `request()` or `async/await`), always prefer Dart's native concurrent patterns:**
+> 
+> **Option 1: Records + Patterns (Dart 3.0+ - Most Elegant) 🌟**
+> ```dart
+> // ✅ BEST: Dart 3.0+ Records and Patterns (requires Dart SDK >= 3.0.0)
+> final (weather, user, products) = await (
+>   RxNet.get().setPath('/weather').request<Weather>(),
+>   RxNet.get().setPath('/user').request<User>(),
+>   RxNet.get().setPath('/products').request<List<Product>>(),
+> ).wait;
+> 
+> // Automatic destructuring, perfect type inference
+> // weather is Weather, user is User, products is List<Product>
+> ```
+> 
+> **Option 2: Future.wait (All Dart versions - Most Compatible) ✅**
+> ```dart
+> // ✅ RECOMMENDED: Works with all Dart versions
+> final results = await Future.wait([
+>   RxNet.get().setPath('/weather').request<Weather>(),
+>   RxNet.get().setPath('/user').request<User>(),
+>   RxNet.get().setPath('/products').request<List<Product>>(),
+> ]);
+> 
+> final weather = results[0];
+> final user = results[1];
+> final products = results[2];
+> ```
+> 
+> **The `zipRequest()` API below is ONLY for merging callback-based requests (using `execute()`).**
+> It's a supplementary feature for callback-style code, not the primary recommendation.
+
+#### Concurrent Callback-Based Requests
+
+RxNet supports executing multiple callback-based requests concurrently with type-safe result aggregation. This is useful when you need to load multiple resources in parallel and update the UI once all requests complete.
+
+**Use Cases:**
+- ✅ Merging multiple callback-style `execute()` requests
+- ❌ NOT for `request()` style - use `Future.wait` instead (see above)
+
+
+#### Basic Example
+
+```dart
+import 'package:rxnet_plus/net/concurrent/concurrent.dart';
+
+// Execute multiple requests concurrently
+final results = await RxNet.zipRequest([
+  ZipRequest<UserInfo>(
+    request: ({success, failure, completed}) {
+      getUserAsync(
+        userId: '123',
+        success: success,
+        failure: failure,
+        completed: completed,
+      );
+    },
+    tag: 'user',
+  ),
+  ZipRequest<List<Product>>(
+    request: ({success, failure, completed}) {
+      getProductsAsync(
+        categoryId: 'electronics',
+        success: success,
+        failure: failure,
+        completed: completed,
+      );
+    },
+    tag: 'products',
+  ),
+  ZipRequest<AppSettings>(
+    request: ({success, failure, completed}) {
+      getSettingsAsync(
+        success: success,
+        failure: failure,
+        completed: completed,
+      );
+    },
+    tag: 'settings',
+  ),
+]);
+
+// Access results by tag with type safety
+final user = results.getRequestByTag<UserInfo>('user');
+final products = results.getRequestByTag<List<Product>>('products');
+final settings = results.getRequestByTag<AppSettings>('settings');
+
+// Or access by index
+final firstResult = results.getRequestByIndex<UserInfo>(0);
+
+// Update UI once with all data
+setState(() {
+  this.user = user;
+  this.products = products;
+  this.settings = settings;
+});
+```
+
+#### Simplified Syntax with withParams
+
+For simple cases, use the `withParams` factory:
+
+```dart
+final results = await RxNet.zipRequest([
+  ZipRequest.withParams<UserInfo>(
+    getUserAsync,
+    {'userId': '123', 'phone': '13800138000'},
+    tag: 'user',
+  ),
+  ZipRequest.withParams<List<Product>>(
+    getProductsAsync,
+    {'categoryId': 'electronics', 'page': 1},
+    tag: 'products',
+  ),
+]);
+```
+
+#### Method Reference and Parameter Passing
+
+ZipRequest supports three usage patterns:
+
+**Pattern 1: Closure Wrapper (Recommended) ⭐**
+
+Most flexible and type-safe. Directly write request logic in the closure:
+
+```dart
+ZipRequest<UserInfo>(
+  request: ({success, failure, completed}) {
+    RxNet.get()
+        .setPath('/user/{id}')
+        .setPathParam('id', '123')
+        .execute<UserInfo>(
+          success: success,
+          failure: failure,
+          completed: completed,
+        );
+  },
+  tag: 'user',
+)
+```
+
+**Pattern 2: Method Reference + Closure**
+
+Extract request logic into a reusable method:
+
+```dart
+// Define a reusable method
+void fetchUserData({
+  required String userId,
+  Success<UserInfo>? success,
+  Failure? failure,
+  Completed? completed,
+}) {
+  RxNet.get()
+      .setPath('/user/{id}')
+      .setPathParam('id', userId)
+      .execute<UserInfo>(
+        success: success,
+        failure: failure,
+        completed: completed,
+      );
+}
+
+// Use in ZipRequest
+ZipRequest<UserInfo>(
+  request: ({success, failure, completed}) {
+    fetchUserData(
+      userId: '123',
+      success: success,
+      failure: failure,
+      completed: completed,
+    );
+  },
+  tag: 'user',
+)
+```
+
+**Pattern 3: withParams Factory**
+
+Simplest syntax for basic cases:
+
+```dart
+ZipRequest.withParams<UserInfo>(
+  fetchUserAsync,
+  {'userId': '123', 'phone': '13800138000'},
+  tag: 'user',
+)
+```
+
+**Recommendation:** Use Pattern 1 for inline requests or Pattern 2 for reusable request logic.
+
+#### Partial Success Handling
+
+By default, `zipRequest()` fails immediately on the first error. Use `eagerError: false` to wait for all requests and handle partial success:
+
+```dart
+final results = await RxNet.zipRequest(
+  [request1, request2, request3],
+  eagerError: false, // Don't fail on first error
+);
+
+// Check which requests succeeded
+for (int i = 0; i < results.length; i++) {
+  if (results.isSuccess(i)) {
+    print('Request $i succeeded');
+    final data = results.getRequestByIndex(i);
+    // Use successful data
+  } else {
+    print('Request $i failed: ${results.errors[i]}');
+    // Handle error or use fallback
+  }
+}
+
+// Get only successful results
+final successful = results.successfulResults;
+print('${successful.length} out of ${results.length} succeeded');
+```
+
+#### Custom Callbacks
+
+Add custom callbacks for logging, analytics, or side effects:
+
+```dart
+ZipRequest<UserInfo>(
+  request: ({success, failure, completed}) {
+    getUserAsync(
+      userId: '123',
+      success: success,
+      failure: failure,
+      completed: completed,
+    );
+  },
+  tag: 'user',
+  success: (data, source) {
+    print('User loaded from $source');
+    analytics.track('user_loaded');
+  },
+  failure: (error) {
+    print('Failed to load user: $error');
+    analytics.trackError(error);
+  },
+  completed: () {
+    print('User request completed');
+  },
+)
+```
+
+#### Cancellation
+
+Cancel all pending requests using a `CancelToken`:
+
+```dart
+final cancelToken = CancelToken();
+
+// Start concurrent requests
+final future = RxNet.zipRequest(
+  [request1, request2, request3],
+  cancelToken: cancelToken,
+);
+
+// Cancel after timeout
+Future.delayed(Duration(seconds: 5), () {
+  cancelToken.cancel('Timeout');
+});
+
+try {
+  final results = await future;
+  // All requests succeeded
+} catch (e) {
+  print('Requests cancelled or failed: $e');
+}
+```
+
+#### Performance Characteristics
+
+- **Execution Time**: ≈ max(individual request times), not sum
+- **Memory**: O(n) where n is number of requests
+- **Concurrency**: All requests execute in parallel
+- **Order Preservation**: Results maintain submission order
+
+#### Migration from Sequential to Concurrent
+
+**Before (Sequential - Slow):**
+```dart
+// Takes 3 seconds total (1s + 1s + 1s)
+final user = await getUserAsync();
+final products = await getProductsAsync();
+final settings = await getSettingsAsync();
+
+setState(() {
+  // Multiple UI updates cause flickering
+});
+```
+
+**After (Concurrent - Fast):**
+```dart
+// Takes ~1 second total (max of all requests)
+final results = await RxNet.zipRequest([
+  ZipRequest<UserInfo>(request: getUserAsync, tag: 'user'),
+  ZipRequest<List<Product>>(request: getProductsAsync, tag: 'products'),
+  ZipRequest<AppSettings>(request: getSettingsAsync, tag: 'settings'),
+]);
+
+setState(() {
+  // Single UI update, no flickering
+  this.user = results.getRequestByTag<UserInfo>('user');
+  this.products = results.getRequestByTag<List<Product>>('products');
+  this.settings = results.getRequestByTag<AppSettings>('settings');
+});
+```
 
 
 ### Upload and Download (supports breakpoint upload and download): Note file read/write permissions on mobile terminals.
@@ -655,11 +968,325 @@ Open debug log window: RxNet.showDebugWindow(context);
 Close debug log window: RxNet.closeDebugWindow();
 ```
 
+## Concurrent Callback Requests
+
+RxNet 0.6.1+ supports executing multiple callback-based requests concurrently with type-safe result aggregation. This feature solves the problem that callback-style `execute()` methods cannot be easily composed with `Future.wait()`.
+
+### Why Concurrent Requests?
+
+When you need to load multiple resources in parallel (user info, products, settings, etc.), sequential requests waste time:
+
+```dart
+// ❌ Sequential: Total time = sum of all requests
+await getUserAsync(...);  // 500ms
+await getProductsAsync(...);  // 800ms
+await getSettingsAsync(...);  // 300ms
+// Total: 1600ms
+```
+
+With concurrent requests, all execute in parallel:
+
+```dart
+// ✅ Concurrent: Total time ≈ longest request
+final results = await RxNet.zipRequest([...]);
+// Total: ~800ms (longest request)
+```
+
+### Basic Usage
+
+```dart
+// Execute multiple requests concurrently
+final results = await RxNet.zipRequest([
+  ZipRequest<UserInfo>(
+    request: ({success, failure, completed}) {
+      getUserAsync(
+        userId: '123',
+        success: success,
+        failure: failure,
+        completed: completed,
+      );
+    },
+    tag: 'user',
+  ),
+  ZipRequest<List<Product>>(
+    request: ({success, failure, completed}) {
+      getProductsAsync(
+        categoryId: 'electronics',
+        success: success,
+        failure: failure,
+        completed: completed,
+      );
+    },
+    tag: 'products',
+  ),
+]);
+
+// Access results by tag with type safety
+final user = results.getRequestByTag<UserInfo>('user');
+final products = results.getRequestByTag<List<Product>>('products');
+
+// Or by index
+final firstResult = results.getRequestByIndex<UserInfo>(0);
+```
+
+### Simplified Syntax with withParams
+
+For simple cases, use the `withParams` factory:
+
+```dart
+final results = await RxNet.zipRequest([
+  ZipRequest.withParams<UserInfo>(
+    getUserAsync,
+    {'userId': '123', 'phone': '13800138000'},
+    tag: 'user',
+  ),
+  ZipRequest.withParams<List<Product>>(
+    getProductsAsync,
+    {'categoryId': 'electronics', 'page': 1},
+    tag: 'products',
+  ),
+]);
+```
+
+### Partial Success Handling
+
+By default, the first error throws immediately. Use `eagerError: false` to wait for all requests:
+
+```dart
+final results = await RxNet.zipRequest(
+  [request1, request2, request3],
+  eagerError: false,  // Don't fail on first error
+);
+
+// Check which requests succeeded
+for (int i = 0; i < results.length; i++) {
+  if (results.isSuccess(i)) {
+    print('Request $i succeeded: ${results[i]}');
+  } else {
+    print('Request $i failed: ${results.errors[i]}');
+  }
+}
+
+// Get only successful results
+final successful = results.successfulResults;
+print('${successful.length} out of ${results.length} succeeded');
+```
+
+### Custom Callbacks
+
+Add custom callbacks for logging, analytics, or UI updates:
+
+```dart
+ZipRequest<UserInfo>(
+  request: ({success, failure, completed}) {
+    getUserAsync(
+      userId: '123',
+      success: success,
+      failure: failure,
+      completed: completed,
+    );
+  },
+  tag: 'user',
+  success: (data, source) {
+    print('User loaded from $source');
+    analytics.track('user_loaded');
+  },
+  failure: (error) {
+    print('Failed to load user: $error');
+  },
+  completed: () {
+    hideLoadingIndicator();
+  },
+)
+```
+
+### Cancellation
+
+Cancel all pending requests with a `CancelToken`:
+
+```dart
+final cancelToken = CancelToken();
+
+// Start concurrent requests
+final future = RxNet.zipRequest(
+  [request1, request2, request3],
+  cancelToken: cancelToken,
+);
+
+// Cancel after 5 seconds
+Future.delayed(Duration(seconds: 5), () {
+  cancelToken.cancel('Timeout');
+});
+
+try {
+  final results = await future;
+} catch (e) {
+  print('Requests cancelled: $e');
+}
+```
+
+### Type Inference
+
+The generic type parameter ensures compile-time type safety:
+
+```dart
+// ✅ Correct: Type matches method return type
+ZipRequest<UserInfo>(request: getUserAsync, tag: 'user')
+
+// ❌ Compile error: Type mismatch
+ZipRequest<String>(request: getUserAsync, tag: 'user')
+```
+
+### Real-World Example: Dashboard Loading
+
+```dart
+Future<void> loadDashboard() async {
+  setState(() => isLoading = true);
+  
+  try {
+    final results = await RxNet.zipRequest([
+      ZipRequest<UserInfo>(
+        request: ({success, failure, completed}) {
+          RxNet.get()
+            .setPath('/user/profile')
+            .setJsonConvert(UserInfo.fromJson)
+            .execute(
+              success: success,
+              failure: failure,
+              completed: completed,
+            );
+        },
+        tag: 'user',
+      ),
+      ZipRequest<List<Product>>(
+        request: ({success, failure, completed}) {
+          RxNet.get()
+            .setPath('/products/featured')
+            .setJsonConvert((data) => (data as List)
+                .map((e) => Product.fromJson(e))
+                .toList())
+            .execute(
+              success: success,
+              failure: failure,
+              completed: completed,
+            );
+        },
+        tag: 'products',
+      ),
+      ZipRequest<AppSettings>(
+        request: ({success, failure, completed}) {
+          RxNet.get()
+            .setPath('/settings')
+            .setJsonConvert(AppSettings.fromJson)
+            .execute(
+              success: success,
+              failure: failure,
+              completed: completed,
+            );
+        },
+        tag: 'settings',
+      ),
+    ]);
+    
+    setState(() {
+      user = results.getRequestByTag<UserInfo>('user');
+      products = results.getRequestByTag<List<Product>>('products');
+      settings = results.getRequestByTag<AppSettings>('settings');
+      isLoading = false;
+    });
+  } catch (e) {
+    setState(() {
+      error = e.toString();
+      isLoading = false;
+    });
+  }
+}
+```
+
+
+### Migration from Sequential to Concurrent
+
+**Before (Sequential):**
+```dart
+UserInfo? user;
+List<Product>? products;
+
+void loadData() async {
+  // Request 1: 500ms
+  RxNet.get()
+    .setPath('/user')
+    .setJsonConvert(UserInfo.fromJson)
+    .execute(success: (data, source) {
+      user = data;
+      
+      // Request 2: 800ms (starts after request 1)
+      RxNet.get()
+        .setPath('/products')
+        .setJsonConvert((data) => (data as List)
+            .map((e) => Product.fromJson(e))
+            .toList())
+        .execute(success: (data, source) {
+          products = data;
+          setState(() {}); // Update UI after both complete
+        });
+    });
+  // Total time: 1300ms
+}
+```
+
+**After (Concurrent):**
+```dart
+Future<void> loadData() async {
+  final results = await RxNet.zipRequest([
+    ZipRequest<UserInfo>(
+      request: ({success, failure, completed}) {
+        RxNet.get()
+          .setPath('/user')
+          .setJsonConvert(UserInfo.fromJson)
+          .execute(
+            success: success,
+            failure: failure,
+            completed: completed,
+          );
+      },
+      tag: 'user',
+    ),
+    ZipRequest<List<Product>>(
+      request: ({success, failure, completed}) {
+        RxNet.get()
+          .setPath('/products')
+          .setJsonConvert((data) => (data as List)
+              .map((e) => Product.fromJson(e))
+              .toList())
+          .execute(
+            success: success,
+            failure: failure,
+            completed: completed,
+          );
+      },
+      tag: 'products',
+    ),
+  ]);
+  
+  setState(() {
+    user = results.getRequestByTag<UserInfo>('user');
+    products = results.getRequestByTag<List<Product>>('products');
+  });
+  // Total time: ~800ms (longest request)
+}
+```
+
+**Benefits:**
+- ⚡ **40% faster** in this example (1300ms → 800ms)
+- 🎯 **Single setState()** call instead of nested callbacks
+- 🛡️ **Type safety** with compile-time checking
+- 🧹 **Cleaner code** without callback nesting
+
 ## Debug Window:
-![Debug Window](https://github.com/zhengzaihong/rxnet/blob/master/images/app_logcat.jpg)
+![Debug Window](https://github.com/ZhengZaiHong/rxnet/blob/master/images/app_logcat.jpg)
 
 ## Also Supports HarmonyOS:
-![HarmonyOS-example.gif](https://github.com/zhengzaihong/rxnet/blob/master/images/HarmonyOS-example.gif)
+![HarmonyOS-example.gif](https://github.com/ZhengZaiHong/rxnet/blob/master/images/HarmonyOS-example.gif)
 
 
 

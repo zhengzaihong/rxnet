@@ -12,7 +12,7 @@ import '../adapter/models/adapter_request.dart' as adapter_models;
 import '../adapter/cancel_token.dart' as rxnet_cancel;
 
 ///
-/// author: zhengzaihong
+/// author: ZhengZaiHong
 /// email: 1096877329@qq.com
 /// date: 2025-08-12
 /// describe: BuildRequest - 网络请求构建器 / Network Request Builder

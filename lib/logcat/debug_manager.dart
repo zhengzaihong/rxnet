@@ -6,7 +6,7 @@ import 'package:rxnet_plus/net/rx_net.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
 
 ///
-/// author: zhengzaihong
+/// author: ZhengZaiHong
 /// email:1096877329@qq.com
 /// date: 2025-08-12
 /// time: 15:56
