@@ -4,15 +4,16 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart' show MultipartFile;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
-import '../../../net/type/http_method.dart';
-import '../../../net/type/response_type.dart';
+import 'package:rxnet_plus/src/type/http_method.dart';
+import '../../../rxnet_lib.dart';
+import '../../type/response_type.dart';
 import '../network_adapter.dart';
 import '../models/adapter_request.dart';
 import '../models/adapter_response.dart';
+import '../models/adapter_base_options.dart';
 import '../interceptor/adapter_interceptor.dart';
 import '../exceptions/adapter_exception.dart';
 import '../cancel_token.dart' as adapter_cancel;
-
 // 条件导入：仅在非 Web 平台导入 dart:io
 // Conditional import: Only import dart:io on non-Web platforms
 import 'dart:io' if (dart.library.html) 'http_adapter_web_stub.dart';
@@ -263,6 +264,10 @@ class HttpAdapter implements NetworkAdapter {
   final List<AdapterInterceptor> _interceptors = [];
   final Map<adapter_cancel.CancelToken, List<Completer>> _pendingRequests = {};
 
+  /// 底层 dart:io HttpClient 引用（仅在 IOClient 场景下非 null）
+  /// 用于在 applyBaseOptions 时设置原生参数（超时、重定向等）
+  HttpClient? _nativeHttpClient;
+
   /// Creates an HttpAdapter.
   ///
   /// 创建 HttpAdapter。
@@ -271,17 +276,24 @@ class HttpAdapter implements NetworkAdapter {
   /// - [client]: Optional custom http.Client instance. If not provided,
   ///             a default instance will be created.
   ///             可选的自定义 http.Client 实例。如果不提供，将创建默认实例。
+  /// - [httpClient]: Optional dart:io HttpClient for native configuration.
+  ///                 When provided, connectTimeout/followRedirects/maxRedirects
+  ///                 from AdapterBaseOptions will be applied directly.
+  ///                 可选的 dart:io HttpClient，用于原生参数配置。
   ///
   /// Example / 示例:
   /// ```dart
   /// // Using default client / 使用默认 client
   /// final adapter = HttpAdapter();
   ///
-  /// // Using custom client / 使用自定义 client
-  /// final client = IOClient(HttpClient());
-  /// final adapter = HttpAdapter(client: client);
+  /// // Using custom client with native config / 使用自定义 client
+  /// final httpClient = HttpClient()
+  ///   ..connectionTimeout = Duration(seconds: 10);
+  /// final adapter = HttpAdapter(httpClient: httpClient);
   /// ```
-  HttpAdapter({http.Client? client}) : _client = client ?? http.Client();
+  HttpAdapter({http.Client? client, HttpClient? httpClient})
+      : _client = client ?? IOClient(httpClient ?? HttpClient()),
+        _nativeHttpClient = httpClient;
 
   /// Gets the underlying http.Client instance.
   ///
@@ -296,6 +308,42 @@ class HttpAdapter implements NetworkAdapter {
 
   @override
   String get version => '1.0.0';
+
+  @override
+  void setBaseUrl(String url) {
+    // HttpAdapter 的 baseUrl 通过 RxNet._baseUrl 管理，
+    // 无需在 adapter 层面存储。此处为空实现。
+  }
+
+
+  /// 全局默认配置（适配器无关）
+  AdapterBaseOptions? _baseOptions;
+
+  @override
+  void applyBaseOptions(AdapterBaseOptions options) {
+    _baseOptions = options;
+    // 如果底层 client 是 IOClient，配置 dart:io HttpClient 的原生参数
+    _applyToNativeHttpClient(options);
+  }
+
+  /// 将 AdapterBaseOptions 应用到底层 dart:io HttpClient（仅 IOClient 有效）
+  void _applyToNativeHttpClient(AdapterBaseOptions options) {
+    if (kIsWeb) return;
+    final nativeClient = _nativeHttpClient;
+    if (nativeClient == null) return;
+
+    try {
+      if (options.connectTimeout != null) {
+        nativeClient.connectionTimeout = options.connectTimeout;
+      }
+      nativeClient.idleTimeout = options.receiveTimeout ?? const Duration(seconds: 30);
+    } catch (_) {
+      // 平台不支持，静默忽略
+    }
+  }
+
+  /// 获取底层 dart:io HttpClient 实例
+  HttpClient? getHttpClient() => _nativeHttpClient;
 
   @override
   Future<AdapterResponse> request(AdapterRequest request) async {
@@ -331,22 +379,49 @@ class HttpAdapter implements NetworkAdapter {
       }
 
       final baseRequest = await _buildBaseRequest(modifiedRequest);
-      final requestFuture = _client.send(baseRequest);
+
+      // --- 超时策略 ---
+      // connectTimeout 包裹 send() 阶段（建连 + 获取响应头）
+      // receiveTimeout 包裹 Response.fromStream() 阶段（读取响应体）
+      // 两者独立作用，互不干扰
+      var sendFuture = _client.send(baseRequest);
+      final connectTimeout = _baseOptions?.connectTimeout;
+      if (connectTimeout != null && connectTimeout.inMilliseconds > 0) {
+        sendFuture = sendFuture.timeout(
+          connectTimeout,
+          onTimeout: () => throw AdapterException(
+            type: AdapterExceptionType.connectionError,
+            message: 'Connect timeout after ${connectTimeout.inSeconds}s',
+          ),
+        );
+      }
+
       final streamedResponse = activeCancelToken != null
           ? await Future.any<http.StreamedResponse>([
-              requestFuture,
+              sendFuture,
               completer.future.then((_) => throw AdapterException(
                     type: AdapterExceptionType.cancel,
                     message:
                         activeCancelToken!.cancelReason ?? 'Request cancelled',
                   )),
             ])
-          : await requestFuture;
+          : await sendFuture;
+
+      // --- receiveDataWhenStatusError 控制 ---
+      // 当状态码表示错误且 receiveDataWhenStatusError 为 false 时，
+      // 不读取响应体以节省带宽
+      final isErrorResponse =
+          streamedResponse.statusCode >= 400;
+      final shouldReadBody = !isErrorResponse ||
+          (_baseOptions?.receiveDataWhenStatusError ?? true);
 
       var response = modifiedRequest.responseType == ResponseType.stream
           ? _convertFromHttpStreamedResponse(streamedResponse, modifiedRequest)
           : _convertFromHttpResponse(
-              await http.Response.fromStream(streamedResponse),
+              shouldReadBody
+                  ? await _readResponseWithTimeout(streamedResponse)
+                  : http.Response('', streamedResponse.statusCode,
+                      headers: streamedResponse.headers),
               modifiedRequest,
             );
 
@@ -726,6 +801,19 @@ class HttpAdapter implements NetworkAdapter {
   Map<String, String> _buildHeaders(AdapterRequest request) {
     final headers = <String, String>{};
 
+    // 1. 先合并全局默认 header（优先级最低）
+    final globalHeaders = _baseOptions?.headers;
+    if (globalHeaders != null) {
+      for (final entry in globalHeaders.entries) {
+        if (entry.value is List) {
+          headers[entry.key] = (entry.value as List).join(', ');
+        } else {
+          headers[entry.key] = entry.value.toString();
+        }
+      }
+    }
+
+    // 2. 再合并请求级 header（覆盖全局）
     for (final entry in request.headers.entries) {
       if (entry.value is List) {
         headers[entry.key] = (entry.value as List).join(', ');
@@ -738,9 +826,10 @@ class HttpAdapter implements NetworkAdapter {
       (key) => key.toLowerCase() == HttpHeaders.contentTypeHeader,
     );
 
-    // 如果有 contentType，添加到头部
-    if (request.contentType != null && !hasContentTypeHeader) {
-      headers['content-type'] = request.contentType!;
+    // 如果有 contentType，添加到头部（请求级 > 全局默认）
+    final contentType = request.contentType ?? _baseOptions?.contentType ;
+    if (contentType != null && !hasContentTypeHeader) {
+      headers['content-type'] = contentType;
     }
 
     return headers;
@@ -772,6 +861,24 @@ class HttpAdapter implements NetworkAdapter {
       // 默认使用 JSON
       return jsonEncode(request.bodyParams);
     }
+  }
+
+  /// 读取响应体，应用 receiveTimeout
+  Future<http.Response> _readResponseWithTimeout(
+    http.StreamedResponse streamedResponse,
+  ) async {
+    var responseFuture = http.Response.fromStream(streamedResponse);
+    final receiveTimeout = _baseOptions?.receiveTimeout;
+    if (receiveTimeout != null && receiveTimeout.inMilliseconds > 0) {
+      responseFuture = responseFuture.timeout(
+        receiveTimeout,
+        onTimeout: () => throw AdapterException(
+          type: AdapterExceptionType.response,
+          message: 'Receive timeout after ${receiveTimeout.inSeconds}s',
+        ),
+      );
+    }
+    return responseFuture;
   }
 
   /// 转换 http.Response 到 AdapterResponse
@@ -936,15 +1043,26 @@ class HttpAdapter implements NetworkAdapter {
         }
       }
 
-      final requestFuture = _client.send(baseRequest);
+      var sendFuture = _client.send(baseRequest);
+      final connectTimeout = _baseOptions?.connectTimeout;
+      if (connectTimeout != null && connectTimeout.inMilliseconds > 0) {
+        sendFuture = sendFuture.timeout(
+          connectTimeout,
+          onTimeout: () => throw AdapterException(
+            type: AdapterExceptionType.connectionError,
+            message: 'Connect timeout after ${connectTimeout.inSeconds}s',
+          ),
+        );
+      }
+
       final streamedResponse = request.cancelToken != null
           ? await Future.any<http.StreamedResponse>([
-              requestFuture,
+              sendFuture,
               completer.future.then((_) => throw AdapterException.cancel(
                     message: request.cancelToken!.cancelReason,
                   )),
             ])
-          : await requestFuture;
+          : await sendFuture;
 
       if (streamedResponse.statusCode >= 400) {
         throw AdapterException(
@@ -1028,15 +1146,26 @@ class HttpAdapter implements NetworkAdapter {
         }
       }
 
-      final requestFuture = _client.send(baseRequest);
+      var sendFuture = _client.send(baseRequest);
+      final connectTimeout = _baseOptions?.connectTimeout;
+      if (connectTimeout != null && connectTimeout.inMilliseconds > 0) {
+        sendFuture = sendFuture.timeout(
+          connectTimeout,
+          onTimeout: () => throw AdapterException(
+            type: AdapterExceptionType.connectionError,
+            message: 'Connect timeout after ${connectTimeout.inSeconds}s',
+          ),
+        );
+      }
+
       final streamedResponse = request.cancelToken != null
           ? await Future.any<http.StreamedResponse>([
-              requestFuture,
+              sendFuture,
               completer.future.then((_) => throw AdapterException.cancel(
                     message: request.cancelToken!.cancelReason,
                   )),
             ])
-          : await requestFuture;
+          : await sendFuture;
 
       if (request.responseType == ResponseType.stream) {
         final response = _convertFromHttpStreamedResponse(
@@ -1055,7 +1184,7 @@ class HttpAdapter implements NetworkAdapter {
       }
 
       final response = _convertFromHttpResponse(
-        await http.Response.fromStream(streamedResponse),
+        await _readResponseWithTimeout(streamedResponse),
         request,
       );
 

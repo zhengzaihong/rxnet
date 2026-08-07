@@ -1,5 +1,5 @@
-import '../../../net/type/http_method.dart';
-import '../../../net/type/response_type.dart';
+import '../../type/http_method.dart';
+import '../../type/response_type.dart';
 import '../network_adapter.dart';
 import '../cancel_token.dart';
 

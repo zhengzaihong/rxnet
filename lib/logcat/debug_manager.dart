@@ -2,8 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:rxnet_plus/logcat/debug_page.dart';
 import 'package:rxnet_plus/logcat/drag_box.dart';
-import 'package:rxnet_plus/net/rx_net.dart';
-import 'package:rxnet_plus/rxnet_lib.dart';
+
+import '../src/rx_net.dart';
 
 ///
 /// author: ZhengZaiHong

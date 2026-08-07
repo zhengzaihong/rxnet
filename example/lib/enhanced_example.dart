@@ -44,7 +44,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("RxNet Plus 0.6.0 增强示例"),
+        title: const Text("RxNet Plus 示例"),
         actions: [
           TextButton(
             onPressed: () {
@@ -240,9 +240,12 @@ class _EnhancedExampleState extends State<EnhancedExample> {
 
       final httpApi = RxNet.create();
       await httpApi.initNet(
-          baseUrl: "http://t.weather.sojson.com",
-          adapter: adapter, // 使用轻量级适配器
-          interceptors: [RxnetSimpleLogInterceptor()]);
+         config: RxNetConfig(
+             baseUrl: "http://t.weather.sojson.com",
+             adapter: adapter, // 使用轻量级适配器
+             interceptors: [RxnetSimpleLogInterceptor()]
+         )
+      );
 
       final response = await httpApi
           .getRequest()
@@ -299,8 +302,9 @@ class _EnhancedExampleState extends State<EnhancedExample> {
       // 使用 MockAdapter
       final mockApi = RxNet.create();
       await mockApi.initNet(
-        baseUrl: "http://mock.api.com",
-        adapter: mockAdapter,
+       config: RxNetConfig(
+         baseUrl: "http://mock.api.com",
+         adapter: mockAdapter,)
       );
 
       final response = await mockApi
@@ -329,16 +333,18 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     try {
       // API 1: 主要API使用 DioAdapter（功能完整）
       final mainApi = RxNet.create();
-      await mainApi.initNet(
+      await mainApi.initNet(config: RxNetConfig(
         baseUrl: "http://t.weather.sojson.com",
         adapter: DioAdapter(),
-      );
+      ));
 
       // API 2: 分析API使用 HttpAdapter（轻量级）
       final analyticsApi = RxNet.create();
       await analyticsApi.initNet(
-        baseUrl: "http://analytics.example.com",
-        adapter: HttpAdapter(),
+       config: RxNetConfig(
+         baseUrl: "http://analytics.example.com",
+         adapter: HttpAdapter(),
+       )
       );
 
       // API 3: 测试API使用 MockAdapter
@@ -359,8 +365,10 @@ class _EnhancedExampleState extends State<EnhancedExample> {
 
       final testApi = RxNet.create();
       await testApi.initNet(
-        baseUrl: "http://test.api.com",
-        adapter: mockAdapter,
+       config: RxNetConfig(
+         baseUrl: "http://test.api.com",
+         adapter: mockAdapter,
+       )
       );
 
       debugPrint("mainApi:${mainApi.hashCode}");
@@ -397,8 +405,10 @@ class _EnhancedExampleState extends State<EnhancedExample> {
       // 创建实例并添加拦截器
       final api = RxNet.create();
       await api.initNet(
-        baseUrl: "http://t.weather.sojson.com",
-        adapter: DioAdapter(),
+       config: RxNetConfig(
+         baseUrl: "http://t.weather.sojson.com",
+         adapter: DioAdapter(),
+       )
       );
 
       // 添加拦截器
@@ -431,7 +441,9 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     //   "Connection": "keep-alive",
     // });
 
-    RxNet.get()
+
+
+    RxNet.get<BaseInfo<Data>>()
         .setPath('api/weather/city/{id}')
         .setPathParam("id", "101030100") //RESTFul时，这里的参数名称需要和路径中占位符--保持一直: http://t.weather.sojson.com/api/weather/city/101030100
         .setCancelToken(pageRequestToken) //取消请求的CancelToken
@@ -444,18 +456,17 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     // .setRequestIgnoreCacheTime(true)  // 是否直接忽略缓存失效时间
     // .setJsonConvert(NewWeatherInfo.fromJson) //解析成NewWeatherInfo对象
     // .setJsonConvert((data)=> BaseBean<Data>.fromJson(data).data) // 如果你只关心data实体部分
-        .setJsonConvert((data) =>
-    BaseInfo<Data>.fromJson(data, Data.fromJson)) //如果你想要 code 等信息
+        .setJsonConvert((data) => BaseInfo<Data>.fromJson(data, Data.fromJson)) //如果你想要 code 等信息
     // .setJsonConvert((data)=>BaseInfo<Data>.fromJson(data, Data.fromJson).data) //如果你只关心data实体部分
     // .setResponseType(ResponseType.stream)
-        .execute<BaseInfo<Data>>(success: (data, source) {
-      //刷新UI
-      count++;
-      setState(() {
-        result =
-        "${sourcesType == SourcesType.net ? "网络请求" : "缓存请求"}-$count : ${jsonEncode(data)}";
-        sourcesType = source;
-      });
+        .execute(success: (data, source) {
+          //刷新UI
+          count++;
+          setState(() {
+            result =
+            "${sourcesType == SourcesType.net ? "网络请求" : "缓存请求"}-$count : ${jsonEncode(data)}";
+            sourcesType = source;
+          });
     }, failure: (e) {
       debugPrint("--执行错误");
       setState(() {
@@ -496,14 +507,13 @@ class _EnhancedExampleState extends State<EnhancedExample> {
   }
 
   void basicExample3() async {
-    final data = await RxNet.get()
+    final data = await RxNet.get<RxResult<NewWeatherInfo>>()
         .setPath('api/weather/city/{id}')
         .setPathParam("id", "101030100")
         .setRetryCount(2) //重试次数
         .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
         .setJsonConvert(NewWeatherInfo.fromJson)
-        .request<NewWeatherInfo>();
-
+        .request();
     setState(() {
       count++;
       result =
@@ -551,7 +561,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
             .setPath('api/weather/city/{id}')
             .setPathParam("id", "101030100")
             .setJsonConvert(NewWeatherInfo.fromJson)
-            .request<NewWeatherInfo>(),
+            .request(),
         
         // 请求2：获取用户信息（模拟）
         RxNet.get()
@@ -606,14 +616,14 @@ class _EnhancedExampleState extends State<EnhancedExample> {
       // 注意：这是对回调方式的补充，不是主要推荐方式
       final results = await RxNet.zipRequest([
         // 请求1：获取天气信息（回调方式）
-        ZipRequest<NewWeatherInfo>(
+        ZipRequest(
           tag: 'weather',
           request: ({success, failure, completed}) {
-            RxNet.get()
+            RxNet.get<NewWeatherInfo>()
                 .setPath('api/weather/city/{id}')
                 .setPathParam("id", "101030100")
                 .setJsonConvert(NewWeatherInfo.fromJson)
-                .execute<NewWeatherInfo>(
+                .execute(
                   success: (data, source) {
                     // ✅ 在这里添加自定义逻辑（日志、分析等）
                     LogUtil.v("Weather loaded: ${data.message}");
@@ -627,12 +637,12 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         ),
         
         // 请求2：获取用户信息（回调方式）
-        ZipRequest<Map<String, dynamic>>(
+        ZipRequest(
           request: ({success, failure, completed}) {
             RxNet.get()
                 .setPath('api/weather/city/{id}')
                 .setPathParam("id", "101030200")
-                .execute<Map<String, dynamic>>(
+                .execute(
                   success: success,
                   failure: failure,
                   completed: completed,
@@ -642,12 +652,12 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         ),
         
         // 请求3：获取产品列表（回调方式）
-        ZipRequest<Map<String, dynamic>>(
+        ZipRequest(
           request: ({success, failure, completed}) {
             RxNet.get()
                 .setPath('api/weather/city/{id}')
                 .setPathParam("id", "101030300")
-                .execute<Map<String, dynamic>>(
+                .execute(
                   success: success,
                   failure: failure,
                   completed: completed,
@@ -661,7 +671,6 @@ class _EnhancedExampleState extends State<EnhancedExample> {
       final weather = results.getRequestByTag<NewWeatherInfo>('weather');
       final user = results.getRequestByTag<Map<String, dynamic>>('user');
       // final products = results.getRequestByTag<Map<String, dynamic>>('products');
-
       setState(() {
         result = "✅ 回调合并请求成功\n\n"
             "方式：RxNet.zipRequest (回调补充)\n"
@@ -688,13 +697,13 @@ class _EnhancedExampleState extends State<EnhancedExample> {
       final results = await RxNet.zipRequest(
         [
           // 请求1：正常请求
-          ZipRequest<NewWeatherInfo>(
+          ZipRequest(
             request: ({success, failure, completed}) {
               RxNet.get()
                   .setPath('api/weather/city/{id}')
                   .setPathParam("id", "101030100")
                   .setJsonConvert(NewWeatherInfo.fromJson)
-                  .execute<NewWeatherInfo>(
+                  .execute(
                     success: success,
                     failure: failure,
                     completed: completed,
@@ -704,11 +713,11 @@ class _EnhancedExampleState extends State<EnhancedExample> {
           ),
           
           // 请求2：可能失败的请求
-          ZipRequest<Map<String, dynamic>>(
+          ZipRequest(
             request: ({success, failure, completed}) {
               RxNet.get()
                   .setPath('api/invalid/path') // 故意使用无效路径
-                  .execute<Map<String, dynamic>>(
+                  .execute(
                     success: success,
                     failure: failure,
                     completed: completed,
@@ -718,12 +727,12 @@ class _EnhancedExampleState extends State<EnhancedExample> {
           ),
           
           // 请求3：正常请求
-          ZipRequest<Map<String, dynamic>>(
+          ZipRequest(
             request: ({success, failure, completed}) {
               RxNet.get()
                   .setPath('api/weather/city/{id}')
                   .setPathParam("id", "101030300")
-                  .execute<Map<String, dynamic>>(
+                  .execute(
                     success: success,
                     failure: failure,
                     completed: completed,
@@ -768,14 +777,14 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         // ==================== 方式1：闭包包装（推荐）====================
         // 最灵活和类型安全，显式传递所有参数
         // 这是最常用和推荐的方式
-        ZipRequest<NewWeatherInfo>(
+        ZipRequest(
           request: ({success, failure, completed}) {
             // 直接在闭包中调用请求方法
             RxNet.get()
                 .setPath('api/weather/city/{id}')
                 .setPathParam("id", "101030100")
                 .setJsonConvert(NewWeatherInfo.fromJson)
-                .execute<NewWeatherInfo>(
+                .execute(
                   success: success,
                   failure: failure,
                   completed: completed,
@@ -786,7 +795,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         
         // ==================== 方式2：方法引用 + 闭包传参 ====================
         // 将请求逻辑提取为独立方法，然后在闭包中调用
-        ZipRequest<Map<String, dynamic>>(
+        ZipRequest(
           request: ({success, failure, completed}) {
             // 调用提取的方法
             _fetchWeatherData(
@@ -801,7 +810,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         // ==================== 方式3：withParams 工厂（最简洁）====================
         // 使用 withParams 工厂方法，自动处理参数传递
         // 注意：需要方法签名符合特定格式
-        ZipRequest<Map<String, dynamic>>(
+        ZipRequest(
           request: ({success, failure, completed}) {
             // 模拟 withParams 的使用场景
             _fetchWeatherWithParams(
@@ -848,14 +857,14 @@ class _EnhancedExampleState extends State<EnhancedExample> {
   /// 可以被多个地方复用
   void _fetchWeatherData({
     required String cityId,
-    Success<Map<String, dynamic>>? success,
+    Success? success,
     Failure? failure,
     Completed? completed,
   }) {
     RxNet.get()
         .setPath('api/weather/city/{id}')
         .setPathParam("id", cityId)
-        .execute<Map<String, dynamic>>(
+        .execute(
           success: success,
           failure: failure,
           completed: completed,
@@ -866,7 +875,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
   /// 演示 withParams 风格的方法签名
   void _fetchWeatherWithParams({
     required Map<String, dynamic> params,
-    Success<Map<String, dynamic>>? success,
+    Success? success,
     Failure? failure,
     Completed? completed,
   }) {
@@ -875,7 +884,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     RxNet.get()
         .setPath('api/weather/city/{id}')
         .setPathParam("id", cityId)
-        .execute<Map<String, dynamic>>(
+        .execute(
           success: success,
           failure: failure,
           completed: completed,
@@ -885,17 +894,23 @@ class _EnhancedExampleState extends State<EnhancedExample> {
   void newInstanceRequest() async {
     // 为这个实例进行独立的初始化配置
     final apiService = RxNet.create();
-    await apiService.initNet(baseUrl: "https://api.xxx.com");
+    await apiService.initNet(
+      config: RxNetConfig(
+          baseUrl: "https://api.xxx.com"
+      )
+    );
     // apiService.setHeaders(xxx)
     await apiService
         .getRequest()
         .setPath("/users/1")
         .setJsonConvert(NewWeatherInfo.fromJson)
-        .request<NewWeatherInfo>();
+        .request();
     // final weatherInfo = response.value;
 
     final testApi = RxNet.create();
-    await testApi.initNet(baseUrl: "https://api.xxx.com");
+    await testApi.initNet( config: RxNetConfig(
+        baseUrl: "https://api.xxx.com"
+    ));
 
     debugPrint("apiService:${apiService.hashCode}");
     debugPrint("testApi:${testApi.hashCode}");
@@ -967,7 +982,6 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         {"name": "张三", "age": 25, "email": "zhangsan@example.com"})
         .asJson() // 明确指定JSON格式
         .request();
-
     setState(() {
       result = "示例3结果：${response.value}";
     });
@@ -1172,8 +1186,10 @@ class UserApiExample {
   /// 初始化API
   static Future<void> init() async {
     await _api.initNet(
-      baseUrl: "https://api.example.com",
-      adapter: DioAdapter(), // 显式指定适配器
+     config: RxNetConfig(
+       baseUrl: "https://api.example.com",
+       adapter: DioAdapter(), // 显式指定适配器
+     )
     );
 
     // 添加自定义拦截器
@@ -1272,14 +1288,18 @@ class MultiAdapterExample {
   static Future<void> init() async {
     // 初始化主API（DioAdapter）
     await mainApi.initNet(
-      baseUrl: "https://api.main.com",
-      adapter: DioAdapter(),
+      config: RxNetConfig(
+        baseUrl: "https://api.main.com",
+        adapter: DioAdapter(),
+      )
     );
 
     // 初始化分析API（HttpAdapter）
     await analyticsApi.initNet(
-      baseUrl: "https://analytics.example.com",
-      adapter: HttpAdapter(),
+      config: RxNetConfig(
+        baseUrl: "https://analytics.example.com",
+        adapter: HttpAdapter(),
+      )
     );
 
     // 初始化测试API（MockAdapter）
@@ -1299,8 +1319,10 @@ class MultiAdapterExample {
     );
 
     await testApi.initNet(
-      baseUrl: "https://test.api.com",
-      adapter: mockAdapter,
+      config: RxNetConfig(
+        baseUrl: "https://test.api.com",
+        adapter: mockAdapter,
+      )
     );
   }
 

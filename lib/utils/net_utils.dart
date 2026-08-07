@@ -1,7 +1,6 @@
-
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:rxnet_plus/utils/text_util.dart';
-
-import 'md5_util.dart';
 
 ///
 /// author: ZhengZaiHong
@@ -44,25 +43,45 @@ class NetUtils {
     return scheme + rest;
   }
 
-  static String getCacheKeyFromPath(String? path, Map<String, dynamic> params,List<String> ignoreKeys) {
-    String cacheKey = "";
-    if (!(TextUtil.isEmpty(path))) {
-      cacheKey = cacheKey + MD5Util.generateMd5(path!);
-    } else {
+  /// 生成缓存键
+  ///
+  /// 使用 SHA-256 哈希生成固定长度的缓存键，避免键过长和碰撞风险。
+  /// 格式：前16字符哈希值，保证唯一性的同时节省存储空间。
+  static String getCacheKeyFromPath(String? path, Map<String, dynamic> params, List<String> ignoreKeys) {
+    if (TextUtil.isEmpty(path)) {
       throw Exception("请求地址不能为空！");
     }
+
+    final buffer = StringBuffer(path!);
+
     if (params.isNotEmpty) {
-      final tempParams = Map<String,dynamic>.from(params);
+      final tempParams = Map<String, dynamic>.from(params);
       tempParams.removeWhere((key, value) => ignoreKeys.contains(key));
-      String paramsStr = "";
-      List<String> sortedKeys = tempParams.keys.toList()..sort();
-      for (var key in sortedKeys) {
-        paramsStr = "$paramsStr$key${tempParams[key]}";
-      }
-      if (paramsStr.isNotEmpty) {
-         cacheKey = cacheKey + MD5Util.generateMd5(paramsStr);
+
+      if (tempParams.isNotEmpty) {
+        buffer.write('?');
+        final sortedKeys = tempParams.keys.toList()..sort();
+        for (var i = 0; i < sortedKeys.length; i++) {
+          if (i > 0) buffer.write('&');
+          final key = sortedKeys[i];
+          buffer.write(key);
+          buffer.write('=');
+          buffer.write(tempParams[key]);
+        }
       }
     }
-    return cacheKey;
+
+    final rawKey = buffer.toString();
+
+    // 如果键长度小于 64，直接使用原始键（短键不需要哈希）
+    if (rawKey.length <= 64) {
+      return rawKey;
+    }
+
+    // 长键使用 SHA-256 哈希，取前 32 字符作为缓存键
+    final bytes = utf8.encode(rawKey);
+    final digest = sha256.convert(bytes);
+    return digest.toString().substring(0, 32);
   }
 }
+

@@ -1,4 +1,5 @@
 import '../models/adapter_response.dart';
+import '../../error/rx_error.dart';
 
 /// 适配器异常类型
 /// Adapter exception type
@@ -34,11 +35,12 @@ enum AdapterExceptionType {
 
 /// 适配器异常基类，统一不同网络库的异常类型
 /// Adapter exception base class, which unifies exception types for different network libraries
-class AdapterException implements Exception {
-  /// 错误消息
-  /// error message
-  final String message;
-  
+///
+/// 继承自 [RxError]，与框架异常体系统一：
+/// - 可以被 `catch (RxError)` 捕获
+/// - 可以被 `catch (AdapterException)` 精确捕获
+/// - 保留了结构化的 [type] 和 [statusCode] 信息
+class AdapterException extends RxError {
   /// 异常类型
   /// exception type
   final AdapterExceptionType type;
@@ -60,13 +62,13 @@ class AdapterException implements Exception {
   final StackTrace? stackTrace;
   
   AdapterException({
-    required this.message,
+    required String message,
     required this.type,
     this.statusCode,
     this.response,
     this.originalError,
     this.stackTrace,
-  });
+  }) : super(message, originalError);
   
   /// 创建连接超时异常
   /// Create connection timeout exception

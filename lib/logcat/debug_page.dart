@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:rxnet_plus/rxnet_lib.dart';
+import '../src/rx_net.dart';
 
 ///
 /// author: ZhengZaiHong

@@ -20,21 +20,54 @@ import 'log_util.dart';
 /// - HarmonyOS: 使用文件系统（纯 Dart 实现）
 ///
 class RxNetDataBase {
-  static Database? _db;
+  // 实例级别状态
+  Database? _db;
+  bool isDatabaseReady = false;
+  Future<void>? _initFuture;
+
+  // StoreRef 不含状态，可以安全共享
   static final StoreRef<String, dynamic> _store = StoreRef.main();
-  static bool isDatabaseReady = false;
-  static final List<void Function(bool isOk)> _checkDataBaseListener = [];
-  static Future<void>? _initFuture;
+
+  // 缓存条目元数据 Store（用于 LRU/LFU/FIFO 淘汰策略）
+  static final StoreRef<String, dynamic> _metadataStore = StoreRef('_metadata');
+
+  // 用于静态方法向后兼容的默认实例
+  static final RxNetDataBase _staticInstance = RxNetDataBase();
 
   RxNetDataBase();
 
-  /// 初始化数据库
-  /// 
-  /// [databaseName] 数据库名称，默认为 'rxnet_cache.db'
-  /// [databasePath] 自定义数据库路径（可选）
-  /// 
-  /// Web 平台会自动使用 IndexedDB，其他平台使用文件系统
+  // ==================== 静态方法（向后兼容，委托给默认实例） ====================
+
+  /// 初始化数据库（静态方法，向后兼容单例模式）
   static Future<void> initDatabase({
+    String databaseName = 'rxnet_cache.db',
+    String? cacheName = 'network_cache',
+    String? databasePath,
+  }) {
+    return _staticInstance.init(
+      databaseName: databaseName,
+      cacheName: cacheName,
+      databasePath: databasePath,
+    );
+  }
+
+  /// 等待数据库初始化完成（静态方法，向后兼容）
+  static Future<void> waitUntilReady() async {
+    return _staticInstance.ready;
+  }
+
+  /// 关闭数据库连接（静态方法，向后兼容）
+  static Future<void> close() async {
+    return _staticInstance.closeInstance();
+  }
+
+  /// 获取默认实例的数据库就绪状态（静态方法，向后兼容）
+  static bool get isReady => _staticInstance.isDatabaseReady;
+
+  // ==================== 实例方法 ====================
+
+  /// 初始化数据库（实例方法，支持多实例独立配置）
+  Future<void> init({
     String databaseName = 'rxnet_cache.db',
     String? cacheName = 'network_cache',
     String? databasePath,
@@ -57,23 +90,8 @@ class RxNetDataBase {
     return future;
   }
 
-  /// 数据库还没初始完成，可能已经存在网络请求，先将其缓存；等待数据库完成后并返回数据后，将其全部回调全部清除。
-  /// The database has not yet been initially completed, and there may already be network requests.
-  /// Cache them first; wait for the database to complete and return data, and clear all their callbacks.
-  @Deprecated('Await RxNet.init() or RxNetDataBase.ready instead')
-  void setDataBaseReadListener(void Function(bool isOk) function) {
-    if (isDatabaseReady && _db != null) {
-      function(true);
-      return;
-    }
-
-    _checkDataBaseListener.add(function);
-  }
-
-  /// 等待数据库初始化完成。
-  Future<void> get ready => waitUntilReady();
-
-  static Future<void> waitUntilReady() async {
+  /// 等待数据库初始化完成
+  Future<void> get ready async {
     if (isDatabaseReady && _db != null) {
       return;
     }
@@ -103,9 +121,6 @@ class RxNetDataBase {
   }
 
   /// 获取数据
-  /// 
-  /// [key] 数据键
-  /// 返回存储的值，如果不存在返回 null
   Future<T?> get<T>(dynamic key) async {
     final db = await _resolveDatabase();
     if (db == null) {
@@ -122,13 +137,7 @@ class RxNetDataBase {
   }
 
   /// 存储数据
-  /// 
-  /// [key] 数据键
-  /// [value] 数据值（支持所有 JSON 可序列化的类型）
-  Future put(
-    dynamic key,
-    dynamic value,
-  ) async {
+  Future put(dynamic key, dynamic value) async {
     final db = await _resolveDatabase();
     if (db == null) {
       return;
@@ -157,8 +166,6 @@ class RxNetDataBase {
   }
 
   /// 删除指定键的数据
-  /// 
-  /// [key] 要删除的数据键
   Future<void> delete(String key) async {
     final db = await _resolveDatabase();
     if (db == null) {
@@ -173,9 +180,6 @@ class RxNetDataBase {
   }
 
   /// 检查键是否存在
-  /// 
-  /// [key] 要检查的数据键
-  /// 返回 true 如果键存在，否则返回 false
   Future<bool> exists(String key) async {
     final db = await _resolveDatabase();
     if (db == null) {
@@ -192,8 +196,6 @@ class RxNetDataBase {
   }
 
   /// 获取所有键
-  /// 
-  /// 返回数据库中所有键的列表
   Future<List<String>> getAllKeys() async {
     final db = await _resolveDatabase();
     if (db == null) {
@@ -224,10 +226,148 @@ class RxNetDataBase {
     }
   }
 
-  /// 关闭数据库连接
-  /// 
-  /// 注意：关闭后需要重新调用 initDatabase 才能继续使用
-  static Future<void> close() async {
+  /// 按前缀清理缓存
+  Future<int> clearByPrefix(String prefix) async {
+    final db = await _resolveDatabase();
+    if (db == null) {
+      return 0;
+    }
+
+    try {
+      final records = await _store.find(db);
+      final keysToDelete = records
+          .where((record) => record.key.startsWith(prefix))
+          .map((record) => record.key)
+          .toList();
+
+      for (final key in keysToDelete) {
+        await _store.record(key).delete(db);
+      }
+
+      LogUtil.v(
+          'RxNetDataBase: Cleared ${keysToDelete.length} records with prefix "$prefix"');
+      return keysToDelete.length;
+    } catch (error, stacktrace) {
+      LogUtil.v('RxNetDataBase: clearByPrefix error: $error\n$stacktrace');
+      return 0;
+    }
+  }
+
+  /// 按正则模式清理缓存
+  Future<int> clearByPattern(RegExp pattern) async {
+    final db = await _resolveDatabase();
+    if (db == null) {
+      return 0;
+    }
+
+    try {
+      final records = await _store.find(db);
+      final keysToDelete = records
+          .where((record) => pattern.hasMatch(record.key))
+          .map((record) => record.key)
+          .toList();
+
+      for (final key in keysToDelete) {
+        await _store.record(key).delete(db);
+      }
+
+      LogUtil.v(
+          'RxNetDataBase: Cleared ${keysToDelete.length} records matching pattern');
+      return keysToDelete.length;
+    } catch (error, stacktrace) {
+      LogUtil.v('RxNetDataBase: clearByPattern error: $error\n$stacktrace');
+      return 0;
+    }
+  }
+
+  /// 获取缓存大小估算值（字节）
+  Future<int> estimateSizeInBytes() async {
+    final db = await _resolveDatabase();
+    if (db == null) {
+      return 0;
+    }
+
+    try {
+      final records = await _store.find(db);
+      int totalSize = 0;
+      for (final record in records) {
+        totalSize += record.key.length * 2;
+        totalSize += record.value.toString().length * 2;
+      }
+      return totalSize;
+    } catch (error, stacktrace) {
+      LogUtil.v(
+          'RxNetDataBase: estimateSizeInBytes error: $error\n$stacktrace');
+      return 0;
+    }
+  }
+
+  /// 写入缓存条目元数据（用于淘汰策略）
+  Future<void> putMetadata(String key, Map<String, dynamic> metadata) async {
+    final db = await _resolveDatabase();
+    if (db == null) return;
+    try {
+      await _metadataStore.record(key).put(db, metadata);
+    } catch (e, st) {
+      LogUtil.v('RxNetDataBase: putMetadata error: $e\n$st');
+    }
+  }
+
+  /// 读取缓存条目元数据
+  Future<Map<String, dynamic>?> getMetadata(String key) async {
+    final db = await _resolveDatabase();
+    if (db == null) return null;
+    try {
+      final value = await _metadataStore.record(key).get(db);
+      if (value is Map) {
+        return Map<String, dynamic>.from(value);
+      }
+      return null;
+    } catch (e, st) {
+      LogUtil.v('RxNetDataBase: getMetadata error: $e\n$st');
+      return null;
+    }
+  }
+
+  /// 读取所有缓存条目元数据
+  Future<List<MapEntry<String, Map<String, dynamic>>>> getAllMetadata() async {
+    final db = await _resolveDatabase();
+    if (db == null) return [];
+    try {
+      final records = await _metadataStore.find(db);
+      return records
+          .map((r) => MapEntry(r.key, r.value as Map<String, dynamic>))
+          .toList();
+    } catch (e, st) {
+      LogUtil.v('RxNetDataBase: getAllMetadata error: $e\n$st');
+      return [];
+    }
+  }
+
+  /// 删除缓存条目元数据
+  Future<void> deleteMetadata(String key) async {
+    final db = await _resolveDatabase();
+    if (db == null) return;
+    try {
+      await _metadataStore.record(key).delete(db);
+    } catch (e, st) {
+      LogUtil.v('RxNetDataBase: deleteMetadata error: $e\n$st');
+    }
+  }
+
+  /// 清空所有缓存条目元数据
+  Future<void> cleanMetadata() async {
+    final db = await _resolveDatabase();
+    if (db == null) return;
+    try {
+      await _metadataStore.delete(db);
+    } catch (e, st) {
+      LogUtil.v('RxNetDataBase: cleanMetadata error: $e\n$st');
+    }
+  }
+
+  /// 关闭当前实例的数据库连接
+  Future<void> closeInstance() async {
     if (_db != null) {
       await _db!.close();
       _db = null;
@@ -237,26 +377,24 @@ class RxNetDataBase {
     _resetInitState();
   }
 
-  static Future<void> _doInitDatabase({
+  // ==================== 私有方法 ====================
+
+  Future<void> _doInitDatabase({
     required String databaseName,
     required String? cacheName,
     required String? databasePath,
   }) async {
     try {
       if (kIsWeb) {
-        // Web 平台：使用 IndexedDB
         LogUtil.v('RxNetDataBase: Initializing for Web platform (IndexedDB)');
         final factory = databaseFactoryWeb;
         _db = await factory.openDatabase(databaseName);
       } else {
-        // 其他平台：使用文件系统
         String dbPath;
 
         if (databasePath != null) {
-          // 使用自定义路径
           dbPath = p.join(databasePath, databaseName);
         } else {
-          // 自动选择合适的路径
           try {
             if (RxNetPlatform.isWindows || RxNetPlatform.isMacOS) {
               final appDir = await getApplicationSupportDirectory();
@@ -268,16 +406,13 @@ class RxNetDataBase {
               final appDir = await getApplicationDocumentsDirectory();
               dbPath = p.join(appDir.path, cacheName, databaseName);
             } else if (RxNetPlatform.isHarmonyOS) {
-              // HarmonyOS 使用临时目录
               final appDir = await getTemporaryDirectory();
               dbPath = p.join(appDir.path, cacheName, databaseName);
             } else {
-              // 默认使用文档目录
               final appDir = await getApplicationDocumentsDirectory();
               dbPath = p.join(appDir.path, cacheName, databaseName);
             }
           } catch (e) {
-            // 如果获取路径失败，使用临时目录
             LogUtil.v(
               'RxNetDataBase: Failed to get app directory, using temp: $e',
             );
@@ -293,12 +428,11 @@ class RxNetDataBase {
 
       isDatabaseReady = true;
       LogUtil.v('RxNetDataBase: Database initialized successfully');
-      _notifyReadyListeners(true);
     } catch (e, stackTrace) {
-      LogUtil.v('RxNetDataBase: Failed to initialize database: $e\n$stackTrace');
+      LogUtil.v(
+          'RxNetDataBase: Failed to initialize database: $e\n$stackTrace');
       _db = null;
       _resetInitState(keepListeners: true);
-      _notifyReadyListeners(false);
       rethrow;
     }
   }
@@ -315,22 +449,8 @@ class RxNetDataBase {
     }
   }
 
-  static void _notifyReadyListeners(bool isOk) {
-    final listeners = List<void Function(bool isOk)>.from(
-      _checkDataBaseListener,
-    );
-    _checkDataBaseListener.clear();
-
-    for (final callback in listeners) {
-      callback(isOk);
-    }
-  }
-
-  static void _resetInitState({bool keepListeners = false}) {
+  void _resetInitState({bool keepListeners = false}) {
     isDatabaseReady = false;
     _initFuture = null;
-    if (!keepListeners) {
-      _checkDataBaseListener.clear();
-    }
   }
 }

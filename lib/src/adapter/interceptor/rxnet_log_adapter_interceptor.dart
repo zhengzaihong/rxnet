@@ -1,9 +1,7 @@
 import 'dart:convert';
-import '../../src/adapter/interceptor/adapter_interceptor.dart';
-import '../../src/adapter/models/adapter_request.dart';
-import '../../src/adapter/models/adapter_response.dart';
-import '../../src/adapter/exceptions/adapter_exception.dart';
-import '../../utils/log_util.dart';
+import 'dart:io' if (dart.library.html) '../../src/adapter/implementations/http_adapter_web_stub.dart';
+import 'package:dio/dio.dart' show MultipartFile;
+import '../../../rxnet_lib.dart';
 
 ///
 /// author: ZhengZaiHong
@@ -224,17 +222,26 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
 
   /// 检查是否是文件类型
   bool _isFileType(dynamic value) {
-    // 检查常见的文件类型
-    final typeName = value.runtimeType.toString();
-    return typeName.contains('MultipartFile') ||
-           typeName.contains('File') ||
-           typeName.contains('UploadFileInfo');
+    // 使用类型检查而非字符串匹配，避免误判类名中含 "File" 的业务实体
+    if (value is MultipartFile) return true;
+    if (value is File) return true;
+    // 兜底：检查是否是持有文件内容的 Map（如 Dio 的 FormData 场景）
+    if (value is Map && value.containsKey('filename') && value.containsKey('length')) {
+      return true;
+    }
+    return false;
   }
 
   /// 获取文件描述信息
   String _getFileDescription(dynamic file) {
     try {
-      // 尝试获取文件名或路径
+      if (file is MultipartFile) {
+        // MultipartFile 没有公开的 filename 字段，从 filename 参数或 runtimeType 获取
+        return file.runtimeType.toString();
+      }
+      if (file is File) {
+        return file.path;
+      }
       if (file is Map && file.containsKey('filename')) {
         return file['filename'].toString();
       }

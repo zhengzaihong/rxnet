@@ -1,187 +1,161 @@
-## 0.6.2
+## 0.7.0
+
+### New Features
+
+- **RxNetConfig Configuration Class** - Clean, type-safe configuration with Builder pattern
+  - `RxNetConfig` replaces long parameter lists with a structured config object
+  - Builder pattern: `RxNetConfig.builder().baseUrl('...').cacheMode(...).build()`
+  - `copyWith()` for immutable config modifications
+  - 100% backward compatible - old `initNet()` parameters still work
+
+- **Cache Eviction Policies** - Automatic cache size management
+  - `cacheMaxSize` - Maximum number of cache entries (0 = unlimited)
+  - `CacheEvictionPolicy.lru` - Least Recently Used eviction
+  - `CacheEvictionPolicy.lfu` - Least Frequently Used eviction
+  - `CacheEvictionPolicy.fifo` - First In First Out eviction
+  - `CacheMetadata` tracks createdAt, lastAccessedAt, accessCount per entry
+  - Automatic eviction on every cache write when size exceeds limit
+
+- **RetryPolicy** - Advanced retry strategies beyond fixed interval
+  - `RetryStrategy.fixed` - Fixed interval (default, backward compatible)
+  - `RetryStrategy.exponentialBackoff` - Delay doubles each attempt
+  - `RetryStrategy.exponentialBackoffWithJitter` - Exponential + random jitter
+  - `maxInterval` cap to prevent excessive delays
+  - Factory methods: `RetryPolicy.fixed()`, `RetryPolicy.exponentialBackoff()`, `RetryPolicy.exponentialBackoffWithJitter()`
+
+- **AdapterBaseOptions** - Adapter-agnostic global request defaults
+  - Set connectTimeout, receiveTimeout, sendTimeout globally
+  - Set default headers, contentType, responseType
+  - Configurable followRedirects, maxRedirects, persistentConnection
+  - Applied via `RxNetConfig(adapterBaseOptions: ...)` or Builder
+
+- **TokenRefreshInterceptor** - Automatic token refresh on auth errors
+  - Detects 401/403 responses and triggers token refresh
+  - Concurrent refresh deduplication (only one refresh call at a time)
+  - Customizable `isUnauthorized` callback
+  - `onRequestUpdated` callback to inject new token into request
+  - Lifecycle callbacks: `onTokenRefreshing`, `onTokenRefreshed`, `onTokenRefreshFailed`
+
+- **DeduplicateInterceptor** - Request deduplication within time window
+  - Prevents duplicate requests with same path within configurable window
+  - Automatically allows requests after window expires
+
+- **ThrottleInterceptor** - Request rate limiting
+  - Rejects requests within throttle window after the first pass-through
+  - Configurable throttle duration
+
+- **Cache Clearing by Prefix/Pattern** - Granular cache management
+  - `cacheManager.clearByPrefix(prefix)` - Clear all entries matching prefix
+  - `cacheManager.clearByPattern(pattern)` - Clear all entries matching regex
+
+- **RxResult Improvements** - Safer result handling
+  - `RxResult.success(value)` factory - Guaranteed non-null value
+  - `requiredValue` getter - Throws StateError if error or null
 
 ### Improved
-  
+
+- **BuildRequest Cache Integration** - Cache operations now use `RxNetCache` directly
+  - Cache reads/writes go through `RxNetCache.saveNetworkCache()` / `readNetworkCache()`
+  - Eviction policies enforced automatically on cache writes
+
+### Changed
+
+- **Database Metadata Store** - `RxNetDataBase` now supports metadata storage
+  - `putMetadata()` / `getMetadata()` / `deleteMetadata()` / `getAllMetadata()` / `cleanMetadata()`
+  - Separate Sembast store for cache metadata (eviction tracking)
+
+### Migration Guide
+
+**100% backward compatible** - No code changes required. New features are opt-in.
+
+**New: RxNetConfig (recommended)**
+
+Before:
+```dart
+await RxNet.init(
+  baseUrl: "https://api.example.com",
+  cacheMode: CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST,
+  cacheInvalidationTime: 60000,
+  interceptors: [RxNetLogAdapterInterceptor()],
+);
+```
+
+After:
+```dart
+await RxNet.init(config: RxNetConfig(
+  baseUrl: "https://api.example.com",
+  cacheMode: CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST,
+  cacheInvalidationTime: 60000,
+  interceptors: [RxNetLogAdapterInterceptor()],
+  cacheMaxSize: 500,
+  cacheEvictionPolicy: CacheEvictionPolicy.lru,
+  adapterBaseOptions: AdapterBaseOptions(
+    connectTimeout: Duration(seconds: 10),
+    receiveTimeout: Duration(seconds: 30),
+  ),
+));
+```
+
+**New: RetryPolicy**
+
+Before:
+```dart
+RxNet.get()
+  .setPath("/api/data")
+  .setRetryCount(3, interval: Duration(seconds: 2))
+  .request();
+```
+
+After:
+```dart
+RxNet.get()
+  .setPath("/api/data")
+  .setRetryPolicy(RetryPolicy.exponentialBackoff(
+    maxRetries: 3,
+    baseInterval: Duration(seconds: 1),
+    maxInterval: Duration(seconds: 10),
+  ))
+  .request();
+```
+
+---
+
+## 0.6.2
+
 ### Fixed
 - **ZipRequest Code Quality** - Improved implementation and maintainability
-  - Simplified `invokeRequest` method by removing unnecessary try-catch blocks
-  - Optimized `_waitWithPartialSuccess` to use fixed-size lists for better performance
-  - Removed code duplication: `operator[]` now delegates to `getRequestByIndex`
-  - Simplified callback creation functions (no longer need to handle user callbacks)
 
 ### Changed
 - **ZipRequest API Simplification** - Breaking change with clear migration path
-  - Constructor parameters reduced: `ZipRequest({request, tag, params})` (removed: success, failure, completed)
-  - Factory method `from()` parameters reduced: removed callback parameters
-  - Factory method `withParams()` parameters reduced: removed callback parameters
-  - Migration: Move custom callback logic from outer parameters into the `request` closure
 
 ## 0.6.1
 
 ### New Features
 - **Concurrent Callback Requests** - Execute multiple callback-based requests in parallel
-  - ✅ `RxNet.zipRequest()` API for concurrent execution of callback-style requests
-  - ✅ Type-safe result aggregation with `ZipResults` container
-  - ✅ Support for both index-based and tag-based result access
-  - ✅ Flexible error handling: eager failure or partial success mode
-  - ✅ Cancellation support with `CancelToken`
-  - ✅ Order preservation: results maintain submission order regardless of completion order
-  - ✅ Custom callbacks for logging, analytics, and UI updates
-  - ✅ Performance: Total time ≈ max(individual requests), not sum
-  - 📖 See README "Concurrent Callback Requests" section for examples
-
-### Breaking Changes
-- **Replaced Hive with Sembast** - Complete migration to pure Dart database solution
-  - ⚠️ **Important:** Cache data will be reset after upgrade (old Hive data will not be migrated)
-  - ✅ True cross-platform support including Web (IndexedDB) and HarmonyOS
-  - ✅ Pure Dart implementation - no native dependencies
-  - ✅ Better Web platform support with automatic IndexedDB backend
-  - ✅ Simplified API with same interface as before
+- **Sembast Database** - Replaced Hive with pure Dart database solution
 
 ### Fixed
-- **Code Quality Improvements** - Removed unused imports and deprecated code
-  - Fixed breakpoint download flow to correctly consume adapter responses and streamed payloads
-  - Fixed `breakPointDownload()` so resumed downloads work with `HttpAdapter`
-  - Fixed request-body length detection for string/byte payloads in the generic request builder
-  - Removed unused `_DioInterceptorBridge` class (deprecated in 0.6.0)
-  - Improved code maintainability and reduced warnings
+- **Breakpoint Download Fixes** - Works correctly with all adapters
+- **HttpAdapter Improvements** - Multipart upload, stream responses, progress tracking
 - **URL Path Normalization** - Fixed multiple slashes in request URLs
-  - Fixed issue where `baseUrl` ending with `/` and `path` starting with `/` caused double slashes
-  - Automatically removes multiple consecutive slashes in paths (e.g., `//api///v1` → `/api/v1`)
-  - Preserves protocol double slashes (`://`) correctly
-  - Works with both regular and RESTful paths
-  - No user code changes required - automatic normalization
 - **Web Platform Support** - Fixed adapters on Web platform
-  - Fixed DioAdapter on Web platform using platform-specific factory functions
-  - Fixed HttpAdapter: Used conditional import for dart:io
-  - Fixed "Unsupported operation: Platform._version" error
-  - Fixed Chinese character encoding in HttpAdapter using utf8.decode
-  - Automatic platform detection, no user code changes required
-- **HttpAdapter Compatibility** - Closed several behavior gaps in the lightweight adapter
-  - Added multipart upload support for regular `upload()` flows
-  - Preserved `ResponseType.stream` instead of forcing it through bytes-only handling
-  - Improved upload/download progress accounting and header handling
-  - Kept cancellation behavior cooperative while aligning request/response handling with DioAdapter expectations
 
-### Changed
-- **Database Backend** - Migrated from Hive to Sembast
-  - `RxNetDataBase` now uses Sembast for all platforms
-  - Web platform automatically uses IndexedDB
-  - Other platforms use file system storage
-  - API remains the same - no code changes needed for users
-  - Added new methods: `getAllKeys()`, `count()`, `close()`
-- **Architecture Simplification** - Removed CacheManager middleware
-  - RxNet now directly uses RxNetDataBase instance
-  - Simplified architecture with fewer abstraction layers
-  - Better performance with reduced method call overhead
-  - Added `getDatabase()` and `getDefaultDatabase()` methods
-
-### Documentation
-- **Updated Documentation** - Clarified interceptor execution flow
-  - Added comments explaining why `_DioInterceptorBridge` was removed
-  - Improved inline documentation for adapter architecture
-  - Updated README adapter capability notes and breakpoint upload/download examples
-  - Corrected `HttpAdapter` limitation notes to match current behavior
-  - Added detailed comments for Sembast implementation
-  - Removed outdated "Web platform does not support cache" notes
-  - Created comprehensive migration guides
-
-### Migration Guide
-If you were using custom database configuration:
-
-**Before (0.6.0):**
-```dart
-await RxNet.init(
-  baseUrl: "...",
-  // Hive-specific parameters (no longer supported)
-);
-```
-
-**After (0.6.1):**
-```dart
-await RxNet.init(
-  baseUrl: "...",
-  // Sembast works automatically - no configuration needed
-  // Cache data will be stored in platform-appropriate location
-);
-```
-
-**Note:** Existing cache data from Hive will not be automatically migrated. The cache will be rebuilt on first use.
-
-### Performance
-- Minor performance improvements from code cleanup
-- Reduced package analysis warnings from 14 to 0
-- Sembast provides comparable or better performance than Hive on most platforms
-
-## 0.6.0 
+## 0.6.0
 
 ### Added
-- **Pluggable Adapter Architecture** - Choose the HTTP client that fits your needs
-- **DioAdapter** - Full-featured adapter (default, backward compatible)
-- **HttpAdapter** - Lightweight alternative based on dart:http package
-- **MockAdapter** - Testing adapter with no network calls
-- **Custom Adapter Support** - Implement `NetworkAdapter` interface for custom clients
-- **Unified Interceptor System** - Adapter-agnostic interceptor interface
-- **Comprehensive Documentation** - Migration guide, API docs, and custom adapter tutorial
-
-### Changed
-- RxNet now uses `NetworkAdapter` abstraction instead of direct Dio dependency
-- Dio remains the default adapter for 100% backward compatibility
-- Interceptor system now uses unified `AdapterInterceptor` interface
-
-### Performance
-- < 1% overhead compared to direct library usage
-- 213k-370k operations/second for type conversion
-- Negligible memory overhead
-
-### Migration
-- **No code changes required** for existing users
-- Simply update version: `rxnet_plus: ^0.6.0`
-- Optional: Explicitly specify adapter for advanced use cases
-- See `MIGRATION_GUIDE_0.6.0.md` for details
-
-### Documentation
-- Added `MIGRATION_GUIDE_0.6.0.md` - Complete migration guide
-- Added `docs/custom_adapter_guide.md` - Custom adapter tutorial with GraphQL example
-- Added `lib/adapters/README.md` - Adapter selection guide
-- Updated README.md with adapter architecture explanation
-- Comprehensive dartdoc comments for all public APIs
-
-### Testing
-- 172 tests passing, 0 failures
-- ~85-90% test coverage
-- Property-based tests for adapter correctness
-- Integration tests for backward compatibility
+- **Pluggable Adapter Architecture** - DioAdapter, HttpAdapter, MockAdapter
+- **Unified Interceptor System** - Adapter-agnostic AdapterInterceptor interface
+- **Custom Adapter Support** - Implement NetworkAdapter interface
 
 ## 0.5.0
-- ** Clarify parameter types ** -Separation of path parameters, query parameters, and Body parameters
-- **RESTful automatic detection ** -No manual settings required
-- **API semantic ** -Method names are more intuitive
-- ** Low-level reconstruction ** -update `BuildRequest`
-- harmony cache plug-in optimization
 
+- **Parameter type separation** - Path, query, and body parameters
+- **RESTful automatic detection** - No manual settings required
+- **API semantic improvement** - More intuitive method names
+- **Low-level reconstruction** - Updated BuildRequest
 
-## 0.4.3
-- Optimize requests support generic requests, which can obtain expected results and eliminate the trouble of generic conversions
-- harmony cache plug-in optimization
-- 
-## 0.4.2
-- Support retrofit RESTFul style @path style request
-- 
-## 0.4.1
-- fix bug
-- 
-## 0.4.0
-- The overall architecture has been redesigned to make it more elegant and easier to get started
-- 
-## 0.3.1
-- Fixed some bugs in the callback pattern
+## 0.4.x
 
-
-## 0.2.2
-- Code optimization, api simplification optimization
-- Other bug modifications
-- 
-## 0.2.1
-- Fixed post form parameter bug
-- Code optimization, new APIs, etc.
+- Generic request support with type conversion
+- RESTFul @path style request support
+- Overall architecture redesign

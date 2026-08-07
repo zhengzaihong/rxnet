@@ -407,7 +407,7 @@ class InterceptorUsageExample {
     
     // 初始化 RxNet 并添加拦截器
     await RxNet.init(
-      baseUrl: "https://api.example.com",
+     config: const RxNetConfig( baseUrl: "https://api.example.com")
     );
     
     // 添加拦截器到适配器
@@ -435,7 +435,9 @@ class InterceptorUsageExample {
     ];
     
     // 初始化并添加所有拦截器
-    await RxNet.init(baseUrl: "https://api.example.com");
+    await RxNet.init(
+        config: const RxNetConfig( baseUrl: "https://api.example.com")
+    );
     
     final adapter = RxNet.getDefaultAdapter();
     for (final interceptor in interceptors) {
@@ -456,12 +458,12 @@ class InterceptorUsageExample {
     
     // API 1: 主 API（带认证和日志）
     final mainApi = RxNet.create();
-    await mainApi.initNet(baseUrl: "https://api.main.com");
+    await mainApi.initNet(config: const RxNetConfig(baseUrl: "https://api.main.com"));
     mainApi.getAdapter()?.addInterceptor(AuthInterceptor()..setToken('main-token'));
     
     // API 2: 分析 API（只有性能监控）
     final analyticsApi = RxNet.create();
-    await analyticsApi.initNet(baseUrl: "https://analytics.example.com");
+    await analyticsApi.initNet(config: const RxNetConfig(baseUrl: "https://analytics.example.com"));
     analyticsApi.getAdapter()?.addInterceptor(PerformanceInterceptor());
     
     // 使用不同的实例

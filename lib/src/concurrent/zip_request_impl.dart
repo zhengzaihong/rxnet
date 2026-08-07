@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'package:rxnet_plus/net/fun/fun_apply.dart';
-import 'package:rxnet_plus/net/type/sources_type.dart';
 import 'package:rxnet_plus/src/adapter/cancel_token.dart';
 import 'package:rxnet_plus/src/adapter/exceptions/adapter_exception.dart';
+import '../fun/fun_apply.dart';
+import '../type/sources_type.dart';
 import 'zip_request.dart';
 import 'zip_request_error.dart';
 import 'zip_results.dart';

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'models/adapter_request.dart';
 import 'models/adapter_response.dart';
+import 'models/adapter_base_options.dart';
 import 'interceptor/adapter_interceptor.dart';
 import 'cancel_token.dart';
 
@@ -256,4 +257,29 @@ abstract class NetworkAdapter {
   ///
   /// Example return value: '1.0.0'
   String get version;
+
+  /// 动态切换适配器的 baseUrl。
+  ///
+  /// 不同适配器实现各自处理 baseUrl 切换逻辑，
+  /// 这样 RxNet 不再需要硬编码 `is DioAdapter` 类型检查。
+  ///
+  /// 默认实现为空操作（适配器不支持动态切换时可忽略）。
+  void setBaseUrl(String url) {
+    // 默认空实现，子类按需覆盖
+  }
+
+
+  /// 应用适配器无关的全局请求默认配置。
+  ///
+  /// 这是配置全局默认参数的标准入口。每个适配器负责将
+  /// [AdapterBaseOptions] 的字段映射为自身原生参数：
+  ///
+  /// - **DioAdapter**：映射为 `Dio.BaseOptions`（超时、header、contentType 等）
+  /// - **HttpAdapter**：默认 header 合并到每个请求，超时通过拦截器实现
+  /// - **MockAdapter**：通常为空操作
+  ///
+  /// 请求级参数始终优先于全局默认值。
+  void applyBaseOptions(AdapterBaseOptions options) {
+    // 默认空实现，子类按需覆盖
+  }
 }

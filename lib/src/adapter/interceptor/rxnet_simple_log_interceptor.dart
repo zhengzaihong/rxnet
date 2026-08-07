@@ -1,5 +1,5 @@
-import '../../rxnet_lib.dart';
-
+import '../../../rxnet_lib.dart';
+import '../../type/http_method.dart';
 
 /// author: ZhengZaiHong
 /// email:1096877329@qq.com

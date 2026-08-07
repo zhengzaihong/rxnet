@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:rxnet_plus/src/adapter/models/adapter_base_options.dart';
 import '../network_adapter.dart';
 import '../models/adapter_request.dart';
 import '../models/adapter_response.dart';
@@ -374,6 +375,15 @@ class MockAdapter implements NetworkAdapter {
       headers: {'content-type': ['application/json']},
       request: request,
     );
+  }
+
+  @override
+  void setBaseUrl(String url) {
+  }
+
+
+  @override
+  void applyBaseOptions(AdapterBaseOptions options) {
   }
 }
 

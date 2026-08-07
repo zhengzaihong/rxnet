@@ -6,7 +6,7 @@ import 'ohos/messages.g.dart' as messages;
 /// email:1096877329@qq.com
 /// date: 2025-08-12
 /// time: 11:20
-/// describe: 必须在根路径下
+/// describe: 鸿蒙插件适配-必须在根路径下
 /// The OHOS implementation of [PathProviderPlatform].
 ///
 class RxNetPlus extends PathProviderPlatform {

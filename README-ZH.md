@@ -6,772 +6,420 @@
 
 Language: [English](README.md) | 简体中文
 
-🚀 RxNet：极简易用、强大、原生风格的 Flutter 网络通信框架，贴合原生开发习惯，几乎零学习成本即可上手。可轻松实现开屏即有数据特性，支持丰富的功能组合，助你构建高性能、可维护的应用程序。
+RxNet：极简易用、强大、原生风格的 Flutter 网络通信框架
 
-## 🎉 0.6.1 更新 - 适配器稳定性 + 跨平台存储
+RxNet 是专为 Flutter 构建的跨平台网络请求工具，贴合原生开发习惯，几乎零学习成本即可上手，支持丰富的功能组合，助你构建高性能、可维护的应用程序。
 
-RxNet 0.6.1 在 0.6.0 可插拔适配器架构的基础上，补上了纯 Dart 缓存后端和一轮适配器兼容性修复。
+---
 
-🌟 0.6.1 新特性：
+## 0.7.0 更新 - 配置类、缓存淘汰、重试策略等
 
-🔁 **断点下载修复**：`breakPointDownload()` 现在可以正确处理适配器响应，包括 `HttpAdapter`
-📦 **HttpAdapter 增强**：补齐 multipart 上传、流式响应和内容长度/进度统计行为
+RxNet 0.7.0 引入了结构化配置类、高级缓存管理、智能重试策略和内置拦截器。
+
+**0.7.0 新特性：**
+
+- **RxNetConfig** - 清晰的配置类，支持 Builder 模式，替代冗长的参数列表
+- **缓存淘汰策略** - 支持 LRU / LFU / FIFO，可配置 `cacheMaxSize`
+- **RetryPolicy** - 支持指数退避、抖动等高级重试策略
+- **AdapterBaseOptions** - 适配器无关的全局请求默认配置（超时、请求头等）
+- **TokenRefreshInterceptor** - 401/403 自动刷新 Token，支持并发去重
+- **DeduplicateInterceptor** - 可配置时间窗口内的请求去重
+- **ThrottleInterceptor** - 请求限流，可配置窗口时间
+- **RxResult.success()** - 保证非空的工厂方法 + `requiredValue` getter
 
 
-### 0.6.0 重大更新 - 可插拔适配器架构
+### 历史亮点
 
-RxNet 0.6.0 引入了可插拔适配器架构，完全解耦框架与特定 HTTP 客户端库。
+- **0.6.x**: 可插拔适配器架构（DioAdapter、HttpAdapter、MockAdapter）
+- **0.5.0**: RESTful 自动检测、参数分离、断点上传/下载
 
-📖 **迁移指南：** [MIGRATION_GUIDE_0.6.0.md](MIGRATION_GUIDE_0.6.0.md) | [迁移指南_0.6.0.md](迁移指南_0.6.0.md) | [0.5.0 指南](迁移指南_0.5.0.md)
+---
 
-🌟 0.6.0 新特性：
+## 目录
 
-🔌 **可插拔适配器**：在 DioAdapter（全功能）、HttpAdapter（轻量级）、MockAdapter（测试）之间选择，或创建自己的自定义适配器
+- [快速开始](#快速开始)
+- [RxNetConfig](#rxnetconfig)
+- [缓存淘汰](#缓存淘汰)
+- [重试策略](#重试策略)
+- [AdapterBaseOptions](#adapterbaseoptions)
+- [适配器选择](#适配器选择)
+- [请求示例](#请求示例)
+- [内置拦截器](#内置拦截器)
+- [并发请求](#并发请求)
+- [上传与下载](#上传与下载)
+- [证书校验](#证书校验)
+- [迁移指南](#从-06x-迁移到-070)
 
-🔄 **100% 向后兼容**：现有代码无需任何更改即可工作 - 默认使用 DioAdapter
+---
 
-🧪 **MockAdapter 测试**：内置模拟适配器，用于无需网络调用的单元测试和集成测试
+## 快速开始
 
-🎯 **多实例支持**：为不同 API 创建具有不同适配器的多个 RxNet 实例
+### 方式一：RxNetConfig（推荐）
 
-🛠️ **自定义适配器**：实现 NetworkAdapter 接口以集成任何 HTTP 客户端
-
-🔗 **统一拦截器**：新的 AdapterInterceptor 系统适用于所有适配器，保留完整的请求信息
-
-⚡ **改进的 CancelToken**：独立的 CancelToken，支持真正的取消（DioAdapter）和回调通知
-
-📊 **更好的日志**：拦截器现在可以访问 bodyParams、pathParams 和所有请求详细信息
-
-### 之前的功能（0.5.0）：
-
-✅ 多种缓存策略：支持首次缓存、失败兜底、仅缓存等多种模式，灵活应对各种场景
-
-🔁 断点续传：上传/下载支持断点恢复，轻松处理大文件传输
-
-🔄 轮询请求：无需额外维护队列，轻松实现定时拉取
-
-🔥 RESTful 风格支持：参数自动拼接，URL更清晰
-
-🧠 JSON → 实体自动转换：支持 setJsonConvert，轻松对接后端数据模型
-
-🧩 全局拦截器与异常捕获：统一处理请求逻辑与错误反馈
-
-🧪 支持 async/await 与响应回调双模式：满足不同开发习惯
-
-🧰 内置日志控制台 UI：调试更直观，线上问题快速定位
-
-📦 轻量键值存储：替代 SharedPreferences，更高效
-
-## 依赖：
-
-```yaml
-dependencies:
-  rxnet_plus: ^0.6.2  # 最新版本，可插拔适配器架构
-  
+```dart
+await RxNet.init(config: RxNetConfig(
+  baseUrl: "https://api.example.com",
+  cacheMode: CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST,
+  cacheInvalidationTime: 24 * 60 * 60 * 1000,
+  cacheMaxSize: 500,
+  cacheEvictionPolicy: CacheEvictionPolicy.lru,
+  adapterBaseOptions: AdapterBaseOptions(
+    connectTimeout: Duration(seconds: 10),
+    receiveTimeout: Duration(seconds: 30),
+  ),
+  interceptors: [
+    RxNetLogAdapterInterceptor(),
+  ],
+));
 ```
 
-**升级？** 
-- 从 0.5.x 到 0.6.0：查看[迁移指南 0.6.0](迁移指南_0.6.0.md)（100% 向后兼容！）
-- 从 0.4.3 到 0.5.0：查看[迁移指南 0.5.0](迁移指南_0.5.0.md)
+### 方式二：Builder 模式
 
-## 选择适配器
+```dart
+await RxNet.init(config: RxNetConfig.builder()
+  .baseUrl("https://api.example.com")
+  .cacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
+  .cacheInvalidationTime(24 * 60 * 60 * 1000)
+  .cacheMaxSize(500)
+  .cacheEvictionPolicy(CacheEvictionPolicy.lru)
+  .baseOptions(AdapterBaseOptions(
+    connectTimeout: Duration(seconds: 10),
+    receiveTimeout: Duration(seconds: 30),
+  ))
+  .addInterceptor(RxNetLogAdapterInterceptor())
+  .build());
+```
 
-RxNet 0.6.0 支持多个 HTTP 客户端适配器。选择适合您需求的：
+---
 
-| 适配器 | 包 | 大小 | 功能 | 取消 | 最适合 |
-|--------|-----|------|------|------|--------|
-| **DioAdapter** | `dio: ^5.8.0+1` | 完整 | 所有功能、拦截器 | ✅ 真正取消（中止连接） | 生产应用（默认） |
-| **HttpAdapter** | `http: ^1.2.0` | 轻量 | 基础 HTTP、拦截器、multipart 上传、流式/下载支持 | ⚠️ 伪取消（标记已取消） | 轻量级应用 |
-| **MockAdapter** | 内置 | 最小 | 测试、无网络 | ✅ 模拟 | 单元/集成测试 |
+## RxNetConfig
 
-**默认行为：** 如果您不指定适配器，将自动使用 DioAdapter。
+`RxNetConfig` 是推荐的 RxNet 配置方式，提供清晰、类型安全的配置对象，支持 Builder 模式。
 
-**取消说明：**
-- **DioAdapter**：提供真正的取消 - 立即中止 HTTP 连接，节省带宽
-- **HttpAdapter**：提供伪取消 - 标记为已取消但 HTTP 请求在后台继续
-- 对于需要真正取消的场景（大文件、长请求），使用 DioAdapter
+### 所有配置选项
 
-**0.6.1 补充说明：** `HttpAdapter` 现在已经更完整地支持常规上传下载流程，包括流式响应和断点下载；但取消语义仍然是协作式的。
+```dart
+final config = RxNetConfig(
+  baseUrl: "https://api.example.com",          // 必填
+  adapter: DioAdapter(),                        // 可选，默认 DioAdapter
+  adapterBaseOptions: AdapterBaseOptions(       // 可选，全局请求默认配置
+    connectTimeout: Duration(seconds: 10),
+    receiveTimeout: Duration(seconds: 30),
+    headers: {'Authorization': 'Bearer token'},
+  ),
+  cacheMode: CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST,
+  cacheInvalidationTime: 60 * 1000,            // 1 分钟
+  cacheMaxSize: 500,                           // 最大 500 条
+  cacheEvictionPolicy: CacheEvictionPolicy.lru, // LRU 淘汰
+  interceptors: [RxNetLogAdapterInterceptor()],
+  cachePath: '/path/to/cache',
+  cacheName: 'network_cache',
+  databaseName: 'rxnet_cache.db',
+  ignoreCacheKeys: ['token'],
+  baseUrlEnv: {'dev': 'https://dev.api.com', 'prod': 'https://api.com'},
+  baseCheckNet: myCheckNetFunction,
+);
+```
+
+### copyWith
+
+```dart
+final updatedConfig = config.copyWith(
+  baseUrl: "https://new-api.example.com",
+  cacheMaxSize: 1000,
+);
+```
+
+---
+
+## 缓存淘汰
+
+### 缓存淘汰策略
+
+```dart
+await RxNet.init(config: RxNetConfig(
+  baseUrl: "https://api.example.com",
+  cacheMaxSize: 200,
+  cacheEvictionPolicy: CacheEvictionPolicy.lru,
+));
+```
+
+| 策略 | 行为 |
+|------|----------|
+| `CacheEvictionPolicy.none` | 不淘汰（默认，向后兼容） |
+| `CacheEvictionPolicy.lru` | 淘汰最久未访问的条目 |
+| `CacheEvictionPolicy.lfu` | 淘汰访问次数最少的条目 |
+| `CacheEvictionPolicy.fifo` | 淘汰最早创建的条目 |
 
 
-## 常用参数：
+### 缓存管理
 
-### 支持的请求方式：`get, post, delete, put, patch`,
+```dart
+final cache = RxNet.I.cacheManager;
 
-缓存策略：CacheMode 支持如下几种模式：
+// 保存/读取网络缓存
+await cache.saveNetworkCache(path: '/api/data', params: {'page': 1}, responseData: {...});
+final data = await cache.readNetworkCache(path: '/api/data', params: {'page': 1});
+
+// 保存/读取键值缓存
+await cache.put('user_token', 'abc123');
+final token = await cache.get<String>('user_token');
+
+// 清除缓存
+await cache.clearAll();
+await cache.clearByPrefix('/api/users');
+await cache.clearByPattern(r'^/api/v\d+/');
+
+// 查询缓存
+final size = await cache.getCacheSize();
+final keys = await cache.getAllKeys();
+```
+
+---
+
+## 重试策略
+
+### 固定间隔（默认，向后兼容）
+
+```dart
+RxNet.get()
+  .setPath("/api/data")
+  .setRetryCount(3, interval: Duration(seconds: 2))
+  .request();
+```
+
+### 高级 RetryPolicy
+
+```dart
+// 指数退避
+RxNet.get()
+  .setPath("/api/data")
+  .setRetryPolicy(RetryPolicy.exponentialBackoff(
+    maxRetries: 3,
+    baseInterval: Duration(seconds: 1),
+    maxInterval: Duration(seconds: 30),
+  ))
+  .request();
+
+// 指数退避 + 随机抖动（推荐用于分布式系统）
+RxNet.get()
+  .setPath("/api/data")
+  .setRetryPolicy(RetryPolicy.exponentialBackoffWithJitter(
+    maxRetries: 5,
+    baseInterval: Duration(seconds: 1),
+    maxInterval: Duration(seconds: 30),
+  ))
+  .request();
+```
+
+| 策略 | 第 1 次 | 第 2 次 | 第 3 次 | 适用场景 |
+|------|---------|---------|---------|----------|
+| `fixed` | 1s | 1s | 1s | 简单场景 |
+| `exponentialBackoff` | 1s | 2s | 4s | 服务器过载恢复 |
+| `exponentialBackoffWithJitter` | ~0.5s | ~1.5s | ~3s | 分布式系统 |
+
+---
+
+## AdapterBaseOptions
+
+设置适用于所有适配器的全局请求默认配置：
+
+```dart
+await RxNet.init(config: RxNetConfig(
+  baseUrl: "https://api.example.com",
+  adapterBaseOptions: AdapterBaseOptions(
+    connectTimeout: Duration(seconds: 10),
+    receiveTimeout: Duration(seconds: 30),
+    sendTimeout: Duration(seconds: 30),
+    headers: {'Authorization': 'Bearer token'},
+    contentType: 'application/json',
+    responseType: ResponseType.json,
+    followRedirects: true,
+    maxRedirects: 5,
+    receiveDataWhenStatusError: true,
+    persistentConnection: true,
+  ),
+));
+```
+
+请求级参数始终优先于全局默认值：
+
+```dart
+RxNet.get()
+  .setPath("/api/data")
+  .setConnectTimeout(Duration(seconds: 5))  // 覆盖全局 10s
+  .request();
+```
+
+---
+
+## 适配器选择
+
+| 适配器 | 包 | 功能 | 取消 | 最适合 |
+|--------|-----|------|------|--------|
+| **DioAdapter** | `dio: ^5.8.0+1` | 所有功能、拦截器 | 真正取消（中止连接） | 生产应用（默认） |
+| **HttpAdapter** | `http: ^1.2.0` | 基础 HTTP、拦截器、multipart、流式 | 伪取消（标记已取消） | 轻量级应用 |
+| **MockAdapter** | 内置 | 测试、无网络 | 模拟 | 单元/集成测试 |
+
+**默认行为：** 未指定适配器时自动使用 DioAdapter。
+
+### 多实例
+
+```dart
+final mainApi = RxNet.create();
+await mainApi.initNet(config:RxNetConfig(baseUrl: "https://api.main.com", adapter: DioAdapter()));
+
+final analyticsApi = RxNet.create();
+await analyticsApi.initNet(config:RxNetConfig(baseUrl: "https://analytics.example.com", adapter: HttpAdapter()));
+```
+
+---
+
+## 请求示例
+
+### 支持的请求方式
+
+`get`、`post`、`delete`、`put`、`patch`、`head`、`options`
+
+### 缓存模式
 
 ```dart
 enum CacheMode {
-
-    //不做缓存，每次都发起请求
-    ONLY_REQUEST,
-    
-    //只使用缓存，通常用于先预加载数据，切换到无网环境做数据显示
-    ONLY_CACHE,
-    
-    //先请求网络，如果请求网络失败，则读取缓存，如果读取缓存失败，本次请求失败
-    REQUEST_FAILED_READ_CACHE,
-    
-    //先使用缓存显示，不管是否存在，仍然请求网络，新数据替换缓存数据，并触发上次数据刷新
-    FIRST_USE_CACHE_THEN_REQUEST,
-    
-    //先使用缓存，无缓存或缓存过期后再请求网络，否则不会请求网络
-    CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST,
+  ONLY_REQUEST,                        // 不缓存，每次请求网络
+  ONLY_CACHE,                          // 仅使用缓存，不请求网络
+  REQUEST_FAILED_READ_CACHE,           // 先请求网络，失败后读取缓存
+  FIRST_USE_CACHE_THEN_REQUEST,        // 先使用缓存，再请求网络
+  CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST, // 缓存为空或过期时才请求网络
 }
-
 ```
 
-⚠️注意：
-
-1.不设置 `setJsonConvert` 返回的都原始类型数据，否则返回定义的实体类型。
-
-2.需要json 转对象，请设置 setJsonConvert 并在回调中根据后端返回统一格式进行转换。
-
-#### 额外功能：小量数据支持 RxNet 数据来存储,效率更高效：
+### 1. 回调模式
 
 ```dart
-// 在 await RxNet.init(...) 之后调用
-await RxNet.saveCache("name", "张三");
-
-final value = await RxNet.readCache<String>("name");
-LogUtil.v(value);  //输出：张三
-
-//或者
-Future.delayed(const Duration(seconds: 5),() async{
-  final result = await RxNet.readCache<String>("name");
-  LogUtil.v(result);  //输出：张三
-});
+RxNet.get<WeatherInfo>()
+  .setPath('/api/weather/city/{id}')
+  .setPathParam("id", "101030100")
+  .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
+  .setJsonConvert(WeatherInfo.fromJson)
+  .setRetryPolicy(RetryPolicy.exponentialBackoff(maxRetries: 3))
+  .execute(
+    success: (data, source) {
+      setState(() { weather = data; });
+    },
+    failure: (e) {
+      setState(() { error = e.toString(); });
+    },
+    completed: () { /* 始终执行 */ },
+  );
 ```
 
-#### 执行请求的几种方式，请结合场景使用：
+### 2. async/await 模式
+
 ```dart
+final result = await RxNet.get<WeatherInfo>()
+  .setPath('/api/weather/city/{id}')
+  .setPathParam("id", "101030100")
+  .setJsonConvert(WeatherInfo.fromJson)
+  .request();
 
-1.方式一 ：RxNet.execute(success,failure,completed)
-  Success 回调中获取最终数据。
-  Failure 回调中获取错误信息。
-  Completed 始终都会执行的回调，取消加载动画，释放资源等
-
-
-2.方式二  await RxNet.request()
-  返回结果或错误信息都在 RxResult 实体中，无需try catch操作。
-  RxResult.value 获取最终结果。
-  RxResult.error 获取错误信息
-
-3.方式三  await RxNet.executeStream()
-  返回结果或错误信息都在 RxResult 实体中。
-  RxResult.value 获取最终结果。
-  RxResult.error 获取错误信息
+if (result.isSuccess) {
+  print(result.value);
+}
 ```
 
-## 服用说明：
- 
- ### 初始化网络框架
+### 3. Stream 流式模式
 
-#### 选项 1：默认（DioAdapter - 推荐）
 ```dart
- await RxNet.init(
-    baseUrl: "http://t.weather.sojson.com/",
-    // 未指定适配器 = 默认使用 DioAdapter
-    baseCacheMode: CacheMode.REQUEST_FAILED_READ_CACHE, //请求失败读取缓存数据
-    baseCheckNet:checkNet, //全局检查网络，所有的请求都走这个方法
-    cacheInvalidationTime: 24 * 60 * 60 * 1000, //缓存时效毫秒
-    interceptors: [
-      RxNetLogAdapterInterceptor()  // 新的统一拦截器
-    ]);
-```
-
-#### 选项 2：显式适配器选择
-```dart
-import 'package:rxnet_plus/adapters/dio_adapter.dart';
-// 或：import 'package:rxnet_plus/adapters/http_adapter.dart';
-
-await RxNet.init(
-  baseUrl: "http://t.weather.sojson.com/",
-  adapter: DioAdapter(),  // 或 HttpAdapter()
-  baseCacheMode: CacheMode.REQUEST_FAILED_READ_CACHE,
-  baseCheckNet: checkNet,
-  cacheInvalidationTime: 24 * 60 * 60 * 1000,
-  interceptors: [
-    RxNetLogAdapterInterceptor()
-  ],
-);
-```
-
-#### 选项 3：使用不同适配器的多个实例
-```dart
-import 'package:rxnet_plus/adapters/dio_adapter.dart';
-import 'package:rxnet_plus/adapters/http_adapter.dart';
-
-// 使用 DioAdapter 的主 API（全功能）
-final mainApi = RxNet.create();
-await mainApi.initNet(
-  baseUrl: "https://api.main.com",
-  adapter: DioAdapter(),
-);
-
-// 使用 HttpAdapter 的分析 API（轻量级）
-final analyticsApi = RxNet.create();
-await analyticsApi.initNet(
-  baseUrl: "https://analytics.example.com",
-  adapter: HttpAdapter(),
-);
-```
-
-#### 选项 4：使用 MockAdapter 测试
-```dart
-import 'package:rxnet_plus/adapters/mock_adapter.dart';
-
-final mockAdapter = MockAdapter();
-mockAdapter.setMockResponse(
-  '/api/weather/city/101030100',
-  AdapterResponse(
-    statusCode: 200,
-    data: {'message': 'success', 'data': {...}},
-    headers: {},
-    request: AdapterRequest(
-      baseUrl: 'http://t.weather.sojson.com/',
-      path: '/api/weather/city/101030100',
-      method: HttpMethod.GET,
-    ),
-  ),
-);
-
-await RxNet.init(
-  baseUrl: "http://t.weather.sojson.com/",
-  adapter: mockAdapter,
-);
-```
-
- ### 发起网络请求（ post, get, delete, put, patch等同理）这里get举例：
-
-###    1.回调模式：
-```dart
-
-RxNet.get()
-    .setPath('api/weather/city/{id}')
-    .setPathParam("id", "101030100") //RESTFul时，这里的参数名称需要和路径中占位符保持一直:最终地址：http://t.weather.sojson.com/api/weather/city/101030100
-    .setCancelToken(pageRequestToken) //取消请求的CancelToken
-    .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
-    //.setRetryCount(2, interval: const Duration(seconds: 7))  //失败重试，重试2次,每次间隔7秒
-    //.setLoop(true, interval: const Duration(seconds: 5)) // 定时请求
-    //.setContentType(ContentTypes.json) //application/json
-    //.setResponseType(ResponseType.json) //json
-    //.setCacheInvalidationTime(1000*10)  //本次请求的缓存失效时间-毫秒
-    //.setRequestIgnoreCacheTime(true)  //是否直接忽略缓存失效时间
-    .setJsonConvert(NewWeatherInfo.fromJson) //解析成NewWeatherInfo对象
-    // .setJsonConvert((data)=> BaseBean<Data>.fromJson(data).data) // 如果你只关心data实体部分
-    // .setJsonConvert((data)=> BaseInfo<Data>.fromJson(data, Data.fromJson)) //如果你想要 code 等信息
-    //.setJsonConvert((data)=>BaseInfo<Data>.fromJson(data, Data.fromJson).data) //如果你只关心data实体部分
-    .execute<NewWeatherInfo>(
-        success: (data, source) {
-          //刷新UI
-          count++;
-          setState(() {
-            content ="$count : ${jsonEncode(data)}";
-            sourcesType = source;
-          });
-         },
-        failure: (e) {
-          setState(() {
-            content = "empty data";
-          });
-         },
-        completed: (){
-          //请求成功或失败后始终都会执行的回调，用于取消加载动画等
-     });
-```
-
-###   2. async/await方式：
-```dart
- var data = await RxNet.get()  
-    .setPath("api/weather/{id}") //RESTFul时，这里的参数名称需要和路径中占位符保持一致:最终地址：http://t.weather.sojson.com/api/weather/101030100
-    .setPathParam("city", "101030100")
-    //.setQueryParams(Map) //一次添加多个参数
-    //.setRetryCount(2)  //重试次数
-    .setCacheMode(CacheMode.ONLY_REQUEST)
-    //.setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data)) //解析成NormalWaterInfoEntity对象
-    .setJsonConvert(NormalWaterInfoEntity.fromJson)
-    .request<NormalWaterInfoEntity>();
-
-  print("--------->#${data.error}");
-  var result = data.value;
-  content = result.toString();
-  sourcesType = data.model;
-```
-
-###   3. Stream 流式：
-```dart
-//用于取消的句柄
 StreamSubscription? _subscription;
 
-void testStreamRequest(){
+_subscription = RxNet.get()
+  .setPath('/api/weather/city/{id}')
+  .setPathParam("id", "101030100")
+  .setLoop(true, interval: const Duration(seconds: 5))
+  .executeStream()
+  .listen((result) {
+    if (result.isSuccess) { setState(() { weather = result.value; }); }
+  });
 
-  final pollingSubscription = RxNet.get()
-       .setPath("api/weather/{id}")
-       .setParam("city", "101030100")
-       .setLoop(true, interval: const Duration(seconds: 7))
-       .executeStream(); // 直接使用 executeStream
-   //     .listen((data) {
-   //       setState(() {
-   //         count++;
-   //         if (data.isSuccess) {
-   //           var result = data.value;
-   //           content =count.toString() +" : "+ jsonEncode(result);
-   //           sourcesType = data.model;
-   //         } else {
-   //           content = data.error.toString();
-   //         }
-   //       });
-   // });
-   // 或者使用如下方式：
-  _subscription = pollingSubscription.listen((data){
-           setState(() {
-             count++;
-             if (data.isSuccess) {
-               var result = data.value;
-               content ="$count : ${jsonEncode(result)}";
-               sourcesType = data.model;
-             } else {
-               content = data.error.toString();
-             }
-           });
-   });
-
-}
+// 不忘记在 dispose() 中取消
+@override
+void dispose() { _subscription?.cancel(); super.dispose(); }
 ```
 
- 注意：方式三中，在不使用时需及时取消订阅：
+---
+
+## 内置拦截器
+
+### TokenRefreshInterceptor
 
 ```dart
-    @override
-    void dispose() {
-     _subscription?.cancel();
-     _cancelToken?.cancel();
-      super.dispose();
-    }
+TokenRefreshInterceptor(
+  tokenProvider: () async { ... },
+  isUnauthorized: (error, request) => error.statusCode == 401,
+  onRequestUpdated: (request, newToken) {
+    return request.copyWith(headers: {...request.headers, 'Authorization': 'Bearer $newToken'});
+  },
+  onTokenRefreshed: (token) => currentToken = token,
+);
 ```
 
-⚠️特别说明：
-
- 无论使用那种请求方式，本质上都是 Stream,当轮询启用时，async/await 只返回首次的结果,底层流将被取消。
- 如要获得所有响应结果，你必须使用execute（）或者直接监听executeStream（）。
-
- 1.方式1中的success第二个参数和RxResult中的Model说明了数据来源：网络/缓存。
-
- 2.使用方式三时，在不需需要时，及时关闭订阅：_subscription?.cancel()
-
- 3.当页面需要退出时，或者不在关系请求结果时，可通过设置的CancelToken取消请求。
-
-
-### 并发请求
-
-> **⭐ 重要提示：对于非回调式请求（使用 `request()` || `async/await`），始终优先使用 Dart 原生的并发模式：**
-> 
-> **方式1：Records + Patterns（Dart 3.0+ - 最优雅）🌟**
-> ```dart
-> // ✅ 最佳：Dart 3.0+ Records 和 Patterns 特性（需要 Dart SDK >= 3.0.0）
-> final (weather, user, products) = await (
->   RxNet.get().setPath('/weather').request<Weather>(),
->   RxNet.get().setPath('/user').request<User>(),
->   RxNet.get().setPath('/products').request<List<Product>>(),
-> ).wait;
-> 
-> // 自动解构赋值，完美的类型推断
-> // weather 是 Weather 类型，user 是 User 类型，products 是 List<Product> 类型
-> ```
-> 
-> **方式2：Future.wait（所有 Dart 版本 - 最兼容）✅**
-> ```dart
-> // ✅ 推荐：适用于所有 Dart 版本
-> final results = await Future.wait([
->   RxNet.get().setPath('/weather').request<Weather>(),
->   RxNet.get().setPath('/user').request<User>(),
->   RxNet.get().setPath('/products').request<List<Product>>(),
-> ]);
-> 
-> final weather = results[0];
-> final user = results[1];
-> final products = results[2];
-> ```
-> 
-> **下面的 `zipRequest()` API 仅用于合并回调式请求（使用 `execute()`）。**
-> 这是对回调风格代码的补充功能，不是主要推荐方式。
-
-#### 并发回调式请求
-
-RxNet 支持并发执行多个回调式请求，并提供类型安全的结果聚合。当你需要并行加载多个资源并在所有请求完成后一次性更新 UI 时，这非常有用。
-
-**使用场景：**
-- ✅ 合并多个回调式 `execute()` 请求
-- ❌ 不适用于 `request()` 方式 - 请使用 `Future.wait`（见上方）
-
-
-#### 基本示例
+### DeduplicateInterceptor
 
 ```dart
-import 'package:rxnet_plus/net/concurrent/concurrent.dart';
-
-// 并发执行多个请求
-final results = await RxNet.zipRequest([
-  ZipRequest<UserInfo>(
-    request: ({success, failure, completed}) {
-      getUserAsync(
-        userId: '123',
-        success: success,
-        failure: failure,
-        completed: completed,
-      );
-    },
-    tag: 'user',
-  ),
-  ZipRequest<List<Product>>(
-    request: ({success, failure, completed}) {
-      getProductsAsync(
-        categoryId: 'electronics',
-        success: success,
-        failure: failure,
-        completed: completed,
-      );
-    },
-    tag: 'products',
-  ),
-  ZipRequest<AppSettings>(
-    request: ({success, failure, completed}) {
-      getSettingsAsync(
-        success: success,
-        failure: failure,
-        completed: completed,
-      );
-    },
-    tag: 'settings',
-  ),
-]);
-
-// 通过 tag 访问结果，类型安全
-final user = results.getRequestByTag<UserInfo>('user');
-final products = results.getRequestByTag<List<Product>>('products');
-final settings = results.getRequestByTag<AppSettings>('settings');
-
-// 或通过索引访问
-final firstResult = results.getRequestByIndex<UserInfo>(0);
-
-// 一次性更新 UI
-setState(() {
-  this.user = user;
-  this.products = products;
-  this.settings = settings;
-});
+DeduplicateInterceptor(windowDuration: Duration(milliseconds: 500))
 ```
 
-#### 使用 withParams 简化语法
+### ThrottleInterceptor
 
-对于简单情况，使用 `withParams` 工厂方法：
+```dart
+ThrottleInterceptor(throttleDuration: Duration(seconds: 1))
+```
+
+---
+
+## 并发请求
+
+### async/await 请求（推荐）
+
+```dart
+final (weather, user) = await (
+  RxNet.get<Weather>().setPath('/weather').request(),
+  RxNet.get<User>().setPath('/user').request(),
+).wait;
+```
+
+### 回调式请求（zipRequest）
 
 ```dart
 final results = await RxNet.zipRequest([
-  ZipRequest.withParams<UserInfo>(
-    getUserAsync,
-    {'userId': '123', 'phone': '13800138000'},
-    tag: 'user',
-  ),
-  ZipRequest.withParams<List<Product>>(
-    getProductsAsync,
-    {'categoryId': 'electronics', 'page': 1},
-    tag: 'products',
-  ),
+  ZipRequest<Weather>(request: ..., tag: 'weather'),
+  ZipRequest<User>(request: ..., tag: 'user'),
 ]);
+final weather = results.getRequestByTag<Weather>('weather');
 ```
 
-#### 方法引用与传参方式
+---
 
-ZipRequest 支持三种使用模式：
-
-**模式1：闭包包装（推荐）⭐**
-
-最灵活和类型安全，直接在闭包中编写请求逻辑：
+## 上传与下载
 
 ```dart
-ZipRequest<UserInfo>(
-  request: ({success, failure, completed}) {
-    RxNet.get()
-        .setPath('/user/{id}')
-        .setPathParam('id', '123')
-        .execute<UserInfo>(
-          success: success,
-          failure: failure,
-          completed: completed,
-        );
-  },
-  tag: 'user',
-)
+// 下载
+await RxNet.get().setPath("https://example.com/file.zip")
+  .downloadFile(savePath: "${appDocPath}/file.zip");
+
+// 断点下载
+RxNet.get().setPath("https://example.com/large-file.zip")
+  .breakPointDownload(savePath: "...", onReceiveProgress: (len, total) {});
+
+// 断点上传
+RxNet.post().setPath("/api/upload")
+  .breakPointUpload(filePath: "/path/to/file.jpg", onSendProgress: (len, total) {});
 ```
 
-**模式2：方法引用 + 闭包**
-
-将请求逻辑提取为可复用的方法：
-
-```dart
-// 定义可复用的方法
-void fetchUserData({
-  required String userId,
-  Success<UserInfo>? success,
-  Failure? failure,
-  Completed? completed,
-}) {
-  RxNet.get()
-      .setPath('/user/{id}')
-      .setPathParam('id', userId)
-      .execute<UserInfo>(
-        success: success,
-        failure: failure,
-        completed: completed,
-      );
-}
-
-// 在 ZipRequest 中使用
-ZipRequest<UserInfo>(
-  request: ({success, failure, completed}) {
-    fetchUserData(
-      userId: '123',
-      success: success,
-      failure: failure,
-      completed: completed,
-    );
-  },
-  tag: 'user',
-)
-```
-
-**模式3：withParams 工厂**
-
-最简洁的语法，适用于简单场景：
-
-```dart
-ZipRequest.withParams<UserInfo>(
-  fetchUserAsync,
-  {'userId': '123', 'phone': '13800138000'},
-  tag: 'user',
-)
-```
-
-**推荐：** 使用模式1处理内联请求，或使用模式2处理可复用的请求逻辑。
-
-#### 部分成功处理
-
-默认情况下，`zipRequest()` 在第一个错误时立即失败。使用 `eagerError: false` 等待所有请求并处理部分成功：
-
-```dart
-final results = await RxNet.zipRequest(
-  [request1, request2, request3],
-  eagerError: false, // 不在第一个错误时失败
-);
-
-// 检查每个请求的状态
-if (results.isSuccessByTag('user')) {
-  final user = results.getRequestByTag<UserInfo>('user');
-} else {
-  // 处理错误
-  print('用户请求失败: ${results.errors[0]}');
-}
-```
-
-#### 取消并发请求
-
-```dart
-final cancelToken = CancelToken();
-
-// 启动并发请求
-final future = RxNet.zipRequest(
-  [request1, request2, request3],
-  cancelToken: cancelToken,
-);
-
-// 需要时取消所有请求
-cancelToken.cancel('用户取消');
-```
+---
 
 
- ### 上传下载(支持断点上传下载)：注意移动终端的文件读写权限。
-
-```dart
-  
-RxNet.get() 
-    .setPath("https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg")
-    .setParam(xx,xx)
-    .breakPointDownload(
-      savePath:"${appDocPath}/55.jpg",
-      onReceiveProgress: (len,total){
-        print("len:$len,total:$total");
-        if(len ==total){
-          downloadPath = appDocPath;
-        }
-      });
-
-
-
-RxNet.post()
-    .setPath("xxxxx/xxx.jpg")
-    .breakPointUpload(
-        success: (data, sourcesType) {},
-        failure: (e) {},
-        onSendProgress: (len, total) {});
-```
-
-### 配置全局请求头的方式
-
- 1.setGlobalHeaders(Map<String, dynamic> headers) 方式:
-
-```dart
-RxNet.setGlobalHeaders({
- "Accept-Encoding": "gzip, deflate, br",
- "Connection": "keep-alive",
-});     
-```
-
- 2.添加自定义请求拦截器 xxxInterceptor() 如：
-
-```dart
-
-class AuthInterceptor extends AdapterInterceptor {
-   String? _token;
-
-   /// 设置认证令牌
-   void setToken(String token) {
-      _token = token;
-   }
-
-   /// 清除认证令牌
-   void clearToken() {
-      _token = null;
-   }
-
-   @override
-   void onRequest(
-           AdapterRequest request,
-           RequestInterceptorHandler handler,
-           ) {
-      if (_token != null) {
-         // 添加 Authorization 头
-         final headers = Map<String, String>.from(request.headers);
-         headers['Authorization'] = 'Bearer $_token';
-
-         // 创建新的请求对象
-         final newRequest = request.copyWith(headers: headers);
-
-         debugPrint('🔐 Added Authorization header to ${request.buildFullUrl()}');
-
-         // 使用修改后的请求继续
-         handler.next(newRequest);
-      } else {
-         // 没有令牌，直接继续
-         handler.next(request);
-      }
-   }
-
-   @override
-   void onResponse(
-           AdapterResponse response,
-           ResponseInterceptorHandler handler,
-           ) {
-      // 检查是否有新的令牌
-      final newToken = response.headers['x-new-token']?.first;
-      if (newToken != null) {
-         debugPrint('🔐 Received new token, updating...');
-         _token = newToken;
-      }
-
-      handler.next(response);
-   }
-
-   @override
-   void onError(
-           AdapterException error,
-           ErrorInterceptorHandler handler,
-           ) {
-      // 如果是 401 错误，清除令牌
-      if (error.statusCode == 401) {
-         debugPrint('🔐 Unauthorized, clearing token...');
-         clearToken();
-      }
-
-      handler.next(error);
-   }
-}
-
-```
-
-
-### 如果你的业务或项目中需要多个网络请求实例可手动创建多个请求对象：
-```dart
-
-void newInstanceRequest() async {
-  // 为这个实例进行独立的初始化配置，请求策略，拦截器等等
-  final apiService = RxNet.create();
-  await apiService.initNet(baseUrl: "https://api.yourdomain.com");
-  // apiService.setHeaders(xxx)
-  final response = await apiService.getRequest()
-      .setPath("/users/1")
-      .setJsonConvert(NewWeatherInfo.fromJson)
-      .request();
-
-  final weatherInfo = response.value;
-}
-```
-
-
-### 请求前的网络检测：  
-```dart
- //无论是默认的请求实例，还是手动创建的多实例 配置了 baseCheckNet，则每次请求都会网络检测
-await RxNet.init(
-    baseUrl: "xxxx",
-    baseCacheMode: CacheMode.REQUEST_FAILED_READ_CACHE, //请求失败读取缓存数据
-    baseCheckNet:checkNet, //全局检查网络，所有的请求都走这个方法
-   );
-
-例如：
-
-Future<bool> checkNet() async{
-  //需自行实现网络检测，或使用三方库
-  var connectivityResult = await (Connectivity().checkConnectivity());
-  if (connectivityResult == ConnectivityResult.none) {
-    Toast.show( "当前无网络");
-    return false;
-  }
-  return Future.value(true);
-}
-```
-
-### 证书校验：
-
-#### 使用 DioAdapter（dio 包方式）
-
-```dart
-// 获取 DioAdapter 实例
-final adapter = DioAdapter();
-
-// 配置证书校验
-adapter.dio.httpClientAdapter = IOHttpClientAdapter(
-  createHttpClient: () {
-    final client = HttpClient();
-    client.badCertificateCallback = (cert, host, port) {
-      // 在这里添加您的证书校验逻辑
-      // 例如：校验证书指纹
-      // const trustedFingerprint = 'YOUR_SHA256_FINGERPRINT';
-      // final certFingerprint = cert.sha1.toString().toUpperCase();
-      // return certFingerprint == trustedFingerprint;
-      return true; // 仅用于测试，生产环境请正确校验
-    };
-    return client;
-  },
-);
-
-// 使用配置好的适配器初始化 RxNet
-await RxNet.init(
-  baseUrl: "https://your-api.com",
-  adapter: adapter,
-);
-```
-
+## 证书校验
 #### 使用 HttpAdapter（http 包方式）
 
 ```dart
@@ -797,99 +445,29 @@ IOClient createPinnedClient() {
 final httpAdapter = HttpAdapter(client: createPinnedClient());
 
 // 使用配置好的适配器初始化 RxNet
-await RxNet.init(
+await RxNet.init(config:RxNetConfig
   baseUrl: "https://your-api.com",
   adapter: httpAdapter,
-);
+));
 ```
 
-### 清晰的日志拦截器，拒绝调试抓瞎。
-     
-需要日志信息，初始化配置网络框架时请添加 RxNetLogAdapterInterceptor 拦截器或者您自定义的
+## 从 0.6.x 迁移到 0.7.0
+
+**务必配置RxNetConfig**
 
 ```dart
- await RxNet.init(
-    // xxxxxx
-    interceptors: [
-      // TokenInterceptor // token拦截器，更多功能请自定义拦截器
-      /// 日志拦截器（0.6.0 新版）
-      RxNetLogAdapterInterceptor()
-      // ResponseInterceptor() // 响应拦截器，预处理结果
-    ]);
+await RxNet.init(config: RxNetConfig(baseUrl: "...", cacheMode: CacheMode.ONLY_REQUEST));
 ```
+---
 
-**注意：** 0.6.0 引入了新的 `RxNetLogAdapterInterceptor`，它适用于所有适配器并可以访问完整的请求信息（包括 bodyParams、pathParams 等）。
+## 调试窗口
 
-   输出格式：
 ```dart
-[log] ###日志：  v  ***************** Request Start *****************
-[log] ###日志：  v  uri: http://t.weather.sojson.com/api/weather/city/101030100
-[log] ###日志：  v  method: GET
-[log] ###日志：  v  responseType: ResponseType.json
-[log] ###日志：  v  followRedirects: true
-[log] ###日志：  v  connectTimeout:
-[log] ###日志：  v  receiveTimeout:
-[log] ###日志：  v  extra: {}
-[log] ###日志：  v  Request Headers:
-[log] ###日志：  v  {"content-type":"application/json"}
-[log] ###日志：  v  data:
-[log] ###日志：  v  null
-[log] ###日志：  v  ***************** Request End *****************
-[log] ###日志：  v  ***************** Response Start *****************
-[log] ###日志：  v  statusCode: 200
-[log] ###日志：  v  Response Headers:
-[log] ###日志：  v   connection: keep-alive
-[log] ###日志：  v   cache-control: max-age=3000
-[log] ###日志：  v   transfer-encoding: chunked
-[log] ###日志：  v   date: Wed, 07 Feb 2024 13:09:47 GMT
-[log] ###日志：  v   vary: Accept-Encoding
-[log] ###日志：  v   content-encoding: gzip
-[log] ###日志：  v   age: 2404
-[log] ###日志：  v   content-type: application/json;charset=UTF-8
-[log] ###日志：  v   x-source: C/200
-[log] ###日志：  v   server: marco/2.20
-[log] ###日志：  v   x-request-id: c58182a21ddcaed97d76dbb49f4771d8; 32238019a67857706c0e40b6dd0e1238
-[log] ###日志：  v   via: S.mix-hz-fdi1-213, T.213.H, V.mix-hz-fdi1-217, T.194.H, M.cun-he-sjw8-194
-[log] ###日志：  v   expires: Wed, 07 Feb 2024 13:19:43 GMT
-[log] ###日志：  v  Response Text:
-[log] ###日志：  v  {"message":"success感谢又拍云(upyun.com)提供CDN赞助","status":200,"date":"20241230","time":"2024-12-30 16:40:54","cityInfo":{"city":"天津市","citykey":"101030100","parent":"天津","updateTime":"15:13"},"data":{"shidu":"16%","pm25":11.0,"pm10":61.0,"quality":"良","wendu":"1.7","ganmao":"极少数敏感人群应减少户外活动","forecast":[{"date":"30","high":"高温 8℃","low":"低温 -6℃","ymd":"2024-12-30","week":"星期一","sunrise":"07:29","sunset":"16:57","aqi":46,"fx":"西北风","fl":"3级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"31","high":"高温 5℃","low":"低温 -3℃","ymd":"2024-12-31","week":"星期二","sunrise":"07:30","sunset":"16:58","aqi":54,"fx":"西风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"01","high":"高温 5℃","low":"低温 -4℃","ymd":"2025-01-01","week":"星期三","sunrise":"07:30","sunset":"16:59","aqi":59,"fx":"东北风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"02","high":"高温 2℃","low":"低温 -2℃","ymd":"2025-01-02","week":"星期四","sunrise":"07:30","sunset":"17:00","aqi":50,"fx":"东北风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"03","high":"高温 4℃","low":"低温 -5℃","ymd":"2025-01-03","week":"星期五","sunrise":"07:30","sunset":"17:00","aqi":65,"fx":"西风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"04","high":"高温 5℃","low":"低温 -5℃","ymd":"2025-01-04","week":"星期六","sunrise":"07:30","sunset":"17:01","aqi":86,"fx":"西南风","fl":"1级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"05","high":"高温 7℃","low":"低温 -2℃","ymd":"2025-01-05","week":"星期日","sunrise":"07:30","sunset":"17:02","aqi":75,"fx":"东北风","fl":"2级","type":"小雪","notice":"小雪虽美，赏雪别着凉"},{"date":"06","high":"高温 7℃","low":"低温 -2℃","ymd":"2025-01-06","week":"星期一","sunrise":"07:30","sunset":"17:03","aqi":31,"fx":"西北风","fl":"3级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"07","high":"高温 6℃","low":"低温 -2℃","ymd":"2025-01-07","week":"星期二","sunrise":"07:30","sunset":"17:04","aqi":32,"fx":"西北风","fl":"3级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"08","high":"高温 3℃","low":"低温 -4℃","ymd":"2025-01-08","week":"星期三","sunrise":"07:30","sunset":"17:05","aqi":52,"fx":"西北风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"09","high":"高温 3℃","low":"低温 -4℃","ymd":"2025-01-09","week":"星期四","sunrise":"07:30","sunset":"17:06","aqi":87,"fx":"西南风","fl":"2级","type":"阴","notice":"不要被阴云遮挡住好心情"},{"date":"10","high":"高温 3℃","low":"低温 -4℃","ymd":"2025-01-10","week":"星期五","sunrise":"07:29","sunset":"17:07","aqi":49,"fx":"西北风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"11","high":"高温 4℃","low":"低温 -2℃","ymd":"2025-01-11","week":"星期六","sunrise":"07:29","sunset":"17:08","aqi":46,"fx":"西北风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"12","high":"高温 3℃","low":"低温 -3℃","ymd":"2025-01-12","week":"星期日","sunrise":"07:29","sunset":"17:09","aqi":40,"fx":"西北风","fl":"3级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"13","high":"高温 3℃","low":"低温 -5℃","ymd":"2025-01-13","week":"星期一","sunrise":"07:29","sunset":"17:10","aqi":68,"fx":"南风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"}],"yesterday":{"date":"29","high":"高温 6℃","low":"低温 -5℃","ymd":"2024-12-29","week":"星期日","sunrise":"07:29","sunset":"16:56","aqi":100,"fx":"西南风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"}}}
-[log] ###日志：  v  useTime:0分:0秒:215毫秒
-[log] ###日志：  v  Response url :http://t.weather.sojson.com/api/weather/city/101030100
-[log] ###日志：  v  ***************** Response End *****************
-[log] ###日志：  v  useJsonAdapter：true
+RxNet.showDebugWindow(context);
 ```
 
- ### 对于线上的APP接口信息，也可通过埋点的RxNet查看请求日志信息。
+![调试窗口](https://github.com/ZhengZaiHong/rxnet/blob/master/images/app_logcat.jpg)
 
-```dart     
-打开调试日志窗口： RxNet.showDebugWindow(context);
-关闭调试日志窗口： RxNet.closeDebugWindow();
-```
+## HarmonyOS 支持
 
-## 调试窗口：
-![调试窗口](https://github.com/ZhengZaiHong/rxnet/blob/master/images/app_logcat.jpg) 
-
-## 对HarmonyOS也支持：
-![HarmonyOS-example.gif](https://github.com/ZhengZaiHong/rxnet/blob/master/images/HarmonyOS-example.gif)
-
-
-
-## 📝 总结
-
-### 核心要点
-
-1. **executeStream() 返回 Stream**
-    - 需要调用 `listen()` 才能开始监听
-    - 必须保存 `StreamSubscription` 以便后续取消
-    - 立即取消会导致回调无法执行
-    - 应该在 `dispose()` 或用户操作时取消
-
-
-2. **选择合适的请求方式**
-    - 单次请求：`request()` 或 `execute()`
-    - 轮询请求：`executeStream()`
-    - 需要取消：使用 `CancelToken`
-
-3. **记得清理资源**
-    - 在 `dispose()` 中取消订阅
-    - 避免内存泄漏
+![HarmonyOS](https://github.com/ZhengZaiHong/rxnet/blob/master/images/HarmonyOS-example.gif)

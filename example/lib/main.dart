@@ -1,14 +1,11 @@
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
 import 'package:uikit_plus/toast/toast_utils.dart';
+import 'package:uikit_plus/uikit_lib.dart';
 import 'enhanced_example.dart';
 
-
-
 void main() async {
-
-
   final adapter = DioAdapter();
   // adapter.dio.httpClientAdapter = IOHttpClientAdapter(
   //   createHttpClient: () {
@@ -24,7 +21,6 @@ void main() async {
   //     return client;
   //   },
   // );
-
 
   // IOClient createPinnedClient() {
   //   final HttpClient httpClient = HttpClient();
@@ -42,14 +38,17 @@ void main() async {
   // final adapter2 = HttpAdapter(client: createPinnedClient());
 
   await RxNet.init(
-      baseUrl: "http://t.weather.sojson.com/",
-      baseCacheMode: CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST,
-      baseCheckNet: checkNet,
-      adapter: adapter,
-      cacheInvalidationTime: 365 * 24 * 60 * 60 * 1000,
-      interceptors: [
-        RxNetLogAdapterInterceptor(),
-      ]);
+      config: RxNetConfig(
+          isDebug: kDebugMode,
+          baseUrl: "http://t.weather.sojson.com/",
+          cacheMode: CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST,
+          baseCheckNet: checkNet,
+          adapter: adapter,
+          cacheInvalidationTime: 365 * 24 * 60 * 60 * 1000,
+          interceptors: [
+            RxNetLogAdapterInterceptor(),
+      ]));
+
   await RxNet.saveCache("name", "张三");
   final value = await RxNet.readCache<String>("name");
   LogUtil.v("value:$value"); //输出：张三
@@ -86,4 +85,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-

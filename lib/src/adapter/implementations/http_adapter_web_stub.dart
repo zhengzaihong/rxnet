@@ -1,12 +1,7 @@
-/// Web platform stub for dart:io types
+﻿/// Web platform stub for dart:io types
 /// 
 /// This file provides stub definitions for dart:io types that are not
 /// available on the Web platform. It's used via conditional imports.
-/// 
-/// Web 平台的 dart:io 类型存根
-/// 
-/// 此文件为 Web 平台上不可用的 dart:io 类型提供存根定义。
-/// 通过条件导入使用。
 
 // Stub class for File (not used on Web)
 class File {
@@ -14,34 +9,41 @@ class File {
 
   Directory get parent => Directory('');
   
+  bool existsSync() => false;
+  int lengthSync() => 0;
+  
   dynamic openWrite() {
     throw UnsupportedError('File operations are not supported on Web platform');
   }
   
-  String get path => throw UnsupportedError('File.path is not supported on Web platform');
+  String get path => '';
 }
 
 // Stub class for Directory (not used on Web)
 class Directory {
   Directory(String path);
 
-  bool existsSync() {
-    throw UnsupportedError(
-      'Directory operations are not supported on Web platform',
-    );
-  }
-
-  void createSync({bool recursive = false}) {
-    throw UnsupportedError(
-      'Directory operations are not supported on Web platform',
-    );
-  }
+  bool existsSync() => false;
+  void createSync({bool recursive = false}) {}
 }
 
 // Stub class for HttpHeaders constants used in shared code
 class HttpHeaders {
   static const String contentTypeHeader = 'content-type';
   static const String contentLengthHeader = 'content-length';
+  static const String rangeHeader = 'range';
+  static const String contentRangeHeader = 'content-range';
+}
+
+// Stub class for MultipartFile (not used on Web)
+class MultipartFile {
+  static Future<MultipartFile> fromPath(
+    String filePath, {
+    String? filename,
+    String? contentType,
+  }) async {
+    throw UnsupportedError('MultipartFile is not supported on Web platform');
+  }
 }
 
 // Stub class for SocketException (not used on Web)

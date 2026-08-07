@@ -6,1306 +6,476 @@
 
 Language: English | [简体中文](README-ZH.md)
 
-🚀 RxNet: Extremely Easy-to-Use, Powerful, Native-Style Flutter Network Communication Framework
+RxNet: Extremely Easy-to-Use, Powerful, Native-Style Flutter Network Communication Framework
 
-RxNet is a cross-platform network request tool specially built for Flutter. It is based on deep encapsulation of Dio and conforms to native development habits. It can be started with almost zero learning cost. It can easily implement the feature of having data on the screen, supports rich function combinations, and helps you build high-performance, maintainable applications.
+RxNet is a cross-platform network request tool specially built for Flutter. It conforms to native development habits, can be started with almost zero learning cost, and supports rich function combinations to help you build high-performance, maintainable applications.
 
-## 🎉 0.6.1 Update - Adapter Stability + Cross-Platform Storage
+---
 
-RxNet 0.6.1 builds on the 0.6.0 pluggable adapter architecture with a pure Dart cache backend and a round of adapter compatibility fixes.
+## 0.7.0 Update - Config, Cache Eviction, Retry Policies & More
 
-🌟 New in 0.6.1:
+RxNet 0.7.0 introduces structured configuration, advanced cache management, intelligent retry strategies, and built-in interceptors.
 
-🔁 **Breakpoint Download Fixes**: `breakPointDownload()` now works correctly with adapter responses, including `HttpAdapter`
+**New in 0.7.0:**
 
-📦 **HttpAdapter Improvements**: Better multipart upload handling, stream response support, and more accurate content-length/progress behavior
+- **RxNetConfig** - Clean configuration class with Builder pattern, replacing long parameter lists
+- **Cache Eviction** - LRU / LFU / FIFO policies with configurable `cacheMaxSize`
+- **RetryPolicy** - Exponential backoff, jitter strategies beyond fixed interval
+- **AdapterBaseOptions** - Adapter-agnostic global request defaults (timeout, headers, etc.)
+- **TokenRefreshInterceptor** - Automatic token refresh on 401/403 with concurrent deduplication
+- **DeduplicateInterceptor** - Prevents duplicate requests within configurable time window
+- **ThrottleInterceptor** - Request rate limiting with configurable window
+- **RxResult.success()** - Guaranteed non-null value factory + `requiredValue` getter
 
-### 0.6.0 Major Update - Pluggable Adapter Architecture
+**100% backward compatible** - All existing code works without changes. New features are opt-in.
 
-RxNet 0.6.0 introduced a pluggable adapter architecture that completely decouples the framework from specific HTTP client libraries.
+### Previous Highlights
 
-📖 **Migration Guide:** [MIGRATION_GUIDE_0.6.0.md](MIGRATION_GUIDE_0.6.0.md) | [迁移指南_0.6.0.md](迁移指南_0.6.0.md) | [0.5.0 Guide](迁移指南_0.5.0.md)
+- **0.6.x**: Pluggable Adapter Architecture (DioAdapter, HttpAdapter, MockAdapter)
+- **0.5.0**: RESTful auto-detection, parameter separation, breakpoint upload/download
 
-🌟 New in 0.6.0:
+## Table of Contents
 
-🔌 **Pluggable Adapters**: Choose between DioAdapter (full-featured), HttpAdapter (lightweight), MockAdapter (testing), or create your own custom adapter
+- [Quick Start](#quick-start)
+- [RxNetConfig](#rxnetconfig)
+- [Cache Eviction](#cache-eviction)
+- [Retry Policy](#retry-policy)
+- [AdapterBaseOptions](#adapterbaseoptions)
+- [Adapter Selection](#adapter-selection)
+- [Request Examples](#request-examples)
+- [Built-in Interceptors](#built-in-interceptors)
+- [Concurrent Requests](#concurrent-requests)
+- [Upload & Download](#upload--download)
+- [Certificate Validation](#certificate-validation)
+- [Migration from 0.6.x to 0.7.0](#migration-from-06x-to-070)
 
-🔄 **100% Backward Compatible**: Existing code works without any changes - DioAdapter is used by default
+---
 
-🧪 **MockAdapter for Testing**: Built-in mock adapter for unit and integration tests without network calls
+## Quick Start
 
-🎯 **Multiple Instances**: Create multiple RxNet instances with different adapters for different APIs
+### Option 1: RxNetConfig (Recommended)
 
-🛠️ **Custom Adapters**: Implement the NetworkAdapter interface to integrate any HTTP client
-
-🔗 **Unified Interceptors**: New AdapterInterceptor system works across all adapters, preserving complete request information
-
-⚡ **Improved CancelToken**: Standalone CancelToken with true cancellation support (DioAdapter) and callback notifications
-
-📊 **Better Logging**: Interceptors now have access to bodyParams, pathParams, and all request details
-
-### Previous Features (0.5.0):
-
-✅ Multiple Cache Strategies: Supports first-use cache, failure fallback, cache-only, and more modes to flexibly respond to various scenarios
-
-🔁 Breakpoint Resume: Upload/download supports breakpoint recovery, easily handling large file transfers
-
-🔄 Polling Requests: No need to maintain additional queues, easily implement timed fetching
-
-🔥 RESTful Style Support: Parameters auto-convert into URLs for cleaner URLs
-
-🧠 JSON → Entity Auto-Conversion: Supports setJsonConvert, seamlessly mapping with backend data models
-
-🧩 Global Interceptors & Error Handling: Centralized control over request flow and error feedback
-
-🧪 Supports async/await and Callback Dual Modes: Meets different development habits
-
-🧰 Built-in Debug Console UI: More intuitive debugging, quickly locate online issues
-
-📦 Lightweight Key-Value Storage: Replaces SharedPreferences, more efficient
-
-## Dependency:
-
-```yaml
-dependencies:
-  rxnet_plus: ^0.6.2  # Latest version with pluggable adapters
+```dart
+await RxNet.init(config: RxNetConfig(
+  baseUrl: "https://api.example.com",
+  cacheMode: CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST,
+  cacheInvalidationTime: 24 * 60 * 60 * 1000,
+  cacheMaxSize: 500,
+  cacheEvictionPolicy: CacheEvictionPolicy.lru,
+  adapterBaseOptions: AdapterBaseOptions(
+    connectTimeout: Duration(seconds: 10),
+    receiveTimeout: Duration(seconds: 30),
+  ),
+  interceptors: [
+    RxNetLogAdapterInterceptor(),
+  ],
+));
 ```
 
-**Upgrading?** 
-- From 0.5.x to 0.6.0: Check [Migration Guide 0.6.0](MIGRATION_GUIDE_0.6.0.md) (100% backward compatible!)
-- From 0.4.3 to 0.5.0: Check [Migration Guide 0.5.0](迁移指南_0.5.0.md)
+### Option 2: Builder Pattern
 
-## Choosing an Adapter
+```dart
+await RxNet.init(config: RxNetConfig.builder()
+  .baseUrl("https://api.example.com")
+  .cacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
+  .cacheInvalidationTime(24 * 60 * 60 * 1000)
+  .cacheMaxSize(500)
+  .cacheEvictionPolicy(CacheEvictionPolicy.lru)
+  .baseOptions(AdapterBaseOptions(
+    connectTimeout: Duration(seconds: 10),
+    receiveTimeout: Duration(seconds: 30),
+  ))
+  .addInterceptor(RxNetLogAdapterInterceptor())
+  .build());
+```
 
-RxNet 0.6.0 supports multiple HTTP client adapters. Choose the one that fits your needs:
+---
 
-| Adapter | Package | Size | Features | Cancellation | Best For |
-|---------|---------|------|----------|--------------|----------|
-| **DioAdapter** | `dio: ^5.8.0+1` | Full | All features, interceptors | ✅ True (aborts connection) | Production apps (default) |
-| **HttpAdapter** | `http: ^1.2.0` | Light | Basic HTTP, interceptors, multipart upload, stream/download support | ⚠️ Pseudo (marks cancelled) | Lightweight apps |
-| **MockAdapter** | Built-in | Minimal | Testing, no network | ✅ Simulated | Unit/integration tests |
+## RxNetConfig
 
-**Default behavior:** If you don't specify an adapter, DioAdapter is used automatically.
+`RxNetConfig` is the recommended way to configure RxNet. It provides a clean, type-safe configuration object with Builder pattern support.
 
-**Cancellation Note:** 
-- **DioAdapter**: Provides true cancellation - aborts the HTTP connection immediately, saves bandwidth
-- **HttpAdapter**: Provides pseudo-cancellation - marks as cancelled but HTTP request continues in background
-- For scenarios requiring true cancellation (large files, long requests), use DioAdapter
+### All Configuration Options
 
-**0.6.1 note:** `HttpAdapter` now supports regular upload/download workflows more completely, including stream responses and resumed downloads. Cancellation semantics are still cooperative.
+```dart
+final config = RxNetConfig(
+  baseUrl: "https://api.example.com",          // Required
+  adapter: DioAdapter(),                        // Optional, defaults to DioAdapter
+  adapterBaseOptions: AdapterBaseOptions(       // Optional, global request defaults
+    connectTimeout: Duration(seconds: 10),
+    receiveTimeout: Duration(seconds: 30),
+    headers: {'Authorization': 'Bearer token'},
+  ),
+  cacheMode: CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST,
+  cacheInvalidationTime: 60 * 1000,            // 1 minute
+  cacheMaxSize: 500,                           // Max 500 entries
+  cacheEvictionPolicy: CacheEvictionPolicy.lru, // LRU eviction
+  interceptors: [RxNetLogAdapterInterceptor()],
+  cachePath: '/path/to/cache',
+  cacheName: 'network_cache',
+  databaseName: 'rxnet_cache.db',
+  ignoreCacheKeys: ['token'],
+  baseUrlEnv: {'dev': 'https://dev.api.com', 'prod': 'https://api.com'},
+  baseCheckNet: myCheckNetFunction,
+);
+```
 
+### copyWith
 
-## Common Parameters:
+```dart
+final updatedConfig = config.copyWith(
+  baseUrl: "https://new-api.example.com",
+  cacheMaxSize: 1000,
+);
+```
 
-### Supported Request Methods: `get, post, delete, put, patch`
+---
 
-Cache Strategy: CacheMode supports the following modes:
+## Cache Eviction & Hit Rate
+
+### Cache Eviction Policies
+
+```dart
+await RxNet.init(config: RxNetConfig(
+  baseUrl: "https://api.example.com",
+  cacheMaxSize: 200,
+  cacheEvictionPolicy: CacheEvictionPolicy.lru,
+));
+```
+
+| Policy | Behavior |
+|--------|----------|
+| `CacheEvictionPolicy.none` | No eviction (default, backward compatible) |
+| `CacheEvictionPolicy.lru` | Evicts least recently accessed entries |
+| `CacheEvictionPolicy.lfu` | Evicts least frequently accessed entries |
+| `CacheEvictionPolicy.fifo` | Evicts oldest entries by creation time |
+
+### Cache Hit Rate Statistics
+
+```dart
+final hitRate = RxNet.I.cacheManager.hitRate;       // 0.0 ~ 1.0
+final hits = RxNet.I.cacheManager.hitCount;
+final misses = RxNet.I.cacheManager.missCount;
+RxNet.I.cacheManager.resetStats();                   // Reset counters
+```
+
+### Programmatic Cache Management
+
+```dart
+final cache = RxNet.I.cacheManager;
+
+// Save/read network cache
+await cache.saveNetworkCache(path: '/api/data', params: {'page': 1}, responseData: {...});
+final data = await cache.readNetworkCache(path: '/api/data', params: {'page': 1});
+
+// Save/read key-value cache
+await cache.put('user_token', 'abc123');
+final token = await cache.get<String>('user_token');
+
+// Clear cache
+await cache.clearAll();
+await cache.clearByPrefix('/api/users');
+await cache.clearByPattern(r'^/api/v\d+/');
+
+// Query cache
+final size = await cache.getCacheSize();
+final keys = await cache.getAllKeys();
+```
+
+---
+
+## Retry Policy
+
+### Fixed Interval (Default)
+
+```dart
+RxNet.get()
+  .setPath("/api/data")
+  .setRetryCount(3, interval: Duration(seconds: 2))
+  .request();
+```
+
+### Advanced RetryPolicy
+
+```dart
+// Exponential backoff
+RxNet.get()
+  .setPath("/api/data")
+  .setRetryPolicy(RetryPolicy.exponentialBackoff(
+    maxRetries: 3,
+    baseInterval: Duration(seconds: 1),
+    maxInterval: Duration(seconds: 30),
+  ))
+  .request();
+
+// Exponential backoff with jitter (recommended for distributed systems)
+RxNet.get()
+  .setPath("/api/data")
+  .setRetryPolicy(RetryPolicy.exponentialBackoffWithJitter(
+    maxRetries: 5,
+    baseInterval: Duration(seconds: 1),
+    maxInterval: Duration(seconds: 30),
+  ))
+  .request();
+```
+
+| Strategy | Attempt 1 | Attempt 2 | Attempt 3 | Best For |
+|----------|-----------|-----------|-----------|----------|
+| `fixed` | 1s | 1s | 1s | Simple cases |
+| `exponentialBackoff` | 1s | 2s | 4s | Server overload recovery |
+| `exponentialBackoffWithJitter` | ~0.5s | ~1.5s | ~3s | Distributed systems |
+
+---
+
+## AdapterBaseOptions
+
+Set global request defaults that apply to all requests across all adapters:
+
+```dart
+await RxNet.init(config: RxNetConfig(
+  baseUrl: "https://api.example.com",
+  adapterBaseOptions: AdapterBaseOptions(
+    connectTimeout: Duration(seconds: 10),
+    receiveTimeout: Duration(seconds: 30),
+    sendTimeout: Duration(seconds: 30),
+    headers: {'Authorization': 'Bearer token'},
+    contentType: 'application/json',
+    responseType: ResponseType.json,
+    followRedirects: true,
+    maxRedirects: 5,
+    receiveDataWhenStatusError: true,
+    persistentConnection: true,
+  ),
+));
+```
+
+Request-level parameters always override global defaults:
+
+```dart
+RxNet.get()
+  .setPath("/api/data")
+  .setConnectTimeout(Duration(seconds: 5))  // Overrides global 10s
+  .request();
+```
+
+---
+
+## Adapter Selection
+
+| Adapter | Package | Features | Cancellation | Best For |
+|---------|---------|----------|--------------|----------|
+| **DioAdapter** | `dio: ^5.8.0+1` | All features, interceptors | True (aborts connection) | Production apps (default) |
+| **HttpAdapter** | `http: ^1.2.0` | Basic HTTP, interceptors, multipart, stream | Pseudo (marks cancelled) | Lightweight apps |
+| **MockAdapter** | Built-in | Testing, no network | Simulated | Unit/integration tests |
+
+**Default:** DioAdapter is used if no adapter is specified.
+
+### Multiple Instances
+
+```dart
+final mainApi = RxNet.create();
+await mainApi.initNet(config:RxNetConfig(baseUrl: "https://api.main.com", adapter: DioAdapter()));
+
+final analyticsApi = RxNet.create();
+await analyticsApi.initNet(config:RxNetConfig(baseUrl: "https://analytics.example.com", adapter: HttpAdapter()));
+```
+
+---
+
+## Request Examples
+
+### Supported Methods
+
+`get`, `post`, `delete`, `put`, `patch`, `head`, `options`
+
+### Cache Modes
 
 ```dart
 enum CacheMode {
-
-    // No caching, always initiates a request
-    ONLY_REQUEST,
-    
-    // Only uses cache, typically for preloading data and displaying in an offline environment
-    ONLY_CACHE,
-    
-    // Requests network first, if network request fails, reads cache; if reading cache fails, this request fails
-    REQUEST_FAILED_READ_CACHE,
-    
-    // Uses cache first regardless of existence, still requests network, new data replaces cached data and triggers data refresh
-    FIRST_USE_CACHE_THEN_REQUEST,
-    
-    // Uses cache first, only requests network if cache is empty or expired, otherwise won't request network
-    CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST,
+  ONLY_REQUEST,                        // No caching, always network
+  ONLY_CACHE,                          // Cache only, no network
+  REQUEST_FAILED_READ_CACHE,           // Network first, fallback to cache
+  FIRST_USE_CACHE_THEN_REQUEST,        // Cache first, then network
+  CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST, // Network only if cache empty/expired
 }
-    
 ```
 
-⚠️Note:
-
-1. If `setJsonConvert` is not set, raw type data is returned; otherwise, the defined entity type is returned.
-
-2. To convert JSON to object, please set setJsonConvert and perform conversion in the callback according to the backend's unified format.
-
-#### Additional Feature: Small amounts of data support RxNet data storage, more efficient:
+### 1. Callback Mode
 
 ```dart
-// After await RxNet.init(...)
-await RxNet.saveCache("name", "John Doe");
-
-final value = await RxNet.readCache<String>("name");
-LogUtil.v(value);  // Output: John Doe
-
-// Or
-Future.delayed(const Duration(seconds: 5), () async {
-  final result = await RxNet.readCache<String>("name");
-  LogUtil.v(result);  // Output: John Doe
-});
+RxNet.get<WeatherInfo>()
+  .setPath('/api/weather/city/{id}')
+  .setPathParam("id", "101030100")
+  .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
+  .setJsonConvert(WeatherInfo.fromJson)
+  .setRetryPolicy(RetryPolicy.exponentialBackoff(maxRetries: 3))
+  .execute(
+    success: (data, source) {
+      setState(() { weather = data; });
+    },
+    failure: (e) {
+      setState(() { error = e.toString(); });
+    },
+    completed: () { /* Always called */ },
+  );
 ```
 
-#### Several ways to execute requests, use according to scenario:
+### 2. async/await Mode
 
 ```dart
-1. Method One: RxNet.execute(success, failure, completed)
-  Get final data in Success callback.
-  Get error information in Failure callback.
-  Completed callback always executes, for canceling loading animations, releasing resources, etc.
+final result = await RxNet.get<WeatherInfo>()
+  .setPath('/api/weather/city/{id}')
+  .setPathParam("id", "101030100")
+  .setJsonConvert(WeatherInfo.fromJson)
+  .request();
 
-
-2. Method Two: await RxNet.request()
-  Results or error information are in RxResult entity, no need for try-catch operation.
-  RxResult.value: gets the final result.
-  RxResult.error: gets error information
-
-3. Method Three: await RxNet.executeStream()
-  Results or error information are in RxResult entity.
-  RxResult.value: gets the final result.
-  RxResult.error: gets error information
+if (result.isSuccess) {
+  print(result.value);
+}
 ```
-## Usage Instructions:
 
-### Initialize Network Framework
+### 3. Stream Mode
 
-#### Option 1: Default (DioAdapter - Recommended)
 ```dart
-await RxNet.init(
-  baseUrl: "http://t.weather.sojson.com/",
-  // No adapter specified = DioAdapter used by default
-  baseCacheMode: CacheMode.REQUEST_FAILED_READ_CACHE,
-  baseCheckNet: checkNet,
-  cacheInvalidationTime: 24 * 60 * 60 * 1000,
-  interceptors: [
-    RxNetLogAdapterInterceptor()  // New unified interceptor
-  ],
-);
-```
-
-#### Option 2: Explicit Adapter Selection
-```dart
-import 'package:rxnet_plus/adapters/dio_adapter.dart';
-// or: import 'package:rxnet_plus/adapters/http_adapter.dart';
-
-await RxNet.init(
-  baseUrl: "http://t.weather.sojson.com/",
-  adapter: DioAdapter(),  // or HttpAdapter()
-  baseCacheMode: CacheMode.REQUEST_FAILED_READ_CACHE,
-  baseCheckNet: checkNet,
-  cacheInvalidationTime: 24 * 60 * 60 * 1000,
-  interceptors: [
-    RxNetLogAdapterInterceptor()
-  ],
-);
-```
-
-#### Option 3: Multiple Instances with Different Adapters
-```dart
-import 'package:rxnet_plus/adapters/dio_adapter.dart';
-import 'package:rxnet_plus/adapters/http_adapter.dart';
-
-// Main API with DioAdapter (full-featured)
-final mainApi = RxNet.create();
-await mainApi.initNet(
-  baseUrl: "https://api.main.com",
-  adapter: DioAdapter(),
-);
-
-// Analytics API with HttpAdapter (lightweight)
-final analyticsApi = RxNet.create();
-await analyticsApi.initNet(
-  baseUrl: "https://analytics.example.com",
-  adapter: HttpAdapter(),
-);
-```
-
-#### Option 4: Testing with MockAdapter
-```dart
-import 'package:rxnet_plus/adapters/mock_adapter.dart';
-
-final mockAdapter = MockAdapter();
-mockAdapter.setMockResponse(
-  '/api/weather/city/101030100',
-  AdapterResponse(
-    statusCode: 200,
-    data: {'message': 'success', 'data': {...}},
-    headers: {},
-    request: AdapterRequest(
-      baseUrl: 'http://t.weather.sojson.com/',
-      path: '/api/weather/city/101030100',
-      method: HttpMethod.GET,
-    ),
-  ),
-);
-
-await RxNet.init(
-  baseUrl: "http://t.weather.sojson.com/",
-  adapter: mockAdapter,
-);
-```
-
-### Initiate Network Request (post, get, delete, put, patch are similar) - GET example:
-
-###    1. Callback Mode:
-```dart
-
-RxNet.get()
-    .setPath('api/weather/city/{id}')
-    .setPathParam("id", "101030100") // For RESTful, parameter name must match placeholder in path: Final URL: http://t.weather.sojson.com/api/weather/city/101030100
-    .setCancelToken(pageRequestToken) // CancelToken for canceling request
-    .setCacheMode(CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST)
-    //.setRetryCount(2, interval: const Duration(seconds: 7))  // Retry on failure, retry 2 times, 7 seconds interval each
-    //.setLoop(true, interval: const Duration(seconds: 5)) // Timed request
-    //.setContentType(ContentTypes.json) // application/json
-    //.setResponseType(ResponseType.json) // json
-    //.setCacheInvalidationTime(1000*10)  // Cache expiration time for this request - milliseconds
-    //.setRequestIgnoreCacheTime(true)  // Whether to directly ignore cache expiration time
-    .setJsonConvert(NewWeatherInfo.fromJson) // Parse into NewWeatherInfo object
-    // .setJsonConvert((data)=> BaseBean<Data>.fromJson(data).data) // If you only care about the data entity part
-    // .setJsonConvert((data)=> BaseInfo<Data>.fromJson(data, Data.fromJson)) // If you want code and other information
-    //.setJsonConvert((data)=>BaseInfo<Data>.fromJson(data, Data.fromJson).data) // If you only care about the data entity part
-    .execute<NewWeatherInfo>(
-        success: (data, source) {
-          // Refresh UI
-          count++;
-          setState(() {
-            content = "$count : ${jsonEncode(data)}";
-            sourcesType = source;
-          });
-         },
-        failure: (e) {
-          setState(() {
-            content = "empty data";
-          });
-         },
-        completed: (){
-          // Callback that always executes after request success or failure, for canceling loading animations, etc.
-     });
-
-```
-###   2. async/await Method:
-```
- var data = await RxNet.get()  
-    .setPath("api/weather/{id}") // For RESTful, parameter name must match placeholder in path: Final URL: http://t.weather.sojson.com/api/weather/101030100
-    .setPathParam("city", "101030100")
-    //.setQueryParams(Map) // Add multiple parameters at once
-    //.setRetryCount(2)  // Retry count
-    .setCacheMode(CacheMode.ONLY_REQUEST)
-    //.setJsonConvert((data) => NormalWaterInfoEntity.fromJson(data)) // Parse into NormalWaterInfoEntity object
-    .setJsonConvert(NormalWaterInfoEntity.fromJson)
-    .request<NormalWaterInfoEntity>();
-
-  print("--------->#${data.error}");
-  var result = data.value;
-  content = result.toString();
-  sourcesType = data.model;
-```
-
-###   3. Stream Style:
-```dart
-// Handle for cancellation
 StreamSubscription? _subscription;
 
-void testStreamRequest(){
+_subscription = RxNet.get()
+  .setPath('/api/weather/city/{id}')
+  .setPathParam("id", "101030100")
+  .setLoop(true, interval: const Duration(seconds: 5))
+  .executeStream()
+  .listen((result) {
+    if (result.isSuccess) { setState(() { weather = result.value; }); }
+  });
 
-  final pollingSubscription = RxNet.get()
-       .setPath("api/weather/{id}")
-       .setParam("city", "101030100")
-       .setLoop(true, interval: const Duration(seconds: 7))
-       .executeStream(); // Directly use executeStream
-   //     .listen((data) {
-   //       setState(() {
-   //         count++;
-   //         if (data.isSuccess) {
-   //           var result = data.value;
-   //           content = count.toString() +" : "+ jsonEncode(result);
-   //           sourcesType = data.model;
-   //         } else {
-   //           content = data.error.toString();
-   //         }
-   //       });
-   // });
-   // Or use the following method:
-  _subscription = pollingSubscription.listen((data){
-           setState(() {
-             count++;
-             if (data.isSuccess) {
-               var result = data.value;
-               content = "$count : ${jsonEncode(result)}";
-               sourcesType = data.model;
-             } else {
-               content = data.error.toString();
-             }
-           });
-   });
-}
-    
+// Don't forget to cancel in dispose()
+@override
+void dispose() { _subscription?.cancel(); super.dispose(); }
 ```
-Note: In Method Three, cancel the subscription in time when not in use:
+
+---
+
+## Built-in Interceptors
+
+### TokenRefreshInterceptor
 
 ```dart
-    @override
-    void dispose() {
-     _subscription?.cancel();
-     _cancelToken?.cancel();
-      super.dispose();
-    }
+TokenRefreshInterceptor(
+  tokenProvider: () async { ... },
+  isUnauthorized: (error, request) => error.statusCode == 401,
+  onRequestUpdated: (request, newToken) {
+    return request.copyWith(headers: {...request.headers, 'Authorization': 'Bearer $newToken'});
+  },
+  onTokenRefreshed: (token) => currentToken = token,
+);
 ```
 
-⚠️Special Note:
-
-Regardless of which request method is used, it is essentially a Stream. When polling is enabled, async/await only returns the first result, and the underlying stream will be canceled.
-To get all response results, you must use execute() or directly listen to executeStream().
-
-1. The second parameter of success in Method 1 and Model in RxResult indicate the data source: network/cache.
-
-2. When using Method Three, cancel the subscription in time when not needed: _subscription?.cancel()
-
-3. When the page needs to exit, or when no longer interested in the request result, the request can be canceled through the set CancelToken.
-
-### Concurrent Requests
-
-> **⭐ IMPORTANT: For non-callback requests (using `request()` or `async/await`), always prefer Dart's native concurrent patterns:**
-> 
-> **Option 1: Records + Patterns (Dart 3.0+ - Most Elegant) 🌟**
-> ```dart
-> // ✅ BEST: Dart 3.0+ Records and Patterns (requires Dart SDK >= 3.0.0)
-> final (weather, user, products) = await (
->   RxNet.get().setPath('/weather').request<Weather>(),
->   RxNet.get().setPath('/user').request<User>(),
->   RxNet.get().setPath('/products').request<List<Product>>(),
-> ).wait;
-> 
-> // Automatic destructuring, perfect type inference
-> // weather is Weather, user is User, products is List<Product>
-> ```
-> 
-> **Option 2: Future.wait (All Dart versions - Most Compatible) ✅**
-> ```dart
-> // ✅ RECOMMENDED: Works with all Dart versions
-> final results = await Future.wait([
->   RxNet.get().setPath('/weather').request<Weather>(),
->   RxNet.get().setPath('/user').request<User>(),
->   RxNet.get().setPath('/products').request<List<Product>>(),
-> ]);
-> 
-> final weather = results[0];
-> final user = results[1];
-> final products = results[2];
-> ```
-> 
-> **The `zipRequest()` API below is ONLY for merging callback-based requests (using `execute()`).**
-> It's a supplementary feature for callback-style code, not the primary recommendation.
-
-#### Concurrent Callback-Based Requests
-
-RxNet supports executing multiple callback-based requests concurrently with type-safe result aggregation. This is useful when you need to load multiple resources in parallel and update the UI once all requests complete.
-
-**Use Cases:**
-- ✅ Merging multiple callback-style `execute()` requests
-- ❌ NOT for `request()` style - use `Future.wait` instead (see above)
-
-
-#### Basic Example
+### DeduplicateInterceptor
 
 ```dart
-import 'package:rxnet_plus/net/concurrent/concurrent.dart';
-
-// Execute multiple requests concurrently
-final results = await RxNet.zipRequest([
-  ZipRequest<UserInfo>(
-    request: ({success, failure, completed}) {
-      getUserAsync(
-        userId: '123',
-        success: success,
-        failure: failure,
-        completed: completed,
-      );
-    },
-    tag: 'user',
-  ),
-  ZipRequest<List<Product>>(
-    request: ({success, failure, completed}) {
-      getProductsAsync(
-        categoryId: 'electronics',
-        success: success,
-        failure: failure,
-        completed: completed,
-      );
-    },
-    tag: 'products',
-  ),
-  ZipRequest<AppSettings>(
-    request: ({success, failure, completed}) {
-      getSettingsAsync(
-        success: success,
-        failure: failure,
-        completed: completed,
-      );
-    },
-    tag: 'settings',
-  ),
-]);
-
-// Access results by tag with type safety
-final user = results.getRequestByTag<UserInfo>('user');
-final products = results.getRequestByTag<List<Product>>('products');
-final settings = results.getRequestByTag<AppSettings>('settings');
-
-// Or access by index
-final firstResult = results.getRequestByIndex<UserInfo>(0);
-
-// Update UI once with all data
-setState(() {
-  this.user = user;
-  this.products = products;
-  this.settings = settings;
-});
+DeduplicateInterceptor(windowDuration: Duration(milliseconds: 500))
 ```
 
-#### Simplified Syntax with withParams
+### ThrottleInterceptor
 
-For simple cases, use the `withParams` factory:
+```dart
+ThrottleInterceptor(throttleDuration: Duration(seconds: 1))
+```
+
+---
+
+## Concurrent Requests
+
+### For async/await (Recommended)
+
+```dart
+final (weather, user) = await (
+  RxNet.get<Weather>().setPath('/weather').request(),
+  RxNet.get<User>().setPath('/user').request(),
+).wait;
+```
+
+### For Callback Requests (zipRequest)
 
 ```dart
 final results = await RxNet.zipRequest([
-  ZipRequest.withParams<UserInfo>(
-    getUserAsync,
-    {'userId': '123', 'phone': '13800138000'},
-    tag: 'user',
-  ),
-  ZipRequest.withParams<List<Product>>(
-    getProductsAsync,
-    {'categoryId': 'electronics', 'page': 1},
-    tag: 'products',
-  ),
+  ZipRequest<Weather>(request: ..., tag: 'weather'),
+  ZipRequest<User>(request: ..., tag: 'user'),
 ]);
+final weather = results.getRequestByTag<Weather>('weather');
 ```
 
-#### Method Reference and Parameter Passing
+---
 
-ZipRequest supports three usage patterns:
-
-**Pattern 1: Closure Wrapper (Recommended) ⭐**
-
-Most flexible and type-safe. Directly write request logic in the closure:
+## Upload & Download
 
 ```dart
-ZipRequest<UserInfo>(
-  request: ({success, failure, completed}) {
-    RxNet.get()
-        .setPath('/user/{id}')
-        .setPathParam('id', '123')
-        .execute<UserInfo>(
-          success: success,
-          failure: failure,
-          completed: completed,
-        );
-  },
-  tag: 'user',
-)
+// Download
+await RxNet.get().setPath("https://example.com/file.zip")
+  .downloadFile(savePath: "${appDocPath}/file.zip");
+
+// Breakpoint Download
+RxNet.get().setPath("https://example.com/large-file.zip")
+  .breakPointDownload(savePath: "...", onReceiveProgress: (len, total) {});
+
+// Breakpoint Upload
+RxNet.post().setPath("/api/upload")
+  .breakPointUpload(filePath: "/path/to/file.jpg", onSendProgress: (len, total) {});
 ```
 
-**Pattern 2: Method Reference + Closure**
+---
 
-Extract request logic into a reusable method:
 
-```dart
-// Define a reusable method
-void fetchUserData({
-  required String userId,
-  Success<UserInfo>? success,
-  Failure? failure,
-  Completed? completed,
-}) {
-  RxNet.get()
-      .setPath('/user/{id}')
-      .setPathParam('id', userId)
-      .execute<UserInfo>(
-        success: success,
-        failure: failure,
-        completed: completed,
-      );
-}
-
-// Use in ZipRequest
-ZipRequest<UserInfo>(
-  request: ({success, failure, completed}) {
-    fetchUserData(
-      userId: '123',
-      success: success,
-      failure: failure,
-      completed: completed,
-    );
-  },
-  tag: 'user',
-)
-```
-
-**Pattern 3: withParams Factory**
-
-Simplest syntax for basic cases:
-
-```dart
-ZipRequest.withParams<UserInfo>(
-  fetchUserAsync,
-  {'userId': '123', 'phone': '13800138000'},
-  tag: 'user',
-)
-```
-
-**Recommendation:** Use Pattern 1 for inline requests or Pattern 2 for reusable request logic.
-
-#### Partial Success Handling
-
-By default, `zipRequest()` fails immediately on the first error. Use `eagerError: false` to wait for all requests and handle partial success:
-
-```dart
-final results = await RxNet.zipRequest(
-  [request1, request2, request3],
-  eagerError: false, // Don't fail on first error
-);
-
-// Check which requests succeeded
-for (int i = 0; i < results.length; i++) {
-  if (results.isSuccess(i)) {
-    print('Request $i succeeded');
-    final data = results.getRequestByIndex(i);
-    // Use successful data
-  } else {
-    print('Request $i failed: ${results.errors[i]}');
-    // Handle error or use fallback
-  }
-}
-
-// Get only successful results
-final successful = results.successfulResults;
-print('${successful.length} out of ${results.length} succeeded');
-```
-
-#### Custom Callbacks
-
-Add custom callbacks for logging, analytics, or side effects:
-
-```dart
-ZipRequest<UserInfo>(
-  request: ({success, failure, completed}) {
-    getUserAsync(
-      userId: '123',
-      success: success,
-      failure: failure,
-      completed: completed,
-    );
-  },
-  tag: 'user',
-  success: (data, source) {
-    print('User loaded from $source');
-    analytics.track('user_loaded');
-  },
-  failure: (error) {
-    print('Failed to load user: $error');
-    analytics.trackError(error);
-  },
-  completed: () {
-    print('User request completed');
-  },
-)
-```
-
-#### Cancellation
-
-Cancel all pending requests using a `CancelToken`:
-
-```dart
-final cancelToken = CancelToken();
-
-// Start concurrent requests
-final future = RxNet.zipRequest(
-  [request1, request2, request3],
-  cancelToken: cancelToken,
-);
-
-// Cancel after timeout
-Future.delayed(Duration(seconds: 5), () {
-  cancelToken.cancel('Timeout');
-});
-
-try {
-  final results = await future;
-  // All requests succeeded
-} catch (e) {
-  print('Requests cancelled or failed: $e');
-}
-```
-
-#### Performance Characteristics
-
-- **Execution Time**: ≈ max(individual request times), not sum
-- **Memory**: O(n) where n is number of requests
-- **Concurrency**: All requests execute in parallel
-- **Order Preservation**: Results maintain submission order
-
-#### Migration from Sequential to Concurrent
-
-**Before (Sequential - Slow):**
-```dart
-// Takes 3 seconds total (1s + 1s + 1s)
-final user = await getUserAsync();
-final products = await getProductsAsync();
-final settings = await getSettingsAsync();
-
-setState(() {
-  // Multiple UI updates cause flickering
-});
-```
-
-**After (Concurrent - Fast):**
-```dart
-// Takes ~1 second total (max of all requests)
-final results = await RxNet.zipRequest([
-  ZipRequest<UserInfo>(request: getUserAsync, tag: 'user'),
-  ZipRequest<List<Product>>(request: getProductsAsync, tag: 'products'),
-  ZipRequest<AppSettings>(request: getSettingsAsync, tag: 'settings'),
-]);
-
-setState(() {
-  // Single UI update, no flickering
-  this.user = results.getRequestByTag<UserInfo>('user');
-  this.products = results.getRequestByTag<List<Product>>('products');
-  this.settings = results.getRequestByTag<AppSettings>('settings');
-});
-```
-
-
-### Upload and Download (supports breakpoint upload and download): Note file read/write permissions on mobile terminals.
-
-```dart
-
-RxNet.get() 
-    .setPath("https://img2.woyaogexing.com/2022/08/02/b3b98b98ec34fb3b!400x400.jpg")
-    .setParam(xx, xx)
-    .breakPointDownload(
-      savePath: "${appDocPath}/55.jpg",
-      onReceiveProgress: (len, total){
-        print("len:$len, total:$total");
-        if(len == total){
-          downloadPath = appDocPath;
-        }
-      });
-
-
-
-RxNet.post()
-    .setPath("xxxxx/xxx.jpg")
-    .breakPointUpload(
-        success: (data, sourcesType) {},
-        failure: (e) {},
-        onSendProgress: (len, total) {});
-
-```
-    
-### Configure Global Request Headers
-
-1. setGlobalHeaders(Map<String, dynamic> headers) method:
- ```dart
-
-RxNet.setGlobalHeaders({
-   "Accept-Encoding": "gzip, deflate, br",
-   "Connection": "keep-alive",
-});
-
-```
-
-2. Add custom request interceptor xxxInterceptor() such as:
-
- ```dart
-
-class AuthInterceptor extends AdapterInterceptor {
-   String? _token;
-
-   /// 设置认证令牌
-   void setToken(String token) {
-      _token = token;
-   }
-
-   /// 清除认证令牌
-   void clearToken() {
-      _token = null;
-   }
-
-   @override
-   void onRequest(
-           AdapterRequest request,
-           RequestInterceptorHandler handler,
-           ) {
-      if (_token != null) {
-         // 添加 Authorization 头
-         final headers = Map<String, String>.from(request.headers);
-         headers['Authorization'] = 'Bearer $_token';
-
-         // 创建新的请求对象
-         final newRequest = request.copyWith(headers: headers);
-
-         debugPrint('🔐 Added Authorization header to ${request.buildFullUrl()}');
-
-         // 使用修改后的请求继续
-         handler.next(newRequest);
-      } else {
-         // 没有令牌，直接继续
-         handler.next(request);
-      }
-   }
-
-   @override
-   void onResponse(
-           AdapterResponse response,
-           ResponseInterceptorHandler handler,
-           ) {
-      // 检查是否有新的令牌
-      final newToken = response.headers['x-new-token']?.first;
-      if (newToken != null) {
-         debugPrint('🔐 Received new token, updating...');
-         _token = newToken;
-      }
-
-      handler.next(response);
-   }
-
-   @override
-   void onError(
-           AdapterException error,
-           ErrorInterceptorHandler handler,
-           ) {
-      // 如果是 401 错误，清除令牌
-      if (error.statusCode == 401) {
-         debugPrint('🔐 Unauthorized, clearing token...');
-         clearToken();
-      }
-
-      handler.next(error);
-   }
-}
-  
-```
-
-### Multiple Network Instances with Different Adapters
-
-You can create multiple RxNet instances with different adapters for different APIs:
-
-```dart
-import 'package:rxnet_plus/adapters/dio_adapter.dart';
-import 'package:rxnet_plus/adapters/http_adapter.dart';
-
-void multipleInstances() async {
-  // Main API with full-featured DioAdapter
-  final mainApi = RxNet.create();
-  await mainApi.initNet(
-    baseUrl: "https://api.yourdomain.com",
-    adapter: DioAdapter(),
-  );
-  
-  // Analytics API with lightweight HttpAdapter
-  final analyticsApi = RxNet.create();
-  await analyticsApi.initNet(
-    baseUrl: "https://analytics.yourdomain.com",
-    adapter: HttpAdapter(),
-  );
-  
-  // Use different instances independently
-  final userResponse = await mainApi.getRequest()
-      .setPath("/users/1")
-      .setJsonConvert(NewWeatherInfo.fromJson)
-      .request();
-  
-  final analyticsResponse = await analyticsApi.postRequest()
-      .setPath("/events")
-      .setParam("event", "page_view")
-      .request();
-}
-```
-
-### Network Detection Before Request:
-
-```dart
- // Whether it's the default request instance or manually created multi-instance, if baseCheckNet is configured, network detection will be performed before each request
-await RxNet.init(
-    baseUrl: "xxxx",
-    baseCacheMode: CacheMode.REQUEST_FAILED_READ_CACHE, // Read cache data on request failure
-    baseCheckNet: checkNet, // Global network check, all requests go through this method
-   );
-
-For example:
-
-Future<bool> checkNet() async{
-  // You need to implement network detection yourself or use a third-party library
-  var connectivityResult = await (Connectivity().checkConnectivity());
-  if (connectivityResult == ConnectivityResult.none) {
-    Toast.show("Currently no network");
-    return false;
-  }
-  return Future.value(true);
-}
-    
-```
-
-### Certificate Validation:
-
-#### Using DioAdapter (dio package)
-
-```dart
-// Get DioAdapter instance
-final adapter = DioAdapter();
-
-// Configure certificate validation
-adapter.dio.httpClientAdapter = IOHttpClientAdapter(
-  createHttpClient: () {
-    final client = HttpClient();
-    client.badCertificateCallback = (cert, host, port) {
-      // Add your certificate validation logic here
-      // For example: validate certificate fingerprint
-      // const trustedFingerprint = 'YOUR_SHA256_FINGERPRINT';
-      // final certFingerprint = cert.sha1.toString().toUpperCase();
-      // return certFingerprint == trustedFingerprint;
-      return true; // For testing only, validate properly in production
-    };
-    return client;
-  },
-);
-
-// Initialize RxNet with the configured adapter
-await RxNet.init(
-  baseUrl: "https://your-api.com",
-  adapter: adapter,
-);
-```
-
-#### Using HttpAdapter (http package)
+## certificate verification
+#### Using HttpAdapter (http package method)
 
 ```dart
 import 'dart:io';
 import 'package:http/io_client.dart';
 
-// Create a custom HTTP client with certificate validation
+// Create a custom HTTP client with certificate verification
 IOClient createPinnedClient() {
   final HttpClient httpClient = HttpClient();
   httpClient.badCertificateCallback = (X509Certificate cert, String host, int port) {
-    // Add your certificate validation logic here
-    // For example: validate certificate fingerprint
+    // Add your certificate verification logic here
+    // For example: verifying certificate fingerprint
     // final der = cert.der;
     // final sha256 = sha256Convert(der);
     // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
     // return sha256 == trustedFingerprint;
-    return true; // For testing only, validate properly in production
+    return true; // For testing only, please verify the production environment correctly
   };
   return IOClient(httpClient);
 }
 
-// Create HttpAdapter with custom client
+// Create an HttpAdapter using a custom client
 final httpAdapter = HttpAdapter(client: createPinnedClient());
 
-// Initialize RxNet with the configured adapter
-await RxNet.init(
+// Initialize RxNet using a configured adapter
+await RxNet.init(config:RxNetConfig
   baseUrl: "https://your-api.com",
   adapter: httpAdapter,
-);
+));
 ```
 
-### Clear Log Interceptor, Refuse Debugging Blindness.
+## Migration from 0.6.x to 0.7.0
 
-    If you need log information, please add RxNetLogInterceptor or your custom interceptor when initializing the network framework
-```dart
- await RxNet.init(
-    interceptors: [
-      // TokenInterceptor // Token interceptor, customize for more features
-      /// Log interceptor
-       RxNetLogAdapterInterceptor()
-    ]);
-```
-
-Output format:
+**Be sure to configure RxNetConfig**
 
 ```dart
-    [log] ###Log:  v  ***************** Request Start *****************
-    [log] ###Log:  v  uri: http://t.weather.sojson.com/api/weather/city/101030100
-    [log] ###Log:  v  method: GET
-    [log] ###Log:  v  responseType: ResponseType.json
-    [log] ###Log:  v  followRedirects: true
-    [log] ###Log:  v  connectTimeout:
-    [log] ###Log:  v  receiveTimeout:
-    [log] ###Log:  v  extra: {}
-    [log] ###Log:  v  Request Headers:
-    [log] ###Log:  v  {"content-type":"application/json"}
-    [log] ###Log:  v  data:
-    [log] ###Log:  v  null
-    [log] ###Log:  v  ***************** Request End *****************
-    [log] ###Log:  v  ***************** Response Start *****************
-    [log] ###Log:  v  statusCode: 200
-    [log] ###Log:  v  Response Headers:
-    [log] ###Log:  v   connection: keep-alive
-    [log] ###Log:  v   cache-control: max-age=3000
-    [log] ###Log:  v   transfer-encoding: chunked
-    [log] ###Log:  v   date: Wed, 07 Feb 2024 13:09:47 GMT
-    [log] ###Log:  v   vary: Accept-Encoding
-    [log] ###Log:  v   content-encoding: gzip
-    [log] ###Log:  v   age: 2404
-    [log] ###Log:  v   content-type: application/json;charset=UTF-8
-    [log] ###Log:  v   x-source: C/200
-    [log] ###Log:  v   server: marco/2.20
-    [log] ###Log:  v   x-request-id: c58182a21ddcaed97d76dbb49f4771d8; 32238019a67857706c0e40b6dd0e1238
-    [log] ###Log:  v   via: S.mix-hz-fdi1-213, T.213.H, V.mix-hz-fdi1-217, T.194.H, M.cun-he-sjw8-194
-    [log] ###Log:  v   expires: Wed, 07 Feb 2024 13:19:43 GMT
-    [log] ###Log:  v  Response Text:
-    [log] ###Log:  v  {"message":"success感谢又拍云(upyun.com)提供CDN赞助","status":200,"date":"20241230","time":"2024-12-30 16:40:54","cityInfo":{"city":"天津市","citykey":"101030100","parent":"天津","updateTime":"15:13"},"data":{"shidu":"16%","pm25":11.0,"pm10":61.0,"quality":"良","wendu":"1.7","ganmao":"极少数敏感人群应减少户外活动","forecast":[{"date":"30","high":"高温 8℃","low":"低温 -6℃","ymd":"2024-12-30","week":"星期一","sunrise":"07:29","sunset":"16:57","aqi":46,"fx":"西北风","fl":"3级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"31","high":"高温 5℃","low":"低温 -3℃","ymd":"2024-12-31","week":"星期二","sunrise":"07:30","sunset":"16:58","aqi":54,"fx":"西风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"01","high":"高温 5℃","low":"低温 -4℃","ymd":"2025-01-01","week":"星期三","sunrise":"07:30","sunset":"16:59","aqi":59,"fx":"东北风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"02","high":"高温 2℃","low":"低温 -2℃","ymd":"2025-01-02","week":"星期四","sunrise":"07:30","sunset":"17:00","aqi":50,"fx":"东北风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"03","high":"高温 4℃","low":"低温 -5℃","ymd":"2025-01-03","week":"星期五","sunrise":"07:30","sunset":"17:00","aqi":65,"fx":"西风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"04","high":"高温 5℃","low":"低温 -5℃","ymd":"2025-01-04","week":"星期六","sunrise":"07:30","sunset":"17:01","aqi":86,"fx":"西南风","fl":"1级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"05","high":"高温 7℃","low":"低温 -2℃","ymd":"2025-01-05","week":"星期日","sunrise":"07:30","sunset":"17:02","aqi":75,"fx":"东北风","fl":"2级","type":"小雪","notice":"小雪虽美，赏雪别着凉"},{"date":"06","high":"高温 7℃","low":"低温 -2℃","ymd":"2025-01-06","week":"星期一","sunrise":"07:30","sunset":"17:03","aqi":31,"fx":"西北风","fl":"3级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"07","high":"高温 6℃","low":"低温 -2℃","ymd":"2025-01-07","week":"星期二","sunrise":"07:30","sunset":"17:04","aqi":32,"fx":"西北风","fl":"3级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"08","high":"高温 3℃","low":"低温 -4℃","ymd":"2025-01-08","week":"星期三","sunrise":"07:30","sunset":"17:05","aqi":52,"fx":"西北风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"09","high":"高温 3℃","low":"低温 -4℃","ymd":"2025-01-09","week":"星期四","sunrise":"07:30","sunset":"17:06","aqi":87,"fx":"西南风","fl":"2级","type":"阴","notice":"不要被阴云遮挡住好心情"},{"date":"10","high":"高温 3℃","low":"低温 -4℃","ymd":"2025-01-10","week":"星期五","sunrise":"07:29","sunset":"17:07","aqi":49,"fx":"西北风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"11","high":"高温 4℃","low":"低温 -2℃","ymd":"2025-01-11","week":"星期六","sunrise":"07:29","sunset":"17:08","aqi":46,"fx":"西北风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"},{"date":"12","high":"高温 3℃","low":"低温 -3℃","ymd":"2025-01-12","week":"星期日","sunrise":"07:29","sunset":"17:09","aqi":40,"fx":"西北风","fl":"3级","type":"晴","notice":"愿你拥有比阳光明媚的心情"},{"date":"13","high":"高温 3℃","low":"低温 -5℃","ymd":"2025-01-13","week":"星期一","sunrise":"07:29","sunset":"17:10","aqi":68,"fx":"南风","fl":"2级","type":"晴","notice":"愿你拥有比阳光明媚的心情"}],"yesterday":{"date":"29","high":"高温 6℃","low":"低温 -5℃","ymd":"2024-12-29","week":"星期日","sunrise":"07:29","sunset":"16:56","aqi":100,"fx":"西南风","fl":"2级","type":"多云","notice":"阴晴之间，谨防紫外线侵扰"}}}
-    [log] ###Log:  v  useTime: 0min: 0sec: 215ms
-    [log] ###Log:  v  Response url: http://t.weather.sojson.com/api/weather/city/101030100
-    [log] ###Log:  v  ***************** Response End *****************
-    [log] ###Log:  v  useJsonAdapter: true
+await RxNet.init(config: RxNetConfig(baseUrl: "...", cacheMode: CacheMode.ONLY_REQUEST));
 ```
 
-### For online APP interface information, you can also view request log information through embedded RxNet.
+---
+
+## Debug Window
 
 ```dart
-Open debug log window: RxNet.showDebugWindow(context);
-Close debug log window: RxNet.closeDebugWindow();
+RxNet.showDebugWindow(context);
 ```
 
-## Concurrent Callback Requests
-
-RxNet 0.6.1+ supports executing multiple callback-based requests concurrently with type-safe result aggregation. This feature solves the problem that callback-style `execute()` methods cannot be easily composed with `Future.wait()`.
-
-### Why Concurrent Requests?
-
-When you need to load multiple resources in parallel (user info, products, settings, etc.), sequential requests waste time:
-
-```dart
-// ❌ Sequential: Total time = sum of all requests
-await getUserAsync(...);  // 500ms
-await getProductsAsync(...);  // 800ms
-await getSettingsAsync(...);  // 300ms
-// Total: 1600ms
-```
-
-With concurrent requests, all execute in parallel:
-
-```dart
-// ✅ Concurrent: Total time ≈ longest request
-final results = await RxNet.zipRequest([...]);
-// Total: ~800ms (longest request)
-```
-
-### Basic Usage
-
-```dart
-// Execute multiple requests concurrently
-final results = await RxNet.zipRequest([
-  ZipRequest<UserInfo>(
-    request: ({success, failure, completed}) {
-      getUserAsync(
-        userId: '123',
-        success: success,
-        failure: failure,
-        completed: completed,
-      );
-    },
-    tag: 'user',
-  ),
-  ZipRequest<List<Product>>(
-    request: ({success, failure, completed}) {
-      getProductsAsync(
-        categoryId: 'electronics',
-        success: success,
-        failure: failure,
-        completed: completed,
-      );
-    },
-    tag: 'products',
-  ),
-]);
-
-// Access results by tag with type safety
-final user = results.getRequestByTag<UserInfo>('user');
-final products = results.getRequestByTag<List<Product>>('products');
-
-// Or by index
-final firstResult = results.getRequestByIndex<UserInfo>(0);
-```
-
-### Simplified Syntax with withParams
-
-For simple cases, use the `withParams` factory:
-
-```dart
-final results = await RxNet.zipRequest([
-  ZipRequest.withParams<UserInfo>(
-    getUserAsync,
-    {'userId': '123', 'phone': '13800138000'},
-    tag: 'user',
-  ),
-  ZipRequest.withParams<List<Product>>(
-    getProductsAsync,
-    {'categoryId': 'electronics', 'page': 1},
-    tag: 'products',
-  ),
-]);
-```
-
-### Partial Success Handling
-
-By default, the first error throws immediately. Use `eagerError: false` to wait for all requests:
-
-```dart
-final results = await RxNet.zipRequest(
-  [request1, request2, request3],
-  eagerError: false,  // Don't fail on first error
-);
-
-// Check which requests succeeded
-for (int i = 0; i < results.length; i++) {
-  if (results.isSuccess(i)) {
-    print('Request $i succeeded: ${results[i]}');
-  } else {
-    print('Request $i failed: ${results.errors[i]}');
-  }
-}
-
-// Get only successful results
-final successful = results.successfulResults;
-print('${successful.length} out of ${results.length} succeeded');
-```
-
-### Custom Callbacks
-
-Add custom callbacks for logging, analytics, or UI updates:
-
-```dart
-ZipRequest<UserInfo>(
-  request: ({success, failure, completed}) {
-    getUserAsync(
-      userId: '123',
-      success: success,
-      failure: failure,
-      completed: completed,
-    );
-  },
-  tag: 'user',
-  success: (data, source) {
-    print('User loaded from $source');
-    analytics.track('user_loaded');
-  },
-  failure: (error) {
-    print('Failed to load user: $error');
-  },
-  completed: () {
-    hideLoadingIndicator();
-  },
-)
-```
-
-### Cancellation
-
-Cancel all pending requests with a `CancelToken`:
-
-```dart
-final cancelToken = CancelToken();
-
-// Start concurrent requests
-final future = RxNet.zipRequest(
-  [request1, request2, request3],
-  cancelToken: cancelToken,
-);
-
-// Cancel after 5 seconds
-Future.delayed(Duration(seconds: 5), () {
-  cancelToken.cancel('Timeout');
-});
-
-try {
-  final results = await future;
-} catch (e) {
-  print('Requests cancelled: $e');
-}
-```
-
-### Type Inference
-
-The generic type parameter ensures compile-time type safety:
-
-```dart
-// ✅ Correct: Type matches method return type
-ZipRequest<UserInfo>(request: getUserAsync, tag: 'user')
-
-// ❌ Compile error: Type mismatch
-ZipRequest<String>(request: getUserAsync, tag: 'user')
-```
-
-### Real-World Example: Dashboard Loading
-
-```dart
-Future<void> loadDashboard() async {
-  setState(() => isLoading = true);
-  
-  try {
-    final results = await RxNet.zipRequest([
-      ZipRequest<UserInfo>(
-        request: ({success, failure, completed}) {
-          RxNet.get()
-            .setPath('/user/profile')
-            .setJsonConvert(UserInfo.fromJson)
-            .execute(
-              success: success,
-              failure: failure,
-              completed: completed,
-            );
-        },
-        tag: 'user',
-      ),
-      ZipRequest<List<Product>>(
-        request: ({success, failure, completed}) {
-          RxNet.get()
-            .setPath('/products/featured')
-            .setJsonConvert((data) => (data as List)
-                .map((e) => Product.fromJson(e))
-                .toList())
-            .execute(
-              success: success,
-              failure: failure,
-              completed: completed,
-            );
-        },
-        tag: 'products',
-      ),
-      ZipRequest<AppSettings>(
-        request: ({success, failure, completed}) {
-          RxNet.get()
-            .setPath('/settings')
-            .setJsonConvert(AppSettings.fromJson)
-            .execute(
-              success: success,
-              failure: failure,
-              completed: completed,
-            );
-        },
-        tag: 'settings',
-      ),
-    ]);
-    
-    setState(() {
-      user = results.getRequestByTag<UserInfo>('user');
-      products = results.getRequestByTag<List<Product>>('products');
-      settings = results.getRequestByTag<AppSettings>('settings');
-      isLoading = false;
-    });
-  } catch (e) {
-    setState(() {
-      error = e.toString();
-      isLoading = false;
-    });
-  }
-}
-```
-
-
-### Migration from Sequential to Concurrent
-
-**Before (Sequential):**
-```dart
-UserInfo? user;
-List<Product>? products;
-
-void loadData() async {
-  // Request 1: 500ms
-  RxNet.get()
-    .setPath('/user')
-    .setJsonConvert(UserInfo.fromJson)
-    .execute(success: (data, source) {
-      user = data;
-      
-      // Request 2: 800ms (starts after request 1)
-      RxNet.get()
-        .setPath('/products')
-        .setJsonConvert((data) => (data as List)
-            .map((e) => Product.fromJson(e))
-            .toList())
-        .execute(success: (data, source) {
-          products = data;
-          setState(() {}); // Update UI after both complete
-        });
-    });
-  // Total time: 1300ms
-}
-```
-
-**After (Concurrent):**
-```dart
-Future<void> loadData() async {
-  final results = await RxNet.zipRequest([
-    ZipRequest<UserInfo>(
-      request: ({success, failure, completed}) {
-        RxNet.get()
-          .setPath('/user')
-          .setJsonConvert(UserInfo.fromJson)
-          .execute(
-            success: success,
-            failure: failure,
-            completed: completed,
-          );
-      },
-      tag: 'user',
-    ),
-    ZipRequest<List<Product>>(
-      request: ({success, failure, completed}) {
-        RxNet.get()
-          .setPath('/products')
-          .setJsonConvert((data) => (data as List)
-              .map((e) => Product.fromJson(e))
-              .toList())
-          .execute(
-            success: success,
-            failure: failure,
-            completed: completed,
-          );
-      },
-      tag: 'products',
-    ),
-  ]);
-  
-  setState(() {
-    user = results.getRequestByTag<UserInfo>('user');
-    products = results.getRequestByTag<List<Product>>('products');
-  });
-  // Total time: ~800ms (longest request)
-}
-```
-
-**Benefits:**
-- ⚡ **40% faster** in this example (1300ms → 800ms)
-- 🎯 **Single setState()** call instead of nested callbacks
-- 🛡️ **Type safety** with compile-time checking
-- 🧹 **Cleaner code** without callback nesting
-
-## Debug Window:
 ![Debug Window](https://github.com/ZhengZaiHong/rxnet/blob/master/images/app_logcat.jpg)
 
-## Also Supports HarmonyOS:
-![HarmonyOS-example.gif](https://github.com/ZhengZaiHong/rxnet/blob/master/images/HarmonyOS-example.gif)
+## HarmonyOS Support
 
-
-
-## 📝 Summary
-
-### Core Points
-
-1. **executeStream() Returns Stream**
-    - Need to call `listen()` to start listening
-    - Must save `StreamSubscription` for later cancellation
-    - Immediate cancellation will cause callbacks not to execute
-    - Should cancel in `dispose()` or on user action
-
-
-2. **Choose the Appropriate Request Method**
-    - Single request: `request()` or `execute()`
-    - Polling request: `executeStream()`
-    - Need to cancel: Use `CancelToken`
-
-3. **Remember to Clean Up Resources**
-    - Cancel subscriptions in `dispose()`
-    - Avoid memory leaks
+![HarmonyOS](https://github.com/ZhengZaiHong/rxnet/blob/master/images/HarmonyOS-example.gif)
