@@ -29,27 +29,50 @@ enum ContextType {
   JS_PAGE_LIFECYCLE,
 }
 
+export enum LTPOSwitchState {
+  OFF = 0,
+  ON = 1,
+  NOT_INIT = 2
+}
+
+/**
+ * Represents a pending platform message that is queued during preloading.
+ * These messages are processed once the Flutter engine is ready to handle them.
+ */
 interface PendingMessage {
+  /** The channel name for the message. */
   channel: string;
+  /** The message data as an ArrayBuffer. */
   message: ArrayBuffer;
+  /** The reply ID for responding to the message. */
   replyId: number;
+  /** Additional message data. */
   messageData: number;
 }
 
 /**
- * 提供arkTs的flutterNAPI接口
+ * Provides Flutter NAPI interface for ArkTS.
+ * This class serves as the bridge between the ArkTS layer and the native Flutter engine,
+ * handling initialization, message passing, viewport management, and lifecycle events.
  */
 export default class FlutterNapi {
   private static hasInit: boolean = false;
-  //是否已实现
+  /** Whether the native methods have been implemented. */
   hasImplemented: boolean = false;
+  /** The native shell holder ID, or null if not attached. */
   nativeShellHolderId: number | null = null;
+  /** The platform message handler for receiving messages from Dart, or null if not set. */
   platformMessageHandler: PlatformMessageHandler | null = null;
   private engineLifecycleListeners = new Set<EngineLifecycleListener>();
+  /** The accessibility delegate for handling accessibility events, or null if not set. */
   accessibilityDelegate: AccessibilityDelegate | null = null;
+  /** The localization plugin for handling locale information, or null if not set. */
   localizationPlugin: LocalizationPlugin | null = null;
+  /** Whether Flutter UI is currently being displayed. */
   isDisplayingFlutterUi: boolean = false;
+  /** Whether Flutter UI has been preloaded. */
   isPreloadedFlutterUi: boolean = false;
+  /** Whether Dart code is currently running. */
   isRunningDart: boolean = false;
   private nextSpawnNapi: FlutterNapi | null = null;
   private pendingMessages: PendingMessage[] = [];
@@ -57,21 +80,39 @@ export default class FlutterNapi {
   private firstPreloading: boolean = true;
 
   /**
-   * 更新刷新率
-   * @param rate
+   * Updates the refresh rate for the Flutter engine.
+   * @param refreshRateFPS - The refresh rate in frames per second
    */
   updateRefreshRate(refreshRateFPS: number) {
     flutter.nativeUpdateRefreshRate(refreshRateFPS);
   }
 
+  /**
+   * Updates the size of the Flutter view.
+   * @param width - The new width in pixels
+   * @param height - The new height in pixels
+   */
   updateSize(width: number, height: number) {
     flutter.nativeUpdateSize(width, height);
   }
 
+  /**
+   * Updates the pixel density of the display.
+   * @param densityPixels - The pixel density value (dots per inch)
+   */
   updateDensity(densityPixels: number) {
     flutter.nativeUpdateDensity(densityPixels);
   }
 
+  /**
+   * Initializes the Flutter engine with the specified parameters.
+   * @param context - The application context
+   * @param args - Command-line arguments for the Flutter engine
+   * @param bundlePath - Path to the Flutter bundle
+   * @param appStoragePath - Path to the application storage directory
+   * @param engineCachesPath - Path to the engine caches directory
+   * @param initTimeMillis - Initialization time in milliseconds
+   */
   init(context: common.Context,
     args: Array<string>,
     bundlePath: string,
@@ -82,7 +123,7 @@ export default class FlutterNapi {
       Log.e(TAG, "the engine has init");
       return;
     }
-    Log.d(TAG, "HAR_VERSION=" + BuildProfile.HAR_VERSION);
+    Log.w(TAG, "HAR_VERSION=" + BuildProfile.HAR_VERSION);
     Log.d(TAG, JSON.stringify({
       "name": "init, initTimeMillis=" + initTimeMillis,
       "bundlePath": bundlePath,
@@ -96,14 +137,25 @@ export default class FlutterNapi {
     Log.d(TAG, "init code=" + code + ", FlutterNapi.hasInit" + FlutterNapi.hasInit);
   }
 
+  /**
+   * Prefetches the default font manager.
+   * This should be called before using fonts in the Flutter engine.
+   */
   static prefetchDefaultFontManager(): void {
     flutter.nativePrefetchDefaultFontManager();
   }
 
+  /**
+   * Checks and reloads fonts for this engine instance.
+   */
   checkAndReloadFont(): void {
     flutter.nativeCheckAndReloadFont(this.nativeShellHolderId!);
   }
 
+  /**
+   * Attaches this FlutterNapi instance to the native engine.
+   * This must be called before using most FlutterNapi methods.
+   */
   attachToNative(): void {
     if (!FlutterNapi.hasInit) {
       Log.e(TAG, "attachToNative fail, FlutterNapi.hasInit=" + FlutterNapi.hasInit);
@@ -115,6 +167,14 @@ export default class FlutterNapi {
     Log.d(TAG, "nativeShellHolderId=" + this.nativeShellHolderId);
   }
 
+  /**
+   * Runs a Flutter bundle and snapshot from a library.
+   * @param bundlePath - Path to the Flutter bundle
+   * @param entrypointFunctionName - Name of the entrypoint function
+   * @param pathToEntrypointFunction - Path to the entrypoint function
+   * @param assetManager - Resource manager for accessing assets
+   * @param entrypointArgs - Arguments to pass to the entrypoint function
+   */
   runBundleAndSnapshotFromLibrary(
     bundlePath: string,
     entrypointFunctionName: string | undefined,
@@ -139,8 +199,9 @@ export default class FlutterNapi {
   };
 
   /**
-   * 当前so方法是否都实现
-   * @returns
+   * Checks if the native methods are implemented.
+   * @param methodName - Optional method name for logging
+   * @returns true if methods are implemented, false otherwise
    */
   checkImplemented(methodName: string = ""): boolean {
     if (!this.hasImplemented) {
@@ -149,6 +210,10 @@ export default class FlutterNapi {
     return this.hasImplemented;
   }
 
+  /**
+   * Sets the platform message handler for receiving messages from Dart.
+   * @param platformMessageHandler - The PlatformMessageHandler instance, or null to remove
+   */
   setPlatformMessageHandler(platformMessageHandler: PlatformMessageHandler | null): void {
     this.ensureRunningOnMainThread();
     this.platformMessageHandler = platformMessageHandler;
@@ -158,6 +223,11 @@ export default class FlutterNapi {
 
   }
 
+  /**
+   * Looks up callback information for a given handler.
+   * @param handle - The handler number
+   * @returns The FlutterCallbackInformation, or null if not found
+   */
   static nativeLookupCallbackInformation(handle: number): FlutterCallbackInformation | null {
     let callbackInformation = new FlutterCallbackInformation();
     let ret: number = flutter.nativeLookupCallbackInformation(callbackInformation, handle);
@@ -167,6 +237,23 @@ export default class FlutterNapi {
     return null;
   }
 
+  /**
+   * Looks up callback information for a given handler using a bigint handle.
+   * @param handle - The handler as a bigint
+   * @returns The FlutterCallbackInformation, or null if not found
+   */
+  static nativeLookupCallbackInformationBigInt(handle: bigint): FlutterCallbackInformation | null {
+    let callbackInformation = new FlutterCallbackInformation();
+    let ret: number = flutter.nativeLookupCallbackInformationBigInt(callbackInformation, handle);
+    if (ret == 0) {
+      return callbackInformation;
+    }
+    return null;
+  }
+
+  /**
+   * Notifies the Flutter engine of a low memory warning.
+   */
   notifyLowMemoryWarning(): void {
     this.ensureRunningOnMainThread();
     if (!this.nativeShellHolderId) {
@@ -176,14 +263,26 @@ export default class FlutterNapi {
     this.nativeNotifyLowMemoryWarning(this.nativeShellHolderId!);
   }
 
+  /**
+   * Checks if this FlutterNapi instance is attached to the native engine.
+   * @returns true if attached, false otherwise
+   */
   isAttached(): boolean {
     return this.nativeShellHolderId != null;
   }
 
+  /**
+   * Ensures that the current code is running on the main thread.
+   */
   private ensureRunningOnMainThread(): void {
 
   }
 
+  /**
+   * Dispatches an empty platform message to Dart.
+   * @param channel - The channel name for the message
+   * @param responseId - The response ID for receiving a reply
+   */
   dispatchEmptyPlatformMessage(channel: String, responseId: number): void {
     this.ensureRunningOnMainThread();
     if (this.isAttached()) {
@@ -202,7 +301,13 @@ export default class FlutterNapi {
     }
   }
 
-  /** Sends a reply {@code message} from HarmonyOS to Flutter over the given {@code channel}. */
+  /**
+   * Sends a platform message with data from OpenHarmony to Flutter over the given channel.
+   * @param channel - The channel name for the message
+   * @param message - The message data as an ArrayBuffer
+   * @param position - The position in the message buffer
+   * @param responseId - The response ID for receiving a reply
+   */
   dispatchPlatformMessage(channel: String, message: ArrayBuffer, position: number, responseId: number): void {
     this.ensureRunningOnMainThread();
     if (this.isAttached()) {
@@ -221,6 +326,10 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Invokes an empty response callback for a platform message.
+   * @param responseId - The response ID that was sent with the original message
+   */
   invokePlatformMessageEmptyResponseCallback(responseId: number): void {
     if (this.isAttached()) {
       if (!this.nativeShellHolderId) {
@@ -236,6 +345,12 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Invokes a response callback with data for a platform message.
+   * @param responseId - The response ID that was sent with the original message
+   * @param message - The reply data as an ArrayBuffer
+   * @param position - The position in the message buffer
+   */
   invokePlatformMessageResponseCallback(responseId: number, message: ArrayBuffer, position: number) {
     if (this.isAttached()) {
       if (!this.nativeShellHolderId) {
@@ -252,6 +367,28 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Sets the viewport metrics for the Flutter view.
+   * @param devicePixelRatio - The device pixel ratio
+   * @param physicalWidth - Physical width in pixels
+   * @param physicalHeight - Physical height in pixels
+   * @param physicalPaddingTop - Top padding in physical pixels
+   * @param physicalPaddingRight - Right padding in physical pixels
+   * @param physicalPaddingBottom - Bottom padding in physical pixels
+   * @param physicalPaddingLeft - Left padding in physical pixels
+   * @param physicalViewInsetTop - Top view inset in physical pixels
+   * @param physicalViewInsetRight - Right view inset in physical pixels
+   * @param physicalViewInsetBottom - Bottom view inset in physical pixels
+   * @param physicalViewInsetLeft - Left view inset in physical pixels
+   * @param systemGestureInsetTop - Top system gesture inset
+   * @param systemGestureInsetRight - Right system gesture inset
+   * @param systemGestureInsetBottom - Bottom system gesture inset
+   * @param systemGestureInsetLeft - Left system gesture inset
+   * @param physicalTouchSlop - Physical touch slop value
+   * @param displayFeaturesBounds - Array of display feature bounds
+   * @param displayFeaturesType - Array of display feature types
+   * @param displayFeaturesState - Array of display feature states
+   */
   setViewportMetrics(devicePixelRatio: number, physicalWidth: number
     , physicalHeight: number, physicalPaddingTop: number, physicalPaddingRight: number
     , physicalPaddingBottom: number, physicalPaddingLeft: number, physicalViewInsetTop: number
@@ -286,6 +423,14 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Spawns a new FlutterNapi instance from this instance.
+   * @param entrypointFunctionName - Name of the entrypoint function
+   * @param pathToEntrypointFunction - Path to the entrypoint function
+   * @param initialRoute - Initial route for navigation
+   * @param entrypointArgs - Arguments to pass to the entrypoint function
+   * @returns A new FlutterNapi instance
+   */
   spawn(entrypointFunctionName: string, pathToEntrypointFunction: string, initialRoute: string,
     entrypointArgs: Array<string>): FlutterNapi {
     if (this.nextSpawnNapi) {
@@ -304,6 +449,14 @@ export default class FlutterNapi {
     return flutterNapi;
   }
 
+  /**
+   * Pre-spawns a new FlutterNapi instance for later use.
+   * @param entrypointFunctionName - Name of the entrypoint function
+   * @param pathToEntrypointFunction - Path to the entrypoint function
+   * @param initialRoute - Initial route for navigation
+   * @param entrypointArgs - Arguments to pass to the entrypoint function
+   * @returns A new FlutterNapi instance that will be used on the next spawn call
+   */
   preSpawn(entrypointFunctionName: string, pathToEntrypointFunction: string, initialRoute: string,
     entrypointArgs: Array<string>): FlutterNapi {
     if (this.nextSpawnNapi) {
@@ -321,15 +474,27 @@ export default class FlutterNapi {
     return flutterNapi;
   }
 
+  /**
+   * Adds an engine lifecycle listener.
+   * @param engineLifecycleListener - The EngineLifecycleListener to add
+   */
   addEngineLifecycleListener(engineLifecycleListener: EngineLifecycleListener): void {
     this.engineLifecycleListeners.add(engineLifecycleListener);
   }
 
+  /**
+   * Removes an engine lifecycle listener.
+   * @param engineLifecycleListener - The EngineLifecycleListener to remove
+   */
   removeEngineLifecycleListener(engineLifecycleListener: EngineLifecycleListener) {
     this.engineLifecycleListeners.delete(engineLifecycleListener);
   }
 
-  //Called by native to respond to a platform message that we sent.
+  /**
+   * Called by native to respond to a platform message that we sent.
+   * @param replyId - The response ID that was sent with the original message
+   * @param reply - The reply data as an ArrayBuffer
+   */
   handlePlatformMessageResponse(replyId: number, reply: ArrayBuffer): void {
     Log.d(TAG, "called handlePlatformMessageResponse Response ID: " + replyId);
     if (this.platformMessageHandler != null) {
@@ -337,7 +502,13 @@ export default class FlutterNapi {
     }
   }
 
-  // Called by native on any thread.
+  /**
+   * Called by native on any thread to handle a platform message from Dart.
+   * @param channel - The channel name for the message
+   * @param message - The message data as an ArrayBuffer
+   * @param replyId - The reply ID for responding to the message
+   * @param messageData - Additional message data
+   */
   handlePlatformMessage(channel: string, message: ArrayBuffer, replyId: number, messageData: number): void {
     Log.d(TAG, "called handlePlatformMessage Channel: " + channel + ". Response ID: " + replyId);
     if (this.platformMessageHandler != null && this.readyForHandleMessage) {
@@ -353,6 +524,9 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Sets the preloading state, preventing message handling until ready.
+   */
   setPreloading(): void {
     if (this.firstPreloading) {
       this.readyForHandleMessage = false;
@@ -360,6 +534,9 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Processes all pending messages that were queued during preloading.
+   */
   processPendingMessages(): void {
     Log.d(TAG, "processPendingMessages len:" + this.pendingMessages.length);
     this.readyForHandleMessage = true;
@@ -376,7 +553,10 @@ export default class FlutterNapi {
     }
   }
 
-  // Called by native to notify first Flutter frame rendered.
+  /**
+   * Called by native to notify that the first Flutter frame has been rendered.
+   * @param isPreload - Whether this is a preload frame (1) or a regular frame (0)
+   */
   onFirstFrame(isPreload: number): void {
     Log.d(TAG, "called onFirstFrame isPreload:" + isPreload);
     if (isPreload) {
@@ -395,18 +575,31 @@ export default class FlutterNapi {
     });
   }
 
-  // Called by native.
+  /**
+   * Called by native when the engine is about to restart.
+   * Notifies all registered lifecycle listeners.
+   */
   onPreEngineRestart(): void {
     Log.d(TAG, "called onPreEngineRestart")
     this.engineLifecycleListeners.forEach(listener => listener.onPreEngineRestart());
   }
 
-  //  /** Invoked by native to obtain the results of OHOS's locale resolution algorithm. */
+  /**
+   * Computes the platform-resolved locale from the given locale strings.
+   * Invoked by native to obtain the results of OpenHarmony's locale resolution algorithm.
+   * @param strings - Array of locale strings
+   * @returns Array of resolved locale strings
+   */
   computePlatformResolvedLocale(strings: Array<string>): Array<string> {
     Log.d(TAG, "called computePlatformResolvedLocale " + JSON.stringify(strings))
     return []
   }
 
+  /**
+   * Sets whether semantics are enabled and sends a response.
+   * @param enabled - Whether to enable semantics
+   * @param responseId - The response ID for the reply
+   */
   setSemanticsEnabledWithRespId(enabled: boolean, responseId: number): void {
     this.ensureRunningOnMainThread();
     if (this.isAttached()) {
@@ -419,6 +612,10 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Sets whether semantics are enabled.
+   * @param enabled - Whether to enable semantics
+   */
   setSemanticsEnabled(enabled: boolean): void {
     this.ensureRunningOnMainThread();
     if (this.isAttached()) {
@@ -430,6 +627,11 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Sets accessibility features and sends a response.
+   * @param accessibilityFeatureFlags - The accessibility feature flags
+   * @param responseId - The response ID for the reply
+   */
   setAccessibilityFeatures(accessibilityFeatureFlags: number, responseId: number): void {
     if (this.isAttached()) {
       flutter.nativeSetAccessibilityFeatures(accessibilityFeatureFlags, responseId);
@@ -441,9 +643,20 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Native method for setting accessibility features.
+   * @param accessibilityFeatureFlags - The accessibility feature flags
+   * @param responseId - The response ID for the reply
+   */
   nativeSetAccessibilityFeatures(accessibilityFeatureFlags: number, responseId: number): void {
   }
 
+  /**
+   * Dispatches a semantics action to the native engine.
+   * @param virtualViewId - The virtual view ID
+   * @param action - The semantics action to dispatch
+   * @param responseId - The response ID for the reply
+   */
   dispatchSemanticsAction(virtualViewId: number, action: Action, responseId: number): void {
     if (this.isAttached()) {
       this.nativeDispatchSemanticsAction(virtualViewId, action, responseId);
@@ -455,9 +668,20 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Native method for dispatching a semantics action.
+   * @param virtualViewId - The virtual view ID
+   * @param action - The semantics action to dispatch
+   * @param responseId - The response ID for the reply
+   */
   nativeDispatchSemanticsAction(virtualViewId: number, action: Action, responseId: number): void {
   }
 
+  /**
+   * Sets the accessibility delegate for handling accessibility events.
+   * @param delegate - The AccessibilityDelegate instance
+   * @param responseId - The response ID for the reply
+   */
   setAccessibilityDelegate(delegate: AccessibilityDelegate, responseId: number): void {
     if (this.isAttached()) {
       this.accessibilityDelegate = delegate;
@@ -469,6 +693,10 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Called when the accessibility state changes.
+   * @param state - Whether accessibility is enabled
+   */
   accessibilityStateChange(state: Boolean): void {
     this.ensureRunningOnMainThread();
     if (this.accessibilityDelegate != null) {
@@ -482,13 +710,25 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Sets the localization plugin for handling locale information.
+   * @param localizationPlugin - The LocalizationPlugin instance, or null to remove
+   */
   setLocalizationPlugin(localizationPlugin: LocalizationPlugin | null): void {
     this.localizationPlugin = localizationPlugin;
   }
 
   /**
-   * 获取系统语言列表
-   * @param rate
+   * Called by native when the application locale is changed via dart:ui setApplicationLocale.
+   * @param locale - The application locale in BCP 47 format
+   */
+  onApplicationLocaleChanged(locale: string): void {
+    Log.i(TAG, "onApplicationLocaleChanged: " + locale);
+    this.localizationPlugin?.onApplicationLocaleChanged(locale);
+  }
+
+  /**
+   * Gets the system language list from the platform.
    */
   getSystemLanguages() {
     Log.d(TAG, "called getSystemLanguages ")
@@ -505,34 +745,36 @@ export default class FlutterNapi {
   }
 
   /**
-   * xcomponet绑定flutterEngine
-   * @param xcomponentId
+   * Attaches a FlutterEngine to an XComponent.
+   * @param xcomponentId - The XComponent ID
    */
   xComponentAttachFlutterEngine(xcomponentId: string) {
     flutter.nativeXComponentAttachFlutterEngine(xcomponentId, this.nativeShellHolderId!);
   }
 
   /**
-   * xcomponet预渲染
-   * @param xcomponentId
+   * Pre-renders an XComponent.
+   * @param xcomponentId - The XComponent ID
+   * @param width - The width of the component
+   * @param height - The height of the component
    */
   xComponentPreDraw(xcomponentId: string, width: number, height: number) {
     flutter.nativeXComponentPreDraw(xcomponentId, this.nativeShellHolderId!, width, height);
   }
 
   /**
-   * xcomponet解除绑定flutterEngine
-   * @param xcomponentId
+   * Detaches a FlutterEngine from an XComponent.
+   * @param xcomponentId - The XComponent ID
    */
   xComponentDetachFlutterEngine(xcomponentId: string) {
     flutter.nativeXComponentDetachFlutterEngine(xcomponentId, this.nativeShellHolderId!);
   }
 
   /**
-   * xcomponent send mouseWheel event to flutterEngine
-   * @param xcomponentId
-   * @param eventType
-   * @param event
+   * Dispatches a mouse wheel event from an XComponent to the Flutter engine.
+   * @param xcomponentId - The XComponent ID
+   * @param eventType - The type of the mouse wheel event
+   * @param event - The pan gesture event containing mouse wheel data
    */
   xComponentDisPatchMouseWheel(xcomponentId: string, eventType: string, event: PanGestureEvent) {
     // only mouse
@@ -555,6 +797,9 @@ export default class FlutterNapi {
     );
   }
 
+  /**
+   * Detaches this FlutterNapi instance from the native engine and releases all resources.
+   */
   detachFromNativeAndReleaseResources() {
     if (!this.nativeShellHolderId) {
       Log.e(TAG, "detachFromNativeAndReleaseResources this.nativeShellHolderId = " + this.nativeShellHolderId)
@@ -568,6 +813,10 @@ export default class FlutterNapi {
     this.readyForHandleMessage = false;
   }
 
+  /**
+   * Unregisters a texture from the Flutter engine.
+   * @param textureId - The texture ID to unregister
+   */
   unregisterTexture(textureId: number): void {
     Log.d(TAG, "called unregisterTexture ");
     if (!this.nativeShellHolderId) {
@@ -577,6 +826,11 @@ export default class FlutterNapi {
     flutter.nativeUnregisterTexture(this.nativeShellHolderId!, textureId);
   }
 
+  /**
+   * Registers a PixelMap as a texture in the Flutter engine.
+   * @param textureId - The texture ID
+   * @param pixelMap - The PixelMap to register
+   */
   registerPixelMap(textureId: number, pixelMap: PixelMap): void {
     Log.d(TAG, "called registerPixelMap ");
     if (!this.nativeShellHolderId) {
@@ -586,6 +840,11 @@ export default class FlutterNapi {
     flutter.nativeRegisterPixelMap(this.nativeShellHolderId!, textureId, pixelMap);
   }
 
+  /**
+   * Sets the background PixelMap for a texture.
+   * @param textureId - The texture ID
+   * @param pixelMap - The PixelMap to use as background
+   */
   setTextureBackGroundPixelMap(textureId: number, pixelMap: PixelMap): void {
     if (this.isAttached()) {
       if (!this.nativeShellHolderId) {
@@ -598,6 +857,11 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Sets the background color for a texture.
+   * @param textureId - The texture ID
+   * @param color - The color value in ARGB format
+   */
   setTextureBackGroundColor(textureId: number, color: number): void {
     Log.d(TAG, "called setTextureBackGroundColor");
     if (!this.isAttached()) {
@@ -607,6 +871,11 @@ export default class FlutterNapi {
     flutter.nativeSetTextureBackGroundColor(this.nativeShellHolderId!, textureId, color);
   }
 
+  /**
+   * Registers a texture in the Flutter engine.
+   * @param textureId - The texture ID to register
+   * @returns The registered texture ID, or 0 if registration fails
+   */
   registerTexture(textureId: number): number {
     Log.d(TAG, "called registerTexture ");
     if (!this.nativeShellHolderId) {
@@ -633,6 +902,11 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Gets the native window pointer for a texture.
+   * @param textureId - The texture ID
+   * @returns The native window pointer as a bigint, or BigInt("0") if not available
+   */
   getTextureNativeWindowPtr(textureId: number): bigint {
     Log.d(TAG, "called getTextureNativeWindowPtr");
     if (this.isAttached()) {
@@ -663,6 +937,12 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Sets an external native image pointer for a texture.
+   * @param textureId - The texture ID
+   * @param native_image_ptr - The native image pointer as a bigint
+   * @returns true if successful, false otherwise
+   */
   setExternalNativeImagePtr(textureId: number, native_image_ptr: bigint): boolean {
     Log.d(TAG, "called setExternalNativeImagePtr");
     if (this.isAttached()) {
@@ -676,6 +956,12 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Resets an external texture.
+   * @param textureId - The texture ID
+   * @param need_surfaceId - Whether a surface ID is needed
+   * @returns The surface ID if needed, or 0 otherwise
+   */
   resetExternalTexture(textureId: number, need_surfaceId: boolean): number {
     Log.d(TAG, "called resetExternalTexture ");
     if (this.isAttached()) {
@@ -689,6 +975,12 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Sets the buffer size for a texture.
+   * @param textureId - The texture ID
+   * @param width - The width of the buffer
+   * @param height - The height of the buffer
+   */
   setTextureBufferSize(textureId: number, width: number, height: number): void {
     Log.d(TAG, "called setTextureBufferSize ");
     if (!this.isAttached()) {
@@ -698,6 +990,12 @@ export default class FlutterNapi {
     flutter.nativeSetTextureBufferSize(this.nativeShellHolderId!, textureId, width, height);
   }
 
+  /**
+   * Notifies the Flutter engine that a texture is being resized.
+   * @param textureId - The texture ID
+   * @param width - The new width
+   * @param height - The new height
+   */
   notifyTextureResizing(textureId: number, width: number, height: number): void {
     Log.d(TAG, "called notifyTextureResizing ");
     if (!this.isAttached()) {
@@ -707,6 +1005,10 @@ export default class FlutterNapi {
     flutter.nativeNotifyTextureResizing(this.nativeShellHolderId!, textureId, width, height);
   }
 
+  /**
+   * Enables or disables frame caching for improved performance.
+   * @param enable - Whether to enable frame caching
+   */
   enableFrameCache(enable: boolean): void {
     if (!this.nativeShellHolderId) {
       return;
@@ -714,45 +1016,96 @@ export default class FlutterNapi {
     flutter.nativeEnableFrameCache(this.nativeShellHolderId!, enable);
   }
 
-  /** Dispatch Touch Event */
+  setPipVisible(visible: boolean): void {
+    if (!this.nativeShellHolderId) {
+      return;
+    }
+    try {
+      flutter.nativeSetPipVisible(this.nativeShellHolderId!, visible);
+    } catch (error) {
+      Log.w(TAG, "nativeSetPipVisible unavailable: " + JSON.stringify(error));
+    }
+  }
+
+  /**
+   * Handles touch events from the platform.
+   * @param strings - Array of strings containing touch event data
+   */
   onTouchEvent(strings: Array<string>): void {
     if (this.isAttached()) {
       TouchEventProcessor.getInstance().postTouchEvent(strings);
     }
   }
 
+  /**
+   * Handles mouse events from the platform.
+   * @param strings - Array of strings containing mouse event data
+   */
   onMouseEvent(strings: Array<string>): void {
     if (this.isAttached()) {
        TouchEventProcessor.getInstance().postMouseEvent(strings);
     }
   }
 
+  /**
+   * Handles axis events (scroll wheel, etc.) from the platform.
+   * @param strings - Array of strings containing axis event data
+   */
   onAxisEvent(strings: Array<string>): void {
     if (this.isAttached()) {
       TouchEventProcessor.getInstance().postAxisEvent(strings);
     }
   }
 
+  /**
+   * Checks if a Unicode code point is an emoji.
+   * @param code - The Unicode code point
+   * @returns true if the code point is an emoji, false otherwise
+   */
   static unicodeIsEmoji(code: number): boolean {
     return Boolean(flutter.nativeUnicodeIsEmoji(code));
   }
 
+  /**
+   * Checks if a Unicode code point is an emoji modifier.
+   * @param code - The Unicode code point
+   * @returns true if the code point is an emoji modifier, false otherwise
+   */
   static unicodeIsEmojiModifier(code: number): boolean {
     return Boolean(flutter.nativeUnicodeIsEmojiModifier(code));
   }
 
+  /**
+   * Checks if a Unicode code point is an emoji modifier base.
+   * @param code - The Unicode code point
+   * @returns true if the code point is an emoji modifier base, false otherwise
+   */
   static unicodeIsEmojiModifierBase(code: number): boolean {
     return Boolean(flutter.nativeUnicodeIsEmojiModifierBase(code));
   }
 
+  /**
+   * Checks if a Unicode code point is a variation selector.
+   * @param code - The Unicode code point
+   * @returns true if the code point is a variation selector, false otherwise
+   */
   static unicodeIsVariationSelector(code: number): boolean {
     return Boolean(flutter.nativeUnicodeIsVariationSelector(code));
   }
 
+  /**
+   * Checks if a Unicode code point is a regional indicator symbol.
+   * @param code - The Unicode code point
+   * @returns true if the code point is a regional indicator symbol, false otherwise
+   */
   static unicodeIsRegionalIndicatorSymbol(code: number): boolean {
     return Boolean(flutter.nativeUnicodeIsRegionalIndicatorSymbol(code));
   }
 
+  /**
+   * Sets the font weight scale for text rendering.
+   * @param fontWeightScale - The font weight scale factor
+   */
   setFontWeightScale(fontWeightScale: number): void {
     this.ensureRunningOnMainThread();
     if (this.isAttached()) {
@@ -763,6 +1116,11 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Sets the Flutter navigation action state.
+   * @param shellHolderId - The shell holder ID
+   * @param isNavigate - Whether navigation is active
+   */
   setFlutterNavigationAction(shellHolderId: number, isNavigate: boolean): void {
     this.ensureRunningOnMainThread();
     if (this.isAttached()) {
@@ -773,11 +1131,91 @@ export default class FlutterNapi {
     }
   }
 
+  /**
+   * Sets the D-VSync switch state.
+   * @param isEnable - Whether to enable D-VSync
+   */
   SetDVsyncSwitch(isEnable: boolean): void {
     flutter.nativeSetDVsyncSwitch(this.nativeShellHolderId!, isEnable);
   }
+
+  /**
+   * @brief  [LTPO] Send Animation Velocity
+   * @note
+   * @param  type: Animation type, 0-TRANSLATE, 1-SCALE, 2-ROTATION
+   * @param  velocity: Current animation velocity. Unit is logical pixels
+   * @return none
+   */
+  static animationVoting(type: number, velocity: number): void {
+    flutter.nativeAnimationVoting(type, velocity);
+  }
+
+  /**
+   * @brief  [LTPO] Send Video Frame Count
+   * @note
+   * @param  seconds: Seconds
+   * @param  frameCount: Frame count within a certain period of time
+   * @return none
+   */
+  static videoVoting(seconds: number, frameCount: number): void {
+    flutter.nativeVideoVoting(seconds, frameCount);
+  }
+
+  /**
+   * @brief  [LTPO] Preload Frame Rate Configuration File
+   * @note
+   * @param  none
+   * @return none
+   */
+  static prefetchFramesCfg(): void {
+    flutter.nativePrefetchFramesCfg();
+  }
+
+  /**
+   * @brief  [LTPO] Check LTPO Activation Status
+   * @note
+   * @param  none
+   * @return number 0: Disabled, 1: Enabled, 2: Uninitialized
+   */
+  static checkLTPOSwitchState(): number {
+    return flutter.nativeCheckLTPOSwitchState();
+  }
+
+  /**
+   * Sets the QoS (Quality of Service) level when low memory is detected.
+   * @param lowMemoryLevel - The low memory level
+   */
+  SetQosOnLowMemory(lowMemoryLevel: number): void {
+    flutter.nativeSetQosOnLowMemory(this.nativeShellHolderId!, lowMemoryLevel);
+  }
+
+  SetAnimationStatus(animationStatus: number): void {
+    flutter.nativeSetAnimationStatus(this.nativeShellHolderId!, animationStatus);
+  }
+
+  NotifyPageChanged(pageName: string, pageNameLen: number, windowID: number): number {
+    return flutter.nativeNotifyPageChanged(pageName, pageNameLen, windowID);
+  }
+
+  /**
+   * @brief  [LTPO] Send high frame rate request when LTPO is enabled
+   * @note
+   * @param  none
+   * @return none
+   */
+  LTPODispatchHighFrameRate(): void {
+    flutter.nativeLTPODispatchHighFrameRate(this.nativeShellHolderId!);
+  }
 }
 
+/**
+ * Interface for handling accessibility state changes.
+ * Implementations of this interface will be notified when the accessibility state changes.
+ */
 export interface AccessibilityDelegate {
+  /**
+   * Called when the accessibility state changes.
+   * @param state - Whether accessibility is enabled
+   */
   accessibilityStateChange(state: Boolean): void;
 }

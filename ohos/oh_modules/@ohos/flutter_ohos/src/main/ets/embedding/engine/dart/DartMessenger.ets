@@ -24,32 +24,43 @@ import { TraceSection } from '../../../util/TraceSection';
 import SendableBinaryMessageHandler from '../../../plugin/common/SendableBinaryMessageHandler'
 
 /**
- * Message conduit for 2-way communication between HarmonyOS and Dart.
+ * Message conduit for 2-way communication between OpenHarmony and Dart.
  *
- * <p>See {@link BinaryMessenger}, which sends messages from HarmonyOS to Dart
+ * See {@link BinaryMessenger}, which sends messages from OpenHarmony to Dart
  *
- * <p>See {@link PlatformMessageHandler}, which handles messages to HarmonyOS from Dart
+ * See {@link PlatformMessageHandler}, which handles messages to OpenHarmony from Dart
  */
 
 const TAG = "DartMessenger";
 
 export class DartMessenger implements BinaryMessenger, PlatformMessageHandler {
+  /** The FlutterNapi instance for native communication. */
   flutterNapi: FlutterNapi;
-  /**
-   * Maps a channel name to an object that contains the task queue and the handler associated with
-   * the channel.
-   */
+  /** Map of channel names to their message handlers. */
   messageHandlers: Map<String, HandlerInfo> = new Map();
+  /** Map of reply IDs to their callback functions waiting for responses. */
   pendingReplies: Map<number, BinaryReply> = new Map();
+  /** The next reply ID to use for message callbacks. */
   nextReplyId: number = 1;
+  /** Factory for creating task queues for background message processing. */
   taskQueueFactory: TaskQueueFactory;
+  /** Map of TaskQueue tokens to their actual task queue implementations. */
   createdTaskQueues: Map<TaskQueue, DartMessengerTaskQueue> = new Map();
 
+  /**
+   * Constructs a new DartMessenger instance.
+   * @param flutterNapi - The FlutterNapi instance for native communication
+   */
   constructor(flutterNapi: FlutterNapi) {
     this.flutterNapi = flutterNapi;
     this.taskQueueFactory = new DefaultTaskQueueFactory();
   }
 
+  /**
+   * Creates a background task queue for handling messages asynchronously.
+   * @param options - Optional task queue configuration options
+   * @returns A TaskQueue instance for background message processing
+   */
   makeBackgroundTaskQueue(options?: TaskQueueOptions): TaskQueue {
     let taskQueue: DartMessengerTaskQueue =
       this.taskQueueFactory.makeBackgroundTaskQueue(options ?? new TaskQueueOptions());
@@ -58,6 +69,13 @@ export class DartMessenger implements BinaryMessenger, PlatformMessageHandler {
     return token;
   }
 
+  /**
+   * Sets a message handler for incoming messages from Dart on the specified channel.
+   * @param channel - The channel name to listen on
+   * @param handler - The message handler, or null to remove the handler
+   * @param taskQueue - Optional task queue for processing messages
+   * @param args - Additional arguments to pass to the handler
+   */
   setMessageHandler(channel: String, handler: BinaryMessageHandler | SendableBinaryMessageHandler | null,
     taskQueue?: TaskQueue, ...args: Object[]): void {
     if (handler == null) {
@@ -79,7 +97,13 @@ export class DartMessenger implements BinaryMessenger, PlatformMessageHandler {
     this.messageHandlers.set(channel, new HandlerInfo(handler, dartMessengerTaskQueue, ...args));
   }
 
-  send(channel: String, message: ArrayBuffer, callback?: BinaryReply): void {
+  /**
+   * Sends a binary message to Dart over the specified channel.
+   * @param channel - The channel name for the message
+   * @param message - The message data as an ArrayBuffer, or null for an empty message
+   * @param callback - Optional callback to receive the reply from Dart
+   */
+  send(channel: String, message: ArrayBuffer | null, callback?: BinaryReply): void {
     Log.d(TAG, "Sending message over channel '" + channel + "'");
     let traceId: number = TraceSection.begin("DartMessenger#send on " + channel);
     try {
@@ -99,11 +123,23 @@ export class DartMessenger implements BinaryMessenger, PlatformMessageHandler {
     this.IsFlutterNavigationExecuted(channel);
   }
 
+  /**
+   * Dispatches a message to a task queue for asynchronous processing.
+   * @param handlerInfo - The handler information containing the handler and task queue
+   * @param message - The message data as an ArrayBuffer
+   * @param replyId - The reply ID for responding to the message
+   */
   dispatchMessageToQueue(handlerInfo: HandlerInfo, message: ArrayBuffer, replyId: number): void {
     let taskState: TaskState = new TaskState(handlerInfo.handler as ESObject, message, ...handlerInfo.args);
     handlerInfo.taskQueue?.dispatch(taskState, new Reply(this.flutterNapi, replyId));
   }
 
+  /**
+   * Invokes a message handler synchronously.
+   * @param handler - The message handler to invoke, or null if no handler is registered
+   * @param message - The message data as an ArrayBuffer
+   * @param replyId - The reply ID for responding to the message
+   */
   invokeHandler(handler: BinaryMessageHandler | null, message: ArrayBuffer, replyId: number): void {
     if (handler != null) {
       try {
@@ -119,6 +155,13 @@ export class DartMessenger implements BinaryMessenger, PlatformMessageHandler {
     }
   }
 
+  /**
+   * Handles a message received from Dart over a specific channel.
+   * @param channel - The channel name for the message
+   * @param message - The message data as an ArrayBuffer
+   * @param replyId - The reply ID for responding to the message
+   * @param messageData - Additional message data
+   */
   handleMessageFromDart(channel: String, message: ArrayBuffer, replyId: number, messageData: number): void {
     Log.d(TAG, "Received message from Dart over channel '" + channel + "'");
     let handlerInfo: HandlerInfo | null = this.messageHandlers.get(channel) ?? null;
@@ -130,6 +173,11 @@ export class DartMessenger implements BinaryMessenger, PlatformMessageHandler {
     this.IsFlutterNavigationExecuted(channel);
   }
 
+  /**
+   * Handles a platform message response from Dart.
+   * @param replyId - The reply ID that was sent with the original message
+   * @param reply - The reply data as an ArrayBuffer
+   */
   handlePlatformMessageResponse(replyId: number, reply: ArrayBuffer): void {
     Log.d(TAG, "Received message reply from Dart.");
     let callback: BinaryReply | null = this.pendingReplies.get(replyId) ?? null;
@@ -147,19 +195,22 @@ export class DartMessenger implements BinaryMessenger, PlatformMessageHandler {
   /**
    * Returns the number of pending channel callback replies.
    *
-   * <p>When sending messages to the Flutter application using {@link BinaryMessenger#send(String,
-   * ByteBuffer, io.flutter.plugin.common.BinaryMessenger.BinaryReply)}, developers can optionally
-   * specify a reply callback if they expect a reply from the Flutter application.
+   * When sending messages to the Flutter application using BinaryMessenger.send,
+   * developers can optionally specify a reply callback if they expect a reply from the Flutter application.
    *
-   * <p>This method tracks all the pending callbacks that are waiting for response, and is supposed
+   * This method tracks all the pending callbacks that are waiting for response, and is supposed
    * to be called from the main thread (as other methods). Calling from a different thread could
    * possibly capture an indeterministic internal state, so don't do it.
+   * @returns The number of pending channel callback replies
    */
   getPendingChannelResponseCount(): number {
     return this.pendingReplies.size;
   }
 
-  //获取当前flutter页面是否路由跳转，并传递到native侧
+  /**
+   * Checks if the current Flutter page is performing navigation and notifies the native side.
+   * @param channel - The channel name to check
+   */
   IsFlutterNavigationExecuted(channel: String): void {
     if (channel == "flutter/navigation") {
       this.flutterNapi.setFlutterNavigationAction(this.flutterNapi.nativeShellHolderId!, true);
@@ -177,6 +228,12 @@ class HandlerInfo {
   taskQueue: DartMessengerTaskQueue | null;
   args: Object[];
 
+  /**
+   * Constructs a new HandlerInfo instance.
+   * @param handler - The message handler
+   * @param taskQueue - The task queue for processing messages, or null for synchronous processing
+   * @param args - Additional arguments to pass to the handler
+   */
   constructor(handler: BinaryMessageHandler | SendableBinaryMessageHandler,
     taskQueue: DartMessengerTaskQueue | null,
     ...args: Object[]) {
@@ -186,16 +243,29 @@ class HandlerInfo {
   }
 }
 
+/**
+ * Implementation of BinaryReply that sends replies back to Dart.
+ */
 class Reply implements BinaryReply {
   flutterNapi: FlutterNapi;
   replyId: number;
   done: boolean = false;
 
+  /**
+   * Constructs a new Reply instance.
+   * @param flutterNapi - The FlutterNapi instance for sending replies
+   * @param replyId - The reply ID for this reply
+   */
   constructor(flutterNapi: FlutterNapi, replyId: number) {
     this.flutterNapi = flutterNapi;
     this.replyId = replyId;
   }
 
+  /**
+   * Sends a reply back to Dart.
+   * @param reply - The reply data as an ArrayBuffer, or null for an empty reply
+   * @throws Error if reply has already been submitted
+   */
   reply(reply: ArrayBuffer | null) {
     if (this.done) {
       throw new Error("Reply already submitted");
@@ -209,11 +279,23 @@ class Reply implements BinaryReply {
   }
 }
 
+/**
+ * Represents the state of a task to be executed in a background task queue.
+ */
 export class TaskState {
+  /** The message handler to execute. */
   handler: SendableBinaryMessageHandler;
+  /** The message data as an ArrayBuffer. */
   message: ArrayBuffer;
+  /** Additional arguments to pass to the handler. */
   args: Object[];
 
+  /**
+   * Constructs a new TaskState instance.
+   * @param handler - The message handler to execute
+   * @param message - The message data as an ArrayBuffer
+   * @param args - Additional arguments to pass to the handler
+   */
   constructor(handler: SendableBinaryMessageHandler, message: ArrayBuffer, ...args: Object[]) {
     this.handler = handler;
     this.message = message;
@@ -221,24 +303,55 @@ export class TaskState {
   }
 }
 
+/**
+ * Interface for task queues that process messages asynchronously.
+ */
 interface DartMessengerTaskQueue {
+  /**
+   * Dispatches a task to be executed in the task queue.
+   * @param taskState - The task state containing the handler and message
+   * @param callback - The reply callback for sending responses
+   */
   dispatch(taskState: TaskState, callback: Reply): void;
 }
 
+/**
+ * Interface for serial task queues that process messages sequentially.
+ */
 interface SerialTaskQueue extends DartMessengerTaskQueue {
 }
 
+/**
+ * Factory interface for creating task queues.
+ */
 interface TaskQueueFactory {
+  /**
+   * Creates a background task queue with the specified options.
+   * @param options - Task queue configuration options
+   * @returns A DartMessengerTaskQueue instance
+   */
   makeBackgroundTaskQueue(options: TaskQueueOptions): DartMessengerTaskQueue;
 }
 
+/**
+ * Task queue that processes messages concurrently.
+ */
 class ConcurrentTaskQueue implements DartMessengerTaskQueue {
   private priority: TaskPriority;
 
+  /**
+   * Constructs a new ConcurrentTaskQueue instance.
+   * @param priority - The priority level for task execution
+   */
   constructor(priority: TaskPriority) {
     this.priority = priority;
   }
 
+  /**
+   * Dispatches a task to be executed concurrently.
+   * @param taskState - The task state containing the handler and message
+   * @param callback - The reply callback for sending responses
+   */
   dispatch(taskState: TaskState, callback: Reply): void {
     let task: taskpool.Task = new taskpool.Task(handleMessageInBackground,
                                                 taskState.handler,
@@ -254,9 +367,16 @@ class ConcurrentTaskQueue implements DartMessengerTaskQueue {
 }
 
 const scriptURL: string = '../workers/PlatformChannelWorker.ets';
+/**
+ * Task queue that processes messages serially using a worker thread.
+ */
 class SerialTaskQueueWithWorker implements SerialTaskQueue {
   private static workerInstance: worker.ThreadWorker | null = null;
 
+  /**
+   * Constructs a new SerialTaskQueueWithWorker instance.
+   * Creates a singleton worker instance if one doesn't exist.
+   */
   constructor () {
     if (!SerialTaskQueueWithWorker.workerInstance) {
       SerialTaskQueueWithWorker.workerInstance =
@@ -264,6 +384,11 @@ class SerialTaskQueueWithWorker implements SerialTaskQueue {
     }
   }
 
+  /**
+   * Dispatches a task to be executed serially in the worker thread.
+   * @param taskState - The task state containing the handler and message
+   * @param callback - The reply callback for sending responses
+   */
   dispatch(taskState: TaskState, callback: Reply): void {
     SerialTaskQueueWithWorker.workerInstance!.onmessage = (e: MessageEvents): void => {
       callback.reply(e.data as ArrayBuffer);
@@ -279,15 +404,27 @@ class SerialTaskQueueWithWorker implements SerialTaskQueue {
 }
 
 type Runnable = () => Promise<void>;
+/**
+ * Task queue that processes messages serially using a task pool.
+ */
 class SerialTaskQueueWithTaskPool implements SerialTaskQueue {
   private priority: TaskPriority;
   private queue: Queue<Runnable> = new Queue();
   private isRunning: boolean = false;
 
+  /**
+   * Constructs a new SerialTaskQueueWithTaskPool instance.
+   * @param priority - The priority level for task execution
+   */
   constructor(priority: TaskPriority) {
     this.priority = priority;
   }
 
+  /**
+   * Dispatches a task to be executed serially in the task pool.
+   * @param taskState - The task state containing the handler and message
+   * @param callback - The reply callback for sending responses
+   */
   dispatch(taskState: TaskState, callback: Reply): void {
     let task: taskpool.Task = new taskpool.Task(handleMessageInBackground,
                                                 taskState.handler,
@@ -324,7 +461,15 @@ class SerialTaskQueueWithTaskPool implements SerialTaskQueue {
   }
 }
 
+/**
+ * Default implementation of TaskQueueFactory.
+ */
 class DefaultTaskQueueFactory implements TaskQueueFactory {
+  /**
+   * Creates a background task queue based on the provided options.
+   * @param options - Task queue configuration options
+   * @returns A DartMessengerTaskQueue instance (serial or concurrent)
+   */
   makeBackgroundTaskQueue(options: TaskQueueOptions): DartMessengerTaskQueue {
     if (options.isSingleThreadMode()) {
       return new SerialTaskQueueWithWorker();
@@ -337,9 +482,20 @@ class DefaultTaskQueueFactory implements TaskQueueFactory {
   }
 }
 
+/**
+ * Token implementation of TaskQueue used to identify task queues.
+ */
 class TaskQueueToken implements TaskQueue {
 }
 
+/**
+ * Handles a message in the background thread.
+ * This function is executed concurrently and processes messages asynchronously.
+ * @param handler - The message handler to execute
+ * @param message - The message data as an ArrayBuffer
+ * @param args - Additional arguments to pass to the handler
+ * @returns A promise that resolves to the reply ArrayBuffer, or null if no reply
+ */
 @Concurrent
 async function handleMessageInBackground(handler: SendableBinaryMessageHandler,
   message: ArrayBuffer,

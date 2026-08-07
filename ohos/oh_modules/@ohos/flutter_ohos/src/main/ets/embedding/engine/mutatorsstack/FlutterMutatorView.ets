@@ -15,6 +15,10 @@ import OhosTouchProcessor from '../../ohos/OhosTouchProcessor';
 import { FlutterMutator, FlutterMutatorsStack } from './FlutterMutatorsStack'
 import Any from '../../../plugin/common/Any';
 
+/**
+ * View that applies Flutter mutators (transforms, clips) to a dynamic view model.
+ * This class manages the layout and mutator application for platform views.
+ */
 export class FlutterMutatorView {
   private mutatorsStack: FlutterMutatorsStack | null = null;
   private screenDensity: number = 0;
@@ -47,6 +51,11 @@ export class FlutterMutatorView {
     new DVModelParam("Column", [], { backgroundColor: Color.Red }, { onTouch: this.onTouch })
   );
 
+  /**
+   * Sets listeners for descendant focus change events.
+   * @param onFocus - Callback invoked when a descendant gains focus
+   * @param onBlur - Callback invoked when a descendant loses focus
+   */
   setOnDescendantFocusChangeListener(onFocus: () => void, onBlur: () => void) {
     // this.model.events["onFocus"] = onFocus;
     // this.model.events["onBlur"] = onBlur;
@@ -55,6 +64,10 @@ export class FlutterMutatorView {
     events2.onBlur = onBlur;
   }
 
+  /**
+   * Sets the layout parameters for this view.
+   * @param parameters - The layout parameters including margin, width, and height
+   */
   public setLayoutParams(parameters: DVModelParameters): void {
     if (this.model.params == null) {
       this.model.params = new DVModelParameters();
@@ -70,10 +83,22 @@ export class FlutterMutatorView {
     this.top = parametersRecord.marginTop as number;
   }
 
+  /**
+   * Adds a child dynamic view model to this view.
+   * @param model - The DVModel to add as a child
+   */
   public addDvModel(model: DVModel): void {
     this.model?.children.push(model);
   }
 
+  /**
+   * Prepares this view for display by applying mutators and setting layout parameters.
+   * @param mutatorsStack - The stack of mutators to apply
+   * @param left - The left position of the view
+   * @param top - The top position of the view
+   * @param width - The width of the view
+   * @param height - The height of the view
+   */
   public readyToDisplay(mutatorsStack: FlutterMutatorsStack, left: number, top: number, width: number, height: number) {
     this.mutatorsStack = mutatorsStack;
     this.left = left;
@@ -111,17 +136,31 @@ export class FlutterMutatorView {
     params.matrix = matrix;
   }
 
+  /**
+   * Gets the dynamic view model for this view.
+   * @returns The DVModel instance, or undefined if not set
+   */
   public getDvModel(): DVModel | undefined {
     return this.model;
   }
 }
 
+/**
+ * Parameters for creating a dynamic view model.
+ */
 class DVModelParam {
   compType: string
   children: []
   attributes: Any
   events: Any
 
+  /**
+   * Constructs a new DVModelParam instance.
+   * @param compType - The component type
+   * @param children - Array of child components
+   * @param attributes - Component attributes
+   * @param events - Component event handlers
+   */
   constructor(compType: string, children: [], attributes: Any, events: Any) {
     this.compType = compType;
     this.children = children;

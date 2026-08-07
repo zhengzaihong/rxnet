@@ -18,12 +18,21 @@ import Log from '../../../util/Log';
 
 const TAG = "LocalizationChannel";
 
+/**
+ * Channel for handling localization-related communication between Flutter and OpenHarmony.
+ * This channel manages locale information and string resource retrieval.
+ */
 export default class LocalizationChannel implements MethodCallHandler {
   private static TAG = "LocalizationChannel";
   private static CHANNEL_NAME = "flutter/localization";
   private channel: MethodChannel;
   private localizationMessageHandler: LocalizationMessageHandler | null = null;
 
+  /**
+   * Handles method calls from Dart.
+   * @param call - The method call from Dart
+   * @param result - The result callback to send a response
+   */
   onMethodCall(call: MethodCall, result: MethodResult): void {
     if (this.localizationMessageHandler == null) {
       Log.e(TAG, "localizationMessageHandler is null");
@@ -48,15 +57,27 @@ export default class LocalizationChannel implements MethodCallHandler {
     }
   }
 
+  /**
+   * Constructs a new LocalizationChannel instance.
+   * @param dartExecutor - The DartExecutor for sending messages to Dart
+   */
   constructor(dartExecutor: DartExecutor) {
     this.channel = new MethodChannel(dartExecutor, LocalizationChannel.CHANNEL_NAME, JSONMethodCodec.INSTANCE);
     this.channel.setMethodCallHandler(this);
   }
 
+  /**
+   * Sets the localization message handler for processing localization requests.
+   * @param localizationMessageHandler - The LocalizationMessageHandler instance
+   */
   setLocalizationMessageHandler(localizationMessageHandler: LocalizationMessageHandler): void {
     this.localizationMessageHandler = localizationMessageHandler;
   }
 
+  /**
+   * Sends locale information to Flutter.
+   * @param locales - Array of locale strings to send
+   */
   sendLocales(locales: string[]): void {
     let data: string[] = [];
     for (let i = 0; i < locales.length; i++) {
@@ -70,6 +91,14 @@ export default class LocalizationChannel implements MethodCallHandler {
   }
 }
 
+/**
+ * Interface for handling localization message requests.
+ */
 export interface LocalizationMessageHandler {
+  /**
+   * Gets a string resource by key and locale.
+   * @param key - The resource key
+   * @param local - The locale string
+   */
   getStringResource(key: string, local: string): void;
 }

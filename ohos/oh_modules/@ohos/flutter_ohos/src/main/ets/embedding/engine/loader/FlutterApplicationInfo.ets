@@ -17,21 +17,40 @@ const DEFAULT_FLUTTER_ASSETS_DIR = "flutter_assets";
 
 
 /**
- * application 信息，后期看如何设置
+ * Contains application information for Flutter initialization.
+ * This class holds configuration data such as AOT library names, snapshot data paths,
+ * asset directories, and build mode information.
  */
 export default class FlutterApplicationInfo {
+  /** Name of the AOT shared library. */
   aotSharedLibraryName: string;
+  /** Name of the VM snapshot data file. */
   vmSnapshotData: string;
+  /** Name of the isolate snapshot data file. */
   isolateSnapshotData: string;
+  /** Directory containing Flutter assets. */
   flutterAssetsDir: string;
+  /** Domain network policy configuration. */
   domainNetworkPolicy: string;
+  /** Directory containing native libraries. */
   nativeLibraryDir: string;
+  /** Whether to automatically register plugins. */
   automaticallyRegisterPlugins: boolean;
-  //是否是开发模式，先放在这里，后续应该从context获取
+  /** Whether the application is running in debug mode. */
   isDebugMode: boolean;
-  //是否是profile模式
+  /** Whether the application is running in profile mode. */
   isProfile: boolean;
 
+  /**
+   * Constructs a new FlutterApplicationInfo instance.
+   * @param aotSharedLibraryName - Name of the AOT shared library, or null to use default
+   * @param vmSnapshotData - Name of the VM snapshot data file, or null to use default
+   * @param isolateSnapshotData - Name of the isolate snapshot data file, or null to use default
+   * @param flutterAssetsDir - Directory containing Flutter assets, or null to use default
+   * @param domainNetworkPolicy - Domain network policy, or null for empty string
+   * @param nativeLibraryDir - Directory containing native libraries
+   * @param automaticallyRegisterPlugins - Whether to automatically register plugins
+   */
   constructor(aotSharedLibraryName: string | null,
     vmSnapshotData: string | null,
     isolateSnapshotData: string | null,

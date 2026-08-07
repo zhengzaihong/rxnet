@@ -6,7 +6,7 @@
 */
 import { BuilderNode, FrameNode, NodeController, NodeRenderType } from '@kit.ArkUI';
 import Any from '../../plugin/common/Any';
-import PlatformView, { Params } from '../../plugin/platform/PlatformView';
+import PlatformView, { Params, PlatformViewVisibleAreaEventOptions } from '../../plugin/platform/PlatformView';
 import Log from '../../util/Log';
 import { DVModel, DVModelChildren, DynamicView } from '../../view/DynamicView/dynamicView';
 
@@ -22,6 +22,10 @@ declare class nodeControllerParams {
 
 const TAG = 'EmbeddingNodeController'
 
+/**
+ * Node controller for embedding platform views in Flutter.
+ * This class manages the lifecycle and rendering of platform views using BuilderNode.
+ */
 export class EmbeddingNodeController extends NodeController {
   private builderNode: BuilderNode<[Params]> | undefined | null = null;
   private wrappedBuilder: WrappedBuilder<[Params]> | null = null;
@@ -31,7 +35,15 @@ export class EmbeddingNodeController extends NodeController {
   private renderType: NodeRenderType = NodeRenderType.RENDER_TYPE_DISPLAY;
   private direction: Direction = Direction.Auto;
   private isDestroy: boolean = false;
+  private platformViewVisibleAreaEventOptions: PlatformViewVisibleAreaEventOptions | null = null;
 
+  /**
+   * Sets the render options for the platform view.
+   * @param platformView - The platform view instance
+   * @param surfaceId - The surface ID
+   * @param renderType - The render type
+   * @param direction - The layout direction
+   */
   setRenderOption(platformView: PlatformView, surfaceId: string, renderType: NodeRenderType, direction: Direction) {
     if (platformView == undefined) {
       Log.e(TAG, "platformView undefined");
@@ -44,30 +56,128 @@ export class EmbeddingNodeController extends NodeController {
     this.direction = direction;
   }
 
+  /**
+   * Notify the PlatformView that it has entered an invisible state, and animations on it need to be inactive.
+   */
+  notifyPlatformViewInvisible(): void {
+    if (!this.platformView || !this.platformViewVisibleAreaEventOptions ||
+      this.platformViewVisibleAreaEventOptions.enable === false) {
+      return;
+    }
+
+    this.platformView.onInactive();
+  }
+
+  /**
+   * Set up the callback for monitoring changes in the visible area of the external texture.
+   */
+  setPlatformViewVisibleAreaEventCallback(): void {
+    if (!this.platformView) {
+      return;
+    }
+
+    this.platformViewVisibleAreaEventOptions =
+      this.platformView.getPlatformViewVisibleAreaEventOptions();
+    if (!this.platformViewVisibleAreaEventOptions) {
+      return;
+    }
+
+    const options = this.platformViewVisibleAreaEventOptions!;
+
+    Log.i(TAG,
+      "setPlatformViewVisibleAreaEventCallback surfaceId:" + this.surfaceId + 
+      ", enable:" + options.enable + 
+      ", ratios:" + options.ratios +
+      ", expectedUpdateInterval:" + options.expectedUpdateInterval +
+      ", onInactiveThreshold:" + options.onInactiveThreshold +
+      ", onActiveThreshold:" + options.onActiveThreshold);
+    if (options.enable === false) {
+      return;
+    }
+
+    let node: FrameNode | null | undefined = this.builderNode?.getFrameNode();
+    if (!node) {
+      return;
+    }
+
+    node?.commonEvent.setOnVisibleAreaApproximateChange(
+      { ratios: options.ratios,
+        expectedUpdateInterval: options.expectedUpdateInterval },
+
+      (isExpanding: boolean, currentRatio: number) =>
+      {
+        if (!this.platformView) {
+          return;
+        }
+
+        Log.i(TAG,
+          "PlatformViewVisibleAreaEventCallback surfaceId:" + this.surfaceId +
+          ", isExpanding:" + isExpanding +
+          ", currentRatio:" + currentRatio);
+        if (!isExpanding &&
+          currentRatio <= options.onInactiveThreshold) {
+          // Pause the operation of continuous production of textures
+          this.platformView.onInactive();
+        } else if (isExpanding &&
+          currentRatio >= options.onActiveThreshold) {
+          // Resume the operation of continuous production of textures
+          this.platformView.onActive();
+        }
+      }
+    )
+  }
+
+  /**
+   * Creates a FrameNode for the platform view.
+   * @param uiContext - The UI context
+   * @returns The created FrameNode, or null if creation fails
+   */
   makeNode(uiContext: UIContext): FrameNode | null {
     this.builderNode = new BuilderNode(uiContext, { surfaceId: this.surfaceId, type: this.renderType });
+
     if (this.platformView) {
       this.builderNode.build(this.wrappedBuilder, { direction: this.direction, platformView: this.platformView });
+      this.setPlatformViewVisibleAreaEventCallback();
     }
     return this.builderNode.getFrameNode();
   }
 
+  /**
+   * Sets the builder node.
+   * @param builderNode - The BuilderNode instance, or null
+   */
   setBuilderNode(builderNode: BuilderNode<Params[]> | null): void {
     this.builderNode = builderNode;
   }
 
+  /**
+   * Gets the builder node.
+   * @returns The BuilderNode instance, or null if not set
+   */
   getBuilderNode(): BuilderNode<[Params]> | undefined | null {
     return this.builderNode;
   }
 
+  /**
+   * Updates the node with new arguments.
+   * @param arg - The update arguments
+   */
   updateNode(arg: Object): void {
     this.builderNode?.update(arg);
   }
 
+  /**
+   * Gets the embed ID.
+   * @returns The embed ID string
+   */
   getEmbedId(): string {
     return this.embedId;
   }
 
+  /**
+   * Sets the destroy state and disposes the builder node if needed.
+   * @param isDestroy - Whether the controller is being destroyed
+   */
   setDestroy(isDestroy: boolean): void {
     this.isDestroy = isDestroy;
     if (this.isDestroy) {
@@ -75,6 +185,9 @@ export class EmbeddingNodeController extends NodeController {
     }
   }
 
+  /**
+   * Disposes the frame node and cleans up resources.
+   */
   disposeFrameNode() {
     this.builderNode?.getFrameNode()?.getRenderNode()?.dispose();
     this.builderNode?.dispose();
@@ -82,21 +195,37 @@ export class EmbeddingNodeController extends NodeController {
     this.builderNode = null;
     this.wrappedBuilder = null;
   }
-  
+
+  /**
+   * Posts a mouse event to the builder node.
+   * Note: postInputEvent is an API20 interface, so we check for its existence to avoid compilation errors.
+   * @param event - The mouse event to post
+   */
   postMouseEvent(event: MouseEvent) {
-    // 避免编译报错，postInputEvent属于API20的接口
+    // Avoid compilation errors: postInputEvent is an API20 interface
     if (typeof (this.builderNode as ESObject)?.postInputEvent == 'function') {
       (this.builderNode as ESObject)?.postInputEvent(event);
     }
   }
 
+  /**
+   * Posts an axis event to the builder node.
+   * Note: postInputEvent is an API20 interface, so we check for its existence to avoid compilation errors.
+   * @param event - The axis event to post
+   */
   postAxisEvent(event: AxisEvent) {
-    // 避免编译报错，postInputEvent属于API20的接口
+    // Avoid compilation errors: postInputEvent is an API20 interface
     if (typeof (this.builderNode as ESObject)?.postInputEvent == 'function') {
       (this.builderNode as ESObject)?.postInputEvent(event);
     }
   }
 
+  /**
+   * Posts a touch event to the builder node.
+   * @param event - The touch event to post, or undefined
+   * @param isPx - Whether the coordinates are already in pixels (default: false, will convert from vp to px)
+   * @returns Whether the event was successfully posted
+   */
   postEvent(event: TouchEvent | undefined, isPx: boolean = false): boolean {
     if (event == undefined) {
       return false;

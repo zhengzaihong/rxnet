@@ -12,16 +12,25 @@ import SendableMessageCodec from './SendableMessageCodec';
 import StringUtils from '../../util/StringUtils';
 
 /**
- * A {@link MessageCodec} using UTF-8 encoded String messages.
+ * A {@link SendableMessageCodec} using UTF-8 encoded String messages.
  *
- * <p>This codec is guaranteed to be compatible with the corresponding <a
- * href="https://api.flutter.dev/flutter/services/StringCodec-class.html">StringCodec</a> on the
- * Dart side. These parts of the Flutter SDK are evolved synchronously.
+ * This codec is guaranteed to be compatible with the corresponding `StringCodec` on the Dart side.
+ * These parts of the Flutter SDK are evolved synchronously.
+ */
+/**
+ * A sendable MessageCodec using UTF-8 encoded String messages.
+ * This codec can be used in background threads and worker contexts.
  */
 @Sendable
 export default class SendableStringCodec implements SendableMessageCodec<string> {
+  /** Singleton instance of SendableStringCodec. */
   static readonly INSTANCE: SendableStringCodec = new SendableStringCodec();
 
+  /**
+   * Encodes a string message into binary format.
+   * @param message - The string message to encode, possibly null
+   * @returns The encoded message as an ArrayBuffer
+   */
   encodeMessage(message: string): ArrayBuffer {
     if (message == null) {
       return StringUtils.stringToArrayBuffer("");
@@ -29,6 +38,11 @@ export default class SendableStringCodec implements SendableMessageCodec<string>
     return StringUtils.stringToArrayBuffer(message);
   }
 
+  /**
+   * Decodes a binary message into a string.
+   * @param message - The binary message to decode, possibly null
+   * @returns The decoded string
+   */
   decodeMessage(message: ArrayBuffer | null): string {
     if (message == null) {
       return "";

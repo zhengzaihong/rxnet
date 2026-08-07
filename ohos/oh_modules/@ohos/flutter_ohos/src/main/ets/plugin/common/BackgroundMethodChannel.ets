@@ -17,20 +17,20 @@ import SendableMethodCodec from './SendableMethodCodec'
 import SendableBinaryMessageHandler from './SendableBinaryMessageHandler'
 
 /**
- * A named channel for communicating with the Flutter application using asynchronous method calls.
+ * A named channel for communicating with Flutter using asynchronous method calls on background threads.
+ * This channel uses sendable codecs that can be passed across thread boundaries.
  *
- * <p>Incoming method calls are decoded from binary on receipt, and Java results are encoded into
+ * Incoming method calls are decoded from binary on receipt, and results are encoded into
  * binary before being transmitted back to Flutter. The {@link MethodCodec} used must be compatible
- * with the one used by the Flutter application. This can be achieved by creating a <a
- * href="https://api.flutter.dev/flutter/services/MethodChannel-class.html">MethodChannel</a>
- * counterpart of this channel on the Dart side. The Java type of method call arguments and results
- * is {@code Object}, but only values supported by the specified {@link MethodCodec} can be used.
+ * with the one used by the Flutter application. This can be achieved by creating a `MethodChannel`
+ * counterpart of this channel on the Dart side. The type of method call arguments and results
+ * is {@code Any}, but only values supported by the specified {@link MethodCodec} can be used.
  *
- * <p>The logical identity of the channel is given by its name. Identically named channels will
+ * The logical identity of the channel is given by its name. Identically named channels will
  * interfere with each other's communication.
  */
-
 export default class BackgroundMethodChannel {
+  /** Tag for logging. */
   static TAG = "BackgroundMethodChannel#";
   private messenger: BinaryMessenger;
   private name: string;
@@ -38,6 +38,14 @@ export default class BackgroundMethodChannel {
   private taskQueue: TaskQueue;
   private args: Object[];
 
+  /**
+   * Constructs a new BackgroundMethodChannel instance.
+   * @param messenger - The BinaryMessenger to use for communication
+   * @param name - The channel name
+   * @param codec - The SendableMethodCodec to use for encoding/decoding, defaults to SendableStandardMethodCodec.INSTANCE
+   * @param taskQueue - Optional TaskQueue for background processing, defaults to a new background task queue
+   * @param args - Additional arguments to pass to message handlers
+   */
   constructor(messenger: BinaryMessenger,
     name: string,
     codec: SendableMethodCodec = SendableStandardMethodCodec.INSTANCE,
@@ -53,11 +61,11 @@ export default class BackgroundMethodChannel {
   /**
    * Invokes a method on this channel, optionally expecting a result.
    *
-   * <p>Any uncaught exception thrown by the result callback will be caught and logged.
+   * Any uncaught exception thrown by the result callback will be caught and logged.
    *
-   * @param method the name String of the method.
-   * @param arguments the arguments for the invocation, possibly null.
-   * @param callback a {@link Result} callback for the invocation result, or null.
+   * @param method - The name of the method
+   * @param args - The arguments for the invocation, possibly null
+   * @param callback - A {@link MethodResult} callback for the invocation result, or null
    */
   invokeMethod(method: string, args: Any, callback?: MethodResult): void {
     this.messenger.send(this.name,
@@ -68,16 +76,13 @@ export default class BackgroundMethodChannel {
   /**
    * Registers a method call handler on this channel.
    *
-   * <p>Overrides any existing handler registration for (the name of) this channel.
+   * Overrides any existing handler registration for (the name of) this channel.
    *
-   * <p>If no handler has been registered, any incoming method call on this channel will be handled
-   * silently by sending a null reply. This results in a <a
-   * href="https://api.flutter.dev/flutter/services/MissingPluginException-class.html">MissingPluginException</a>
-   * on the Dart side, unless an <a
-   * href="https://api.flutter.dev/flutter/services/OptionalMethodChannel-class.html">OptionalMethodChannel</a>
-   * is used.
+   * If no handler has been registered, any incoming method call on this channel will be handled
+   * silently by sending a null reply. This results in a `MissingPluginException` 
+   * on the Dart side, unless an `OptionalMethodChannel` is used.
    *
-   * @param handler a {@link MethodCallHandler}, or null to deregister.
+   * @param handler - A {@link SendableMethodCallHandler}, or null to deregister
    */
   setMethodCallHandler(handler: SendableMethodCallHandler | null): void {
     this.messenger.setMessageHandler(this.name,
@@ -89,21 +94,34 @@ export default class BackgroundMethodChannel {
    * Adjusts the number of messages that will get buffered when sending messages to channels that
    * aren't fully set up yet. For example, the engine isn't running yet or the channel's message
    * handler isn't set up on the Dart side yet.
+   * @param newSize - The new buffer size
    */
   resizeChannelBuffer(newSize: number): void {
     MessageChannelUtils.resizeChannelBuffer(this.messenger, this.name, newSize);
   }
 }
 
+/**
+ * Internal handler for incoming method call results from Flutter in background threads.
+ */
 export class IncomingSendableResultHandler implements BinaryReply {
   private callback: MethodResult;
   private codec: SendableMethodCodec;
 
+  /**
+   * Constructs a new IncomingSendableResultHandler instance.
+   * @param callback - The MethodResult callback to invoke
+   * @param codec - The SendableMethodCodec to use for decoding
+   */
   constructor(callback: MethodResult, codec: SendableMethodCodec) {
     this.callback = callback;
     this.codec = codec
   }
 
+  /**
+   * Handles a binary reply from Flutter.
+   * @param reply - The binary reply, possibly null
+   */
   reply(reply: ArrayBuffer | null): void {
     try {
       if (reply == null) {
@@ -121,16 +139,30 @@ export class IncomingSendableResultHandler implements BinaryReply {
   }
 }
 
+/**
+ * Internal handler for incoming method calls from Flutter in background threads.
+ */
 @Sendable
 export class IncomingSendableMethodCallHandler implements SendableBinaryMessageHandler {
   private handler: SendableMethodCallHandler;
   private codec: SendableMethodCodec;
 
+  /**
+   * Constructs a new IncomingSendableMethodCallHandler instance.
+   * @param handler - The SendableMethodCallHandler to delegate to
+   * @param codec - The SendableMethodCodec to use for encoding/decoding
+   */
   constructor(handler: SendableMethodCallHandler, codec: SendableMethodCodec) {
     this.handler = handler;
     this.codec = codec;
   }
 
+  /**
+   * Handles a binary method call from Flutter.
+   * @param message - The binary message containing the method call
+   * @param reply - The BinaryReply callback to send a response
+   * @param args - Additional arguments passed to the handler
+   */
   onMessage(message: ArrayBuffer, reply: BinaryReply, ...args: Object[]): void {
     try {
       this.handler.onMethodCall(

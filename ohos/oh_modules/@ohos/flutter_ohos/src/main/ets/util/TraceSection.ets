@@ -10,10 +10,20 @@
 
 import hiTraceMeter from '@ohos.hiTraceMeter'
 
+/**
+ * Utility class for tracing code sections using hiTraceMeter.
+ * Provides methods to begin and end trace sections with automatic name cropping.
+ */
 export class TraceSection {
-
+  /** The current task ID for trace sections. */
   static taskId: number = 0;
 
+  /**
+   * Crops a section name to ensure it stays below 124 characters.
+   * @param sectionName - The section name to crop
+   * @returns The cropped section name.
+   * @private
+   */
   private static cropSectionName(sectionName: string): string {
     return sectionName.length < 124 ? sectionName : sectionName.substring(0, 124) + "...";
   }
@@ -21,7 +31,8 @@ export class TraceSection {
   /**
    * Wraps Trace.beginSection to ensure that the line length stays below 127 code units.
    *
-   * @param sectionName The string to display as the section name in the trace.
+   * @param sectionName - The string to display as the section name in the trace
+   * @returns The task ID for this trace section
    */
   public static begin(sectionName: string): number {
     TraceSection.taskId++;
@@ -29,11 +40,19 @@ export class TraceSection {
     return TraceSection.taskId;
   }
 
-  /** Wraps Trace.endSection. */
+  /**
+   * Ends a trace section.
+   * @param sectionName - The section name to end.
+   */
   public static end(sectionName: string): void {
     hiTraceMeter.finishTrace(TraceSection.cropSectionName(sectionName), TraceSection.taskId);
   }
 
+  /**
+   * Ends a trace section with a specific task ID.
+   * @param sectionName - The section name to end.
+   * @param id - The task ID to use.
+   */
   public static endWithId(sectionName: string, id: number): void {
     hiTraceMeter.finishTrace(TraceSection.cropSectionName(sectionName), id);
   }

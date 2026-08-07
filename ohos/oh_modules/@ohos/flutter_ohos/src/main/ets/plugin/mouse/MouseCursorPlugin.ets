@@ -16,40 +16,50 @@ import Any from '../common/Any';
 
 const TAG: string = "MouseCursorPlugin";
 
+/**
+ * Plugin for handling mouse cursor changes in Flutter applications.
+ * This class manages the interaction between Flutter's cursor system
+ * and the OpenHarmony pointer style system.
+ */
 export default class MouseCursorPlugin implements MouseCursorMethodHandler {
   private mouseCursorChannel: MouseCursorChannel;
   private systemCursorConstants: HashMap<string, pointer.PointerStyle> | null = null;
   private windowId: number;
 
+  /**
+   * Constructs a new MouseCursorPlugin instance.
+   * @param windowId - The window ID for setting pointer styles
+   * @param mouseCursorChannel - The MouseCursorChannel for communication with Flutter
+   */
   constructor(windowId: number, mouseCursorChannel: MouseCursorChannel) {
     this.windowId = windowId;
     this.mouseCursorChannel = mouseCursorChannel;
     this.mouseCursorChannel.setMethodHandler(this);
   }
 
+  /**
+   * Activates a system cursor for the specified kind.
+   * @param kind - The cursor kind (e.g., "click", "text", "move")
+   */
   activateSystemCursor(kind: string): void {
     if (this.windowId < 0) {
-      Log.w(TAG, "set point style failed windowId is invalid");
+      Log.e(TAG, "setPointerStyle failed: windowId is invalid: " + this.windowId);
       return;
     }
     let pointStyle: pointer.PointerStyle = this.resolveSystemCursor(kind);
     try {
       pointer.setPointerStyle(this.windowId, pointStyle, (err: Any) => {
-        Log.i(TAG, "set point style success kind : " + kind);
+        if (err) {
+          Log.e(TAG, "setPointerStyle callback error: kind=" + kind + ", err=" + JSON.stringify(err));
+        } else {
+          Log.i(TAG, "setPointerStyle success: kind=" + kind);
+        }
       })
     } catch (e) {
-      Log.e(TAG, "set point style failed : " + kind + " " + JSON.stringify(e));
+      Log.e(TAG, "setPointerStyle exception: kind=" + kind + ", error=" + JSON.stringify(e));
     }
   }
 
-  /**
-   * Return mouse cursor point style
-   *
-   * <p>This method guarantees to return a non-null object.
-   *
-   * @param kind mouse cursor type
-   * @returns point style
-   */
   private resolveSystemCursor(kind: string): pointer.PointerStyle {
     if (this.systemCursorConstants == null) {
       this.systemCursorConstants = new HashMap();
@@ -115,9 +125,8 @@ export default class MouseCursorPlugin implements MouseCursorMethodHandler {
   }
 
   /**
-   * Detaches the text input plugin from the platform views controller;
-   *
-   * <p> The MouseCursorPlugin instance should not be used after call this.
+   * Destroys the mouse cursor plugin and cleans up resources.
+   * The MouseCursorPlugin instance should not be used after calling this.
    */
   destroy(): void {
     this.mouseCursorChannel.setMethodHandler(null);

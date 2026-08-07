@@ -14,7 +14,9 @@ import DartExecutor from '../dart/DartExecutor';
 import BasicMessageChannel from '../../../plugin/common/BasicMessageChannel';
 
 /**
- * 生命周期channel
+ * Channel for handling application lifecycle events.
+ * This channel manages communication of lifecycle state changes between OpenHarmony and Flutter,
+ * including resumed, inactive, paused, and detached states.
  */
 export default class LifecycleChannel {
   private static TAG = "LifecycleChannel";
@@ -29,32 +31,52 @@ export default class LifecycleChannel {
   private lastFocus = true;
   private channel: BasicMessageChannel<string>;
 
+  /**
+   * Constructs a new LifecycleChannel instance.
+   * @param dartExecutor - The DartExecutor for sending messages to Dart
+   */
   constructor(dartExecutor: DartExecutor) {
     this.channel = new BasicMessageChannel<string>(dartExecutor, LifecycleChannel.CHANNEL_NAME, StringCodec.INSTANCE)
   }
 
-  // Called if at least one window in the app has focus.
+  /**
+   * Called when at least one window in the app has focus.
+   */
   aWindowIsFocused(): void {
     this.sendState(this.lastOhosState, true);
   }
 
-  // Called if no windows in the app have focus.
+  /**
+   * Called when no windows in the app have focus.
+   */
   noWindowsAreFocused(): void {
     this.sendState(this.lastOhosState, false);
   }
 
+  /**
+   * Called when the app is resumed.
+   */
   appIsResumed(): void {
     this.sendState(LifecycleChannel.RESUMED, this.lastFocus);
   }
 
+  /**
+   * Called when the app is inactive.
+   */
   appIsInactive(): void {
     this.sendState(LifecycleChannel.INACTIVE, this.lastFocus);
   }
 
+  /**
+   * Called when the app is paused.
+   */
   appIsPaused(): void {
     this.sendState(LifecycleChannel.PAUSED, this.lastFocus);
   }
 
+  /**
+   * Called when the app is detached.
+   */
   appIsDetached(): void {
     this.sendState(LifecycleChannel.DETACHED, this.lastFocus);
   }

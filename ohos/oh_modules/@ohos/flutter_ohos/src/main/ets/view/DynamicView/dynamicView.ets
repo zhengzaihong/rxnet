@@ -34,18 +34,33 @@ import Log from '../../util/Log';
  * View Model classes
  */
 
+/**
+ * Parameters for DynamicView model components.
+ * This class is observed to enable reactive updates when parameters change.
+ * It serves as a container for component attributes and properties.
+ */
 @Observed
 export class DVModelParameters extends Object {
   /* empty, just get any instance wrapped inside an ObservedObject
   with the help of the decoration */
 }
 
+/**
+ * Events for DynamicView model components.
+ * This class is observed to enable reactive updates when events change.
+ * It serves as a container for component event handlers.
+ */
 @Observed
 export class DVModelEvents extends Object {
   /* empty, just get any instance wrapped inside an ObservedObject
   with the help of the decoration */
 }
 
+/**
+ * Children array for DynamicView model components.
+ * This class is observed to enable reactive updates when children change.
+ * It serves as a container for child DVModel instances.
+ */
 @Observed
 export class DVModelChildren extends Array<DVModel> {
   /* empty, just get any instance wrapped inside an ObservedObject
@@ -54,15 +69,34 @@ export class DVModelChildren extends Array<DVModel> {
 
 let nextId: number = 1;
 
+/**
+ * Model class representing a dynamic view component.
+ * This class holds all information needed to render a component dynamically,
+ * including its type, parameters, events, children, and optional builder.
+ */
 @Observed
 export class DVModel {
+  /** The unique identifier for this model. */
   id_: number;
+  /** The component type (e.g., "Column", "Row", "Text", "Image"). */
   compType: string;
+  /** The component parameters. */
   params: DVModelParameters;
+  /** The component events. */
   events: DVModelEvents;
+  /** The child components. */
   children: DVModelChildren;
+  /** Optional custom builder function. */
   builder: Any;
 
+  /**
+   * Constructs a new DVModel instance.
+   * @param compType - The component type (e.g., "Column", "Row", "Text", "Image")
+   * @param params - The component parameters
+   * @param events - The component events
+   * @param children - The child components
+   * @param builder - Optional custom builder function
+   */
   constructor(compType: string, params: DVModelParameters, events: DVModelEvents, children: DVModelChildren,
     builder?: Any) {
     this.id_ = nextId++;
@@ -73,15 +107,27 @@ export class DVModel {
     this.builder = builder;
   }
 
+  /**
+   * Gets the layout parameters for this model.
+   * @returns The DVModelParameters instance
+   */
   public getLayoutParams(): DVModelParameters {
     return this.params;
   }
 }
 
-// includes the root DVModel objects.
+/**
+ * Container for the root DVModel object.
+ * This class wraps the root model to provide a container structure.
+ */
 export class DVModelContainer {
+  /** The root DVModel instance. */
   model: DVModel;
 
+  /**
+   * Constructs a new DVModelContainer instance.
+   * @param model - The root DVModel to contain
+   */
   constructor(model: DVModel) {
     this.model = model;
   }
@@ -123,20 +169,30 @@ export struct DynamicView {
   @ObjectLink params: DVModelParameters;
   @ObjectLink events: DVModelEvents;
   @BuilderParam customBuilder?: ($$: BuilderParams) => void;
+
+  /**
+   * Gets a parameter value from the parameters object.
+   * @param params - The parameters object
+   * @param element - The parameter key
+   * @returns The parameter value, or undefined if not found
+   */
   getParams: (params: DVModelParameters, element: string) => string | Any =
     (params: DVModelParameters, element: string): string | Any => {
       let params2 = params as Record<string, Any>;
       return params2[element];
     }
+
+  /**
+   * Gets an event handler from the events object.
+   * @param events - The events object
+   * @param element - The event key
+   * @returns The event handler, or undefined if not found
+   */
   getEvents: (events: DVModelEvents, element: string) => Any = (events: DVModelEvents, element: string): Any => {
     let events2 = events as Record<string, Any>;
     return events2[element];
   }
 
-  /*
-    we use this @Styles member function to set all common attributes and event handlers
-    and set component specific attribute and event handler functions in the @Builder function
-  */
   @Styles
   common_attrs() {
     .width(this.getParams(this.params, "width"))
@@ -232,7 +288,6 @@ export struct DynamicView {
       .common_attrs()
   }
 
-  // Button with label
   @Builder
   buildButton() {
     Button(this.getParams(this.params, "value"))
@@ -277,9 +332,18 @@ export struct DynamicView {
   }
 }
 
+/**
+ * Parameters passed to custom builder functions.
+ * This class wraps DVModelParameters for use in custom builders.
+ */
 export class BuilderParams {
+  /** The DVModelParameters to wrap. */
   params: DVModelParameters;
 
+  /**
+   * Constructs a new BuilderParams instance.
+   * @param params - The DVModelParameters to wrap
+   */
   constructor(params: DVModelParameters) {
     this.params = params;
   }

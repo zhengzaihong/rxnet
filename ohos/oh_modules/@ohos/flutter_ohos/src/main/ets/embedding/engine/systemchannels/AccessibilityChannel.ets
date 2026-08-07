@@ -20,7 +20,8 @@ import flutter from 'libflutter.so';
 import { ByteBuffer } from '../../../util/ByteBuffer';
 
 /**
- * 辅助功能channel
+ * Channel for handling accessibility-related communication between Flutter and OpenHarmony.
+ * This channel manages accessibility features, semantics, and accessibility events.
  */
 export default class AccessibilityChannel implements MessageHandler<object> {
   private static TAG = "AccessibilityChannel";
@@ -30,6 +31,11 @@ export default class AccessibilityChannel implements MessageHandler<object> {
   private handler: AccessibilityMessageHandler;
   private nextReplyId: number = 1;
 
+  /**
+   * Handles messages from Dart.
+   * @param message - The message object from Dart
+   * @param reply - The reply callback to send a response
+   */
   onMessage(message: object, reply: Reply<object>): void {
     if (this.handler == null) {
       Log.i(AccessibilityChannel.TAG, "handler == NULL");
@@ -79,6 +85,11 @@ export default class AccessibilityChannel implements MessageHandler<object> {
     reply.reply(StringUtils.stringToArrayBuffer(""));
   }
 
+  /**
+   * Constructs a new AccessibilityChannel instance.
+   * @param dartExecutor - The DartExecutor for sending messages to Dart
+   * @param flutterNapi - The FlutterNapi instance for native communication
+   */
   constructor(dartExecutor: DartExecutor, flutterNapi: FlutterNapi) {
     Log.i(AccessibilityChannel.TAG, "Channel entered");
     this.channel =
@@ -88,24 +99,40 @@ export default class AccessibilityChannel implements MessageHandler<object> {
     this.handler = new DefaultHandler(this.flutterNapi);
   }
 
+  /**
+   * Called when OpenHarmony accessibility is enabled.
+   */
   onOhosAccessibilityEnabled(): void {
     let replyId: number = this.nextReplyId++;
     this.flutterNapi.setSemanticsEnabledWithRespId(true, replyId);
     Log.i(AccessibilityChannel.TAG, "onOhosAccessibilityEnabled = true");
   }
 
+  /**
+   * Called when OpenHarmony accessibility features change.
+   * @param accessibilityFeatureFlags - The accessibility feature flags
+   */
   onOhosAccessibilityFeatures(accessibilityFeatureFlags: number): void {
     let replyId: number = this.nextReplyId++;
     this.flutterNapi.setAccessibilityFeatures(accessibilityFeatureFlags, replyId);
     Log.i(AccessibilityChannel.TAG, "onOhosAccessibilityFeatures");
   }
 
+  /**
+   * Dispatches a semantics action to Flutter.
+   * @param virtualViewId - The virtual view ID
+   * @param action - The accessibility action to dispatch
+   */
   dispatchSemanticsAction(virtualViewId: number, action: Action): void {
     let replyId: number = this.nextReplyId++;
     this.flutterNapi.dispatchSemanticsAction(virtualViewId, action, replyId);
     Log.i(AccessibilityChannel.TAG, "dispatchSemanticsAction");
   }
 
+  /**
+   * Sets the accessibility message handler.
+   * @param handler - The AccessibilityMessageHandler instance
+   */
   setAccessibilityMessageHandler(handler: AccessibilityMessageHandler): void {
     this.handler = handler;
     let replyId: number = this.nextReplyId++;
@@ -113,49 +140,99 @@ export default class AccessibilityChannel implements MessageHandler<object> {
   }
 }
 
+/**
+ * Interface for handling accessibility messages.
+ */
 export interface AccessibilityMessageHandler extends AccessibilityDelegate {
+  /**
+   * Announces a message to the user.
+   * @param message - The message to announce
+   */
   announce(message: string): void;
 
+  /**
+   * Handles a tap event on an accessibility node.
+   * @param nodeId - The ID of the accessibility node
+   */
   onTap(nodeId: number): void;
 
+  /**
+   * Handles a long press event on an accessibility node.
+   * @param nodeId - The ID of the accessibility node
+   */
   onLongPress(nodeId: number): void;
 
+  /**
+   * Handles a tooltip event.
+   * @param nodeId - The tooltip node ID
+   */
   onTooltip(nodeId: string): void;
 }
 
+/**
+ * Default implementation of AccessibilityMessageHandler.
+ * Handles accessibility events and forwards them to the native Flutter engine.
+ */
 export class DefaultHandler implements AccessibilityMessageHandler {
   private static TAG = "AccessibilityMessageHandler";
   private flutterNapi: FlutterNapi;
 
+  /**
+   * Constructs a new DefaultHandler instance.
+   * @param flutterNapi - The FlutterNapi instance for native communication
+   */
   constructor(flutterNapi: FlutterNapi) {
     this.flutterNapi = flutterNapi;
   }
 
+  /**
+   * Announces a message to the user.
+   * @param message - The message to announce
+   */
   announce(message: string): void {
     Log.i(DefaultHandler.TAG, "handler announce.");
     flutter.nativeAccessibilityAnnounce(this.flutterNapi.nativeShellHolderId!, message);
   }
 
+  /**
+   * Handles a tap event on an accessibility node.
+   * @param nodeId - The ID of the accessibility node
+   */
   onTap(nodeId: number): void {
     Log.i(DefaultHandler.TAG, "handler onTap.");
     flutter.nativeAccessibilityOnTap(this.flutterNapi.nativeShellHolderId!, nodeId);
   }
 
+  /**
+   * Handles a long press event on an accessibility node.
+   * @param nodeId - The ID of the accessibility node
+   */
   onLongPress(nodeId: number): void {
     Log.i(DefaultHandler.TAG, "handler onLongPress.");
     flutter.nativeAccessibilityOnLongPress(this.flutterNapi.nativeShellHolderId!, nodeId);
   }
 
+  /**
+   * Handles a tooltip event.
+   * @param message - The tooltip message
+   */
   onTooltip(message: string): void {
     Log.i(DefaultHandler.TAG, "handler onTooltip.");
     flutter.nativeAccessibilityOnTooltip(this.flutterNapi.nativeShellHolderId!, message);
   }
 
+  /**
+   * Called when accessibility state changes.
+   * @param state - The new accessibility state
+   */
   accessibilityStateChange(state: Boolean): void {
     Log.i(DefaultHandler.TAG, "handler accessibilityStateChange");
   }
 }
 
+/**
+ * Accessibility actions that can be performed on semantic nodes.
+ */
 export enum Action {
   TAP = 1 << 0,
   LONG_PRESS = 1 << 1,

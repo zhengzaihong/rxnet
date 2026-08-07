@@ -23,10 +23,25 @@ import SendableBinaryMessageHandler from '../../../plugin/common/SendableBinaryM
 const TAG = "DartExecutor";
 
 /**
- * dart代码执行器
+ * Configures, bootstraps, and starts executing Dart code.
+ *
+ * To specify a top-level Dart function to execute, use a {@link DartEntrypoint} to tell
+ * DartExecutor where to find the Dart code to execute, and which Dart function to use as the
+ * entrypoint. To execute the entrypoint, pass the {@link DartEntrypoint} to
+ * {@link executeDartEntrypoint}.
+ *
+ * To specify a Dart callback to execute, use a {@link DartCallback}. A given Dart callback must
+ * be registered with the Dart VM to be invoked by a DartExecutor. To execute the callback,
+ * pass the {@link DartCallback} to {@link executeDartCallback}.
+ *
+ * Once started, a DartExecutor cannot be stopped. The associated Dart code will execute
+ * until it completes, or until the {@link FlutterEngine} that owns this
+ * DartExecutor is destroyed.
  */
 export default class DartExecutor implements BinaryMessenger {
+  /** The FlutterNapi instance for native communication. */
   flutterNapi: FlutterNapi;
+  /** The resource manager for accessing application assets. */
   assetManager: resourceManager.ResourceManager;
   private dartMessenger: DartMessenger;
   private binaryMessenger: BinaryMessenger;
@@ -36,6 +51,11 @@ export default class DartExecutor implements BinaryMessenger {
   private isolateChannelMessageHandler: BinaryMessageHandler =
     new IsolateChannelMessageHandler(this.isolateServiceId, this.isolateServiceIdListener);
 
+  /**
+   * Constructs a new DartExecutor instance.
+   * @param flutterNapi - The FlutterNapi instance for native communication
+   * @param assetManager - The resource manager for accessing assets
+   */
   constructor(flutterNapi: FlutterNapi, assetManager: resourceManager.ResourceManager) {
     this.flutterNapi = flutterNapi;
     this.assetManager = assetManager;
@@ -49,18 +69,13 @@ export default class DartExecutor implements BinaryMessenger {
     }
   }
 
-
   /**
-   * Invoked when the {@link io.flutter.embedding.engine.FlutterEngine} that owns this {@link
-   * DartExecutor} attaches to NAPI.
+   * Invoked when the FlutterEngine that owns this DartExecutor attaches to NAPI.
    *
-   * <p>When attached to NAPI, this {@link DartExecutor} begins handling 2-way communication to/from
-   * the Dart execution context. This communication is facilitate via 2 APIs:
-   *
-   * <ul>
-   *   <li>{@link BinaryMessenger}, which sends messages to Dart
-   *   <li>{@link PlatformMessageHandler}, which receives messages from Dart
-   * </ul>
+   * When attached to NAPI, this DartExecutor begins handling 2-way communication to/from
+   * the Dart execution context. This communication is facilitated via 2 APIs:
+   * BinaryMessenger, which sends messages to Dart
+   * PlatformMessageHandler, which receives messages from Dart
    */
   onAttachedToNAPI(): void {
     Log.d(TAG, "Attached to NAPI. Registering the platform message handler for this Dart execution context.");
@@ -68,10 +83,9 @@ export default class DartExecutor implements BinaryMessenger {
   }
 
   /**
-   * Invoked when the {@link io.flutter.embedding.engine.FlutterEngine} that owns this {@link
-   * DartExecutor} detaches from NAPI.
+   * Invoked when the FlutterEngine that owns this DartExecutor detaches from NAPI.
    *
-   * <p>When detached from NAPI, this {@link DartExecutor} stops handling 2-way communication to/from
+   * When detached from NAPI, this DartExecutor stops handling 2-way communication to/from
    * the Dart execution context.
    */
   onDetachedFromNAPI(): void {
@@ -80,22 +94,21 @@ export default class DartExecutor implements BinaryMessenger {
   }
 
   /**
-   * Is this {@link DartExecutor} currently executing Dart code?
+   * Checks if this DartExecutor is currently executing Dart code.
    *
-   * @return true if Dart code is being executed, false otherwise
+   * @returns True if Dart code is being executed, false otherwise
    */
   isExecutingDart(): boolean {
     return this.isApplicationRunning;
   }
 
   /**
-   * Starts executing Dart code based on the given {@code dartEntrypoint} and the {@code
-   * dartEntrypointArgs}.
+   * Starts executing Dart code based on the given dartEntrypoint and the dartEntrypointArgs.
    *
-   * <p>See {@link DartEntrypoint} for configuration options.
+   * See DartEntrypoint for configuration options.
    *
-   * @param dartEntrypoint specifies which Dart function to run, and where to find it
-   * @param dartEntrypointArgs Arguments passed as a list of string to Dart's entrypoint function.
+   * @param dartEntrypoint - Specifies which Dart function to run, and where to find it
+   * @param dartEntrypointArgs - Arguments passed as a list of strings to Dart's entrypoint function
    */
   executeDartEntrypoint(dartEntrypoint: DartEntrypoint, dartEntrypointArgs?: string[]): void {
     if (this.isApplicationRunning) {
@@ -120,11 +133,11 @@ export default class DartExecutor implements BinaryMessenger {
   }
 
   /**
-   * Starts executing Dart code based on the given {@code dartCallback}.
+   * Starts executing Dart code based on the given dartCallback.
    *
-   * <p>See {@link DartCallback} for configuration options.
+   * See DartCallback for configuration options.
    *
-   * @param dartCallback specifies which Dart callback to run, and where to find it
+   * @param dartCallback - Specifies which Dart callback to run, and where to find it
    */
   executeDartCallback(dartCallback: DartCallback): void {
     if (this.isApplicationRunning) {
@@ -149,59 +162,71 @@ export default class DartExecutor implements BinaryMessenger {
   }
 
   /**
-   * Returns a {@link BinaryMessenger} that can be used to send messages to, and receive messages
-   * from, Dart code that this {@code DartExecutor} is executing.
+   * Gets a BinaryMessenger that can be used to send messages to, and receive messages
+   * from, Dart code that this DartExecutor is executing.
+   * @returns The BinaryMessenger instance
    */
-
   getBinaryMessenger(): BinaryMessenger {
     return this.binaryMessenger;
   }
 
+  /**
+   * Creates a background task queue for handling messages asynchronously.
+   * @param options - Optional task queue configuration options
+   * @returns A TaskQueue instance for background message processing
+   */
   makeBackgroundTaskQueue(options?: TaskQueueOptions): TaskQueue {
     return this.getBinaryMessenger().makeBackgroundTaskQueue(options);
   }
 
 
+  /**
+   * Sends a binary message to Dart over the specified channel.
+   * @param channel - The channel name for the message
+   * @param message - The message data as an ArrayBuffer
+   * @param callback - Optional callback to receive the reply from Dart
+   */
   send(channel: String, message: ArrayBuffer, callback?: BinaryReply): void {
     this.getBinaryMessenger().send(channel, message, callback);
   }
 
+  /**
+   * Sets a message handler for incoming messages from Dart on the specified channel.
+   * @param channel - The channel name to listen on
+   * @param handler - The message handler, or null to remove the handler
+   * @param taskQueue - Optional task queue for processing messages
+   * @param args - Additional arguments to pass to the handler
+   */
   setMessageHandler(channel: String, handler: BinaryMessageHandler | SendableBinaryMessageHandler | null,
     taskQueue?: TaskQueue, ...args: Object[]): void {
     this.getBinaryMessenger().setMessageHandler(channel, handler, taskQueue, ...args);
   }
 
   /**
-   * Returns the number of pending channel callback replies.
-   *
-   * <p>When sending messages to the Flutter application using {@link BinaryMessenger#send(String,
-   * ByteBuffer, io.flutter.plugin.common.BinaryMessenger.BinaryReply)}, developers can optionally
-   * specify a reply callback if they expect a reply from the Flutter application.
-   *
-   * <p>This method tracks all the pending callbacks that are waiting for response, and is supposed
-   * to be called from the main thread (as other methods). Calling from a different thread could
-   * possibly capture an indeterministic internal state, so don't do it.
-   *
-   * <p>Currently, it's mainly useful for a testing framework like Espresso to determine whether all
-   * the async channel callbacks are handled and the app is idle.
+   * Gets the number of pending channel callback replies.
+   * When sending messages with reply callbacks, this tracks how many are still waiting for responses.
+   * Must be called from the main thread.
+   * Mainly useful for testing frameworks to determine if the app is idle.
+   * @returns The number of pending channel callback replies
    */
   getPendingChannelResponseCount(): number {
     return this.dartMessenger.getPendingChannelResponseCount();
   }
 
   /**
-   * Returns an identifier for this executor's primary isolate. This identifier can be used in
+   * Gets an identifier for this executor's primary isolate. This identifier can be used in
    * queries to the Dart service protocol.
+   * @returns The isolate service ID
    */
-
   getIsolateServiceId(): String {
     return this.isolateServiceId;
   }
 
 
   /**
-   * Set a listener that will be notified when an isolate identifier is available for this
+   * Sets a listener that will be notified when an isolate identifier is available for this
    * executor's primary isolate.
+   * @param listener - The listener to be notified when the isolate service ID is available
    */
   setIsolateServiceIdListener(listener: IsolateServiceIdListener): void {
     this.isolateServiceIdListener = listener;
@@ -211,14 +236,11 @@ export default class DartExecutor implements BinaryMessenger {
   }
 
   /**
-   * Notify the Dart VM of a low memory event, or that the application is in a state such that now
-   * is an appropriate time to free resources, such as going to the background.
+   * Notifies the Dart VM of a low memory event.
+   * This allows the Dart VM to free resources, but does not notify the Flutter application.
+   * To notify the Flutter application, use SystemChannel.sendMemoryPressureWarning().
    *
-   * <p>This does not notify a Flutter application about memory pressure. For that, use the {@link
-   * io.flutter.embedding.engine.systemchannels.SystemChannel#sendMemoryPressureWarning}.
-   *
-   * <p>Calling this method may cause jank or latency in the application. Avoid calling it during
-   * critical periods like application startup or periods of animation.
+   * Note: Calling this method may cause performance issues. Avoid calling during startup or animations.
    */
   notifyLowMemoryWarning(): void {
     if (this.flutterNapi.isAttached()) {
@@ -233,13 +255,19 @@ export default class DartExecutor implements BinaryMessenger {
  * that entrypoint and other assets required for Dart execution.
  */
 export class DartEntrypoint {
-  /** The path within the AssetManager where the app will look for assets. */
+  /** The path within the ResourceManager where the app will look for assets. */
   pathToBundle: string;
   /** The library or file location that contains the Dart entrypoint function. */
   dartEntrypointLibrary: string;
   /** The name of a Dart function to execute. */
   dartEntrypointFunctionName: string;
 
+  /**
+   * Constructs a new DartEntrypoint instance.
+   * @param pathToBundle - The path within the AssetManager where the app will look for assets
+   * @param dartEntrypointLibrary - The library or file location that contains the Dart entrypoint function
+   * @param dartEntrypointFunctionName - The name of a Dart function to execute
+   */
   constructor(pathToBundle: string,
     dartEntrypointLibrary: string,
     dartEntrypointFunctionName: string) {
@@ -248,6 +276,11 @@ export class DartEntrypoint {
     this.dartEntrypointFunctionName = dartEntrypointFunctionName;
   }
 
+  /**
+   * Creates a default DartEntrypoint using the main function.
+   * @returns A DartEntrypoint configured with the default main entrypoint
+   * @throws Error if FlutterLoader is not initialized
+   */
   static createDefault() {
     const flutterLoader = FlutterInjector.getInstance().getFlutterLoader();
     if (!flutterLoader.initialized) {
@@ -259,8 +292,14 @@ export class DartEntrypoint {
 }
 
 
-/** Callback interface invoked when the isolate identifier becomes available. */
+/**
+ * Callback interface invoked when the isolate identifier becomes available.
+ */
 interface IsolateServiceIdListener {
+  /**
+   * Called when the isolate service ID becomes available.
+   * @param isolateServiceId - The isolate service ID
+   */
   onIsolateServiceIdAvailable(isolateServiceId: String): void;
 }
 
@@ -270,13 +309,19 @@ interface IsolateServiceIdListener {
  * that callback and other assets required for Dart execution.
  */
 export class DartCallback {
-  /** Standard HarmonyOS AssetManager, provided from some {@code Context} or {@code Resources}. */
+  /** Standard OpenHarmony ResourceManager for accessing assets. */
   public resourceManager: resourceManager.ResourceManager;
-  /** The path within the AssetManager where the app will look for assets. */
+  /** The path within the ResourceManager where the app will look for assets. */
   public pathToBundle: string;
   /** A Dart callback that was previously registered with the Dart VM. */
   public callbackHandle: FlutterCallbackInformation;
 
+  /**
+   * Constructs a new DartCallback instance.
+   * @param resourceManager - Standard OpenHarmony ResourceManager
+   * @param pathToBundle - The path within the ResourceManager where the app will look for assets
+   * @param callbackHandle - A Dart callback that was previously registered with the Dart VM
+   */
   constructor(resourceManager: resourceManager.ResourceManager,
     pathToBundle: string,
     callbackHandle: FlutterCallbackInformation) {
@@ -285,6 +330,10 @@ export class DartCallback {
     this.callbackHandle = callbackHandle;
   }
 
+  /**
+   * Returns a string representation of this DartCallback.
+   * @returns A string describing the callback's bundle path, library path, and function name
+   */
   toString(): String {
     return "DartCallback( bundle path: "
       + this.pathToBundle
@@ -296,38 +345,49 @@ export class DartCallback {
   }
 }
 
+/**
+ * Default implementation of BinaryMessenger that delegates to DartMessenger.
+ */
 export class DefaultBinaryMessenger implements BinaryMessenger {
   private messenger: DartMessenger;
 
+  /**
+   * Constructs a new DefaultBinaryMessenger instance.
+   * @param messenger - The DartMessenger instance to delegate to
+   */
   constructor(messenger: DartMessenger) {
     this.messenger = messenger;
   }
 
+  /**
+   * Creates a background task queue for handling messages asynchronously.
+   * @param options - Optional task queue configuration options
+   * @returns A TaskQueue instance for background message processing
+   */
   makeBackgroundTaskQueue(options?: TaskQueueOptions): TaskQueue {
     return this.messenger.makeBackgroundTaskQueue(options);
   }
 
   /**
-   * Sends the given {@code messages} from HarmonyOS to Dart over the given {@code channel} and then
-   * has the provided {@code callback} invoked when the Dart side responds.
+   * Sends a message from OpenHarmony to Dart over the given channel and then
+   * has the provided callback invoked when the Dart side responds.
    *
-   * @param channel the name of the logical channel used for the message.
-   * @param message the message payload, a direct-allocated {@link ByteBuffer} with the message
-   *     bytes between position zero and current position, or null.
-   * @param callback a callback invoked when the Dart application responds to the message
+   * @param channel - The name of the logical channel used for the message
+   * @param message - The message payload as an ArrayBuffer, or null for an empty message
+   * @param callback - A callback invoked when the Dart application responds to the message
    */
-
   send(channel: String, message: ArrayBuffer, callback?: BinaryReply): void {
     this.messenger.send(channel, message, callback);
   }
 
   /**
-   * Sets the given {@link io.flutter.plugin.common.BinaryMessenger.BinaryMessageHandler} as the
-   * singular handler for all incoming messages received from the Dart side of this Dart execution
-   * context.
+   * Sets the given BinaryMessageHandler as the singular handler for all incoming messages
+   * received from the Dart side of this Dart execution context.
    *
-   * @param channel the name of the channel.
-   * @param handler a {@link BinaryMessageHandler} to be invoked on incoming messages, or null.
+   * @param channel - The name of the channel
+   * @param handler - A BinaryMessageHandler to be invoked on incoming messages, or null
+   * @param taskQueue - Optional task queue for processing messages
+   * @param args - Additional arguments to pass to the handler
    */
   setMessageHandler(channel: String, handler: BinaryMessageHandler | SendableBinaryMessageHandler | null,
     taskQueue?: TaskQueue, ...args: Object[]): void {
@@ -335,15 +395,28 @@ export class DefaultBinaryMessenger implements BinaryMessenger {
   }
 }
 
+/**
+ * Message handler for the isolate channel that receives isolate service IDs.
+ */
 class IsolateChannelMessageHandler implements BinaryMessageHandler {
   private isolateServiceId: String;
   private isolateServiceIdListener: IsolateServiceIdListener | null = null;
 
+  /**
+   * Constructs a new IsolateChannelMessageHandler instance.
+   * @param isolateServiceId - The isolate service ID
+   * @param isolateServiceIdListener - Optional listener to be notified when the ID is available
+   */
   constructor(isolateServiceId: String, isolateServiceIdListener: IsolateServiceIdListener | null) {
     this.isolateServiceId = isolateServiceId;
     this.isolateServiceIdListener = isolateServiceIdListener;
   }
 
+  /**
+   * Handles a message received on the isolate channel.
+   * @param message - The message containing the isolate service ID
+   * @param callback - The reply callback
+   */
   onMessage(message: ArrayBuffer, callback: BinaryReply): void {
     this.isolateServiceId = StringCodec.INSTANCE.decodeMessage(message);
     if (this.isolateServiceIdListener != null) {

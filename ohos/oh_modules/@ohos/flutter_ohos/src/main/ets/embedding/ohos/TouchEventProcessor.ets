@@ -18,7 +18,14 @@ import Any from '../../plugin/common/Any';
 
 const OH_NATIVEXCOMPONENT_UNKNOWN = 4;
 const OH_NATIVEXCOMPONENT_TOOL_TYPE_UNKNOWN = 0;
+const PLATFORM_VIEW_ACTIVE_TOUCHES = 'platformViewActiveTouches';
+const PLATFORM_VIEW_LAST_TOUCH_EVENT = 'platformViewLastTouchEvent';
+const PLATFORM_VIEW_LAST_TOUCH_EVENT_IS_PX = 'platformViewLastTouchEventIsPx';
+const PLATFORM_VIEW_CANCEL_DRAINING = 'platformViewCancelDraining';
 
+/**
+ * Represents a touch point in a native XComponent touch event.
+ */
 class OH_NativeXComponent_TouchPoint {
   id: number = 0;
   screenX: number = 0.0;
@@ -31,6 +38,19 @@ class OH_NativeXComponent_TouchPoint {
   timeStamp: number = 0;
   isPressed: boolean = false;
 
+  /**
+   * Constructs a new OH_NativeXComponent_TouchPoint instance.
+   * @param id - The touch point ID
+   * @param screenX - The screen X coordinate
+   * @param screenY - The screen Y coordinate
+   * @param x - The local X coordinate
+   * @param y - The local Y coordinate
+   * @param type - The touch type
+   * @param size - The touch size
+   * @param force - The touch force
+   * @param timeStamp - The timestamp
+   * @param isPressed - Whether the touch is pressed
+   */
   constructor(id: number,
     screenX: number,
     screenY: number,
@@ -54,6 +74,9 @@ class OH_NativeXComponent_TouchPoint {
   }
 }
 
+/**
+ * Represents a native XComponent touch event.
+ */
 class OH_NativeXComponent_TouchEvent {
   id: number = 0;
   screenX: number = 0.0;
@@ -68,6 +91,21 @@ class OH_NativeXComponent_TouchEvent {
   touchPoints: OH_NativeXComponent_TouchPoint[] = [];
   numPoints: number = 0;
 
+  /**
+   * Constructs a new OH_NativeXComponent_TouchEvent instance.
+   * @param id - The event ID
+   * @param screenX - The screen X coordinate
+   * @param screenY - The screen Y coordinate
+   * @param x - The local X coordinate
+   * @param y - The local Y coordinate
+   * @param type - The touch type
+   * @param size - The touch size
+   * @param force - The touch force
+   * @param deviceId - The device ID
+   * @param timeStamp - The timestamp
+   * @param touchPoints - Array of touch points
+   * @param numPoints - Number of touch points
+   */
   constructor(id: number,
     screenX: number,
     screenY: number,
@@ -95,12 +133,22 @@ class OH_NativeXComponent_TouchEvent {
   }
 }
 
+/**
+ * Packet containing touch event data and tool information.
+ */
 class TouchPacket {
   touchEvent: OH_NativeXComponent_TouchEvent;
   toolType: number = OH_NATIVEXCOMPONENT_TOOL_TYPE_UNKNOWN;
   tiltX: number = 0;
   tiltY: number = 0;
 
+  /**
+   * Constructs a new TouchPacket instance.
+   * @param touchEvent - The touch event
+   * @param toolType - The tool type
+   * @param tiltX - The X-axis tilt
+   * @param tiltY - The Y-axis tilt
+   */
   constructor(touchEvent: OH_NativeXComponent_TouchEvent,
     toolType: number,
     tiltX: number,
@@ -112,6 +160,9 @@ class TouchPacket {
   }
 }
 
+/**
+ * Packet containing mouse event data.
+ */
 class MousePacket {
   offset: number;
   x: number;
@@ -122,6 +173,17 @@ class MousePacket {
   action: number;
   button: number;
 
+  /**
+   * Constructs a new MousePacket instance.
+   * @param offset - The offset value
+   * @param x - The local X coordinate
+   * @param y - The local Y coordinate
+   * @param screenX - The screen X coordinate
+   * @param screenY - The screen Y coordinate
+   * @param timestamp - The timestamp
+   * @param action - The mouse action
+   * @param button - The mouse button
+   */
   constructor(  offset: number,
     x: number,
     y: number,
@@ -141,9 +203,17 @@ class MousePacket {
   }
 }
 
+/**
+ * Processor for handling touch events received by FlutterNapi.
+ * This class processes and converts touch events from native format to Flutter format.
+ */
 export default class TouchEventProcessor {
   private static instance: TouchEventProcessor;
 
+  /**
+   * Gets the singleton instance of TouchEventProcessor.
+   * @returns The singleton TouchEventProcessor instance
+   */
   static getInstance(): TouchEventProcessor {
     if (TouchEventProcessor.instance == null) {
       TouchEventProcessor.instance = new TouchEventProcessor();
@@ -257,7 +327,13 @@ export default class TouchEventProcessor {
     return customTouchEvent1;
   }
 
-  /** Construct the CustomTouchEvent and return. */
+  /**
+   * Constructs a CustomTouchEvent from string array data.
+   * @param strings - Array of string values representing touch data
+   * @param top - The top offset
+   * @param left - The left offset
+   * @returns A CustomTouchEvent instance
+   */
   public constructCustomTouchEvent(strings: Array<string>, top: number, left: number): CustomTouchEvent {
     let densityPixels: number = display.getDefaultDisplaySync().densityPixels;
 
@@ -266,9 +342,61 @@ export default class TouchEventProcessor {
     return customTouchEvent;
   }
 
-  // 轴/滚轮坐标通过postAxisEvent传入到节点
+  private isTerminalTouch(type: TouchType): boolean {
+    return type === TouchType.Up || type === TouchType.Cancel;
+  }
+
+  private cloneTouchObjectWithType(touch: CustomTouchObject, type: TouchType): CustomTouchObject {
+    return new CustomTouchObject(type, touch.id, touch.displayX, touch.displayY, touch.windowX, touch.windowY,
+      touch.screenX, touch.screenY, touch.x, touch.y);
+  }
+
+  private getActiveTouches(params: Record<string, Any>, create: boolean = false): Map<number, CustomTouchObject> | undefined {
+    let activeTouches = params[PLATFORM_VIEW_ACTIVE_TOUCHES] as Map<number, CustomTouchObject> | undefined;
+    if (activeTouches === undefined && create) {
+      activeTouches = new Map<number, CustomTouchObject>();
+      params[PLATFORM_VIEW_ACTIVE_TOUCHES] = activeTouches;
+    }
+    return activeTouches;
+  }
+
+  private rememberPostedTouchEvent(params: Record<string, Any>, event: CustomTouchEvent): void {
+    params[PLATFORM_VIEW_LAST_TOUCH_EVENT] = event;
+    params[PLATFORM_VIEW_LAST_TOUCH_EVENT_IS_PX] = true;
+
+    let activeTouches = this.getActiveTouches(params, true)!;
+    if (event.type === TouchType.Cancel) {
+      activeTouches.clear();
+      return;
+    }
+
+    for (let touch of event.changedTouches) {
+      if (this.isTerminalTouch(touch.type)) {
+        activeTouches.delete(touch.id);
+      } else {
+        activeTouches.set(touch.id, this.cloneTouchObjectWithType(touch, touch.type));
+      }
+    }
+
+    for (let touch of event.touches) {
+      if (this.isTerminalTouch(touch.type)) {
+        activeTouches.delete(touch.id);
+      } else {
+        activeTouches.set(touch.id, this.cloneTouchObjectWithType(touch, touch.type));
+      }
+    }
+  }
+
+  /**
+   * Posts an axis/scroll event to platform views.
+   * Axis/wheel coordinates are passed to nodes through this method.
+   * @param strings - Array of string values representing axis event data
+   */
   public postAxisEvent(strings: Array<string>) {
     FlutterManager.getInstance().getFlutterViewList().forEach((value) => {
+      if (!value.getActive()) {
+        return
+      }
       let length = value.getDVModel().children.length
       for (let index = length - 1; index >= 0; index--) {
         const dvModel = value.getDVModel().children[index]
@@ -305,12 +433,19 @@ export default class TouchEventProcessor {
 
         let nodeController = params['nodeController'] as EmbeddingNodeController;
         nodeController.postAxisEvent(axisEvent)
-      }
+      }      
     });
   }
   
+  /**
+   * Posts a touch event to platform views.
+   * @param strings - Array of string values representing touch event data
+   */
   public postTouchEvent(strings: Array<string>) {
     FlutterManager.getInstance().getFlutterViewList().forEach((value) => {
+      if (!value.getActive()) {
+        return
+      }
       let length = value.getDVModel().children.length
       for (let index = length - 1; index >= 0; index--) {
         let dvModel = value.getDVModel().children[index]
@@ -322,15 +457,21 @@ export default class TouchEventProcessor {
           //如果flutter端判断当前platformView是可点击的，则将事件分发出去
           let touchEvent: CustomTouchEvent = TouchEventProcessor.getInstance().constructCustomTouchEvent(strings, top, left);
           let nodeController = params['nodeController'] as EmbeddingNodeController;
-          nodeController.postEvent(touchEvent)
+          nodeController.postEvent(touchEvent);
+          this.rememberPostedTouchEvent(params, touchEvent);
         } else {
           //如果触摸事件为OH_NATIVEXCOMPONENT_DOWN=0，且只有一个手指，说明是下一次点击了，这时候需要清空上一次的数据
           if (strings[6] == '0' && strings[0] == '1') {
             params['touchEvent'] = undefined
+            params[PLATFORM_VIEW_CANCEL_DRAINING] = false;
           }
           //如果触摸事件为OH_NATIVEXCOMPONENT_DOWN=0类型，且在flutter端还没判断当前view是否处于点击区域内，则
           //将点击事件存储在list列表中。
           let touchEvent: CustomTouchEvent = TouchEventProcessor.getInstance().constructCustomTouchEvent(strings, top, left);
+          const cancelDraining = params[PLATFORM_VIEW_CANCEL_DRAINING] as boolean ?? false;
+          if (cancelDraining && touchEvent.type !== TouchType.Down) {
+            continue;
+          }
           let array: Array<CustomTouchEvent> | undefined = params['touchEvent'] as Array<CustomTouchEvent>
           if (array == undefined) {
             array = []
@@ -398,8 +539,15 @@ export default class TouchEventProcessor {
   }
 
   // 鼠标坐标通过postInputEvent传入到节点
+  /**
+   * Posts a mouse event to platform views.
+   * @param strings - Array of string values representing mouse event data
+   */
   public postMouseEvent(strings: Array<string>) {
     FlutterManager.getInstance().getFlutterViewList().forEach((value) => {
+      if (!value.getActive()) {
+        return
+      }
       let length = value.getDVModel().children.length
       for (let index = length - 1; index >= 0; index--) {
         const dvModel = value.getDVModel().children[index]

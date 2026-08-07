@@ -18,7 +18,7 @@ const workerPort: ThreadWorkerGlobalScope = worker.workerPort;
  * Defines the event handler to be called when the worker thread receives a message sent by the host thread.
  * The event handler is executed in the worker thread.
  *
- * @param e message data
+ * @param e - The message event data
  */
 workerPort.onmessage = async (e: MessageEvents) => {
   let data: TaskState = e.data;
@@ -30,7 +30,7 @@ workerPort.onmessage = async (e: MessageEvents) => {
  * Defines the event handler to be called when the worker receives a message that cannot be deserialized.
  * The event handler is executed in the worker thread.
  *
- * @param e message data
+ * @param e - The message event data
  */
 workerPort.onmessageerror = (e: MessageEvents) => {
   Log.e(TAG, '#onmessageerror = ' + e.data);
@@ -40,12 +40,19 @@ workerPort.onmessageerror = (e: MessageEvents) => {
  * Defines the event handler to be called when an exception occurs during worker execution.
  * The event handler is executed in the worker thread.
  *
- * @param e error message
+ * @param e - The error event
  */
 workerPort.onerror = (e: ErrorEvent) => {
   Log.e(TAG, '#onerror = ' + e.message);
 }
 
+/**
+ * Handles a message in the worker thread.
+ * @param handler - The message handler to execute
+ * @param message - The message data as an ArrayBuffer
+ * @param args - Additional arguments to pass to the handler
+ * @returns A promise that resolves to the reply ArrayBuffer, or null if no reply
+ */
 async function handleMessage(handler: SendableBinaryMessageHandler,
                              message: ArrayBuffer,
                              args: Object[]): Promise<ArrayBuffer | null> {

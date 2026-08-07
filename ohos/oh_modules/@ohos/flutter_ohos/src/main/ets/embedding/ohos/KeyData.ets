@@ -6,6 +6,10 @@
 
 import util from '@ohos.util'
 
+/**
+ * Represents key event data for communication between OpenHarmony and Flutter.
+ * This class can serialize and deserialize key data to/from binary format.
+ */
 export default class KeyData {
   private static TAG = "KeyData";
   public static CHANNEL = "flutter/keydata";
@@ -15,14 +19,25 @@ export default class KeyData {
   //  * platform_dispatcher.dart (_kKeyDataFieldCount)
   private static FIELD_COUNT: number = 6;
   private static BYTES_PER_FIELD: number = 8;
+  /** Timestamp of the key event. */
   public timestamp: number = 0;
+  /** Type of the key event (KDOWN, KUP, or KREPEAT). */
   public type: Type = Type.KDOWN;
+  /** Physical key code. */
   public physicalKey: number = 0;
+  /** Logical key code. */
   public logicalKey: number = 0;
+  /** Whether this key event was synthesized. */
   public isSynthesized: boolean = false;
+  /** Type of the input device. */
   public deviceType: DeviceType = DeviceType.KKEYBOARD;
+  /** Character representation of the key, or null if not applicable. */
   public character: string | null = null;
 
+  /**
+   * Constructs a new KeyData instance.
+   * @param buffer - Optional ArrayBuffer to deserialize key data from
+   */
   constructor(buffer?: ArrayBuffer) {
     if (buffer !== undefined) {
       const view = new DataView(buffer);
@@ -61,6 +76,10 @@ export default class KeyData {
     }
   }
 
+  /**
+   * Serializes this KeyData instance to a binary ArrayBuffer.
+   * @returns The serialized key data as an ArrayBuffer
+   */
   public toBytes(): ArrayBuffer {
     const encoder = new util.TextEncoder("utf-8");
     const encodedCharBytes = this.character == null ? null : encoder.encode(this.character);
@@ -100,12 +119,18 @@ export default class KeyData {
   }
 }
 
+/**
+ * Key event types.
+ */
 export enum Type {
   KDOWN = 0,
   KUP,
   KREPEAT
 }
 
+/**
+ * Types of input devices.
+ */
 export enum DeviceType {
   KKEYBOARD = 0,
   KDIRECTIONALPAD,

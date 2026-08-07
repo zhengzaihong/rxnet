@@ -14,26 +14,46 @@ import Log from '../../../util/Log';
 import JSONMessageCodec from '../../../plugin/common/JSONMessageCodec';
 import { KeyCode } from '@kit.InputKit';
 import { ModifierKeyMetaInfo } from '../../ohos/KeyboardMap'
+import Any from '../../../plugin/common/Any';
 
+/**
+ * Channel for handling keyboard key events between OpenHarmony and Flutter.
+ * This channel manages communication of key events, including both hardware keyboard events
+ * and simulated key events for soft-keyboard text-editing. It uses a BasicMessageChannel
+ * with JSON encoding to send key event data to the Flutter framework.
+ */
 export default class KeyEventChannel {
   private static TAG = "KeyEventChannel";
   private static CHANNEL_NAME = "flutter/keyevent";
-  private channel: BasicMessageChannel<Map<String, Object>>;
+  private channel: BasicMessageChannel<Object>;
 
+  /**
+   * Constructs a new KeyEventChannel instance.
+   * @param binaryMessenger - The BinaryMessenger for sending messages to Dart
+   */
   constructor(binaryMessenger: BinaryMessenger) {
-    this.channel = new BasicMessageChannel<Map<String, Object>>(binaryMessenger, KeyEventChannel.CHANNEL_NAME,
+    this.channel = new BasicMessageChannel<Object>(binaryMessenger, KeyEventChannel.CHANNEL_NAME,
       JSONMessageCodec.INSTANCE);
   }
 
+  /**
+   * Sends a hardware key event to the Flutter framework.
+   * The event is encoded and sent asynchronously. The response handler will be called
+   * when Flutter responds, indicating whether the event was handled.
+   * @param keyEvent - The FlutterKeyEvent containing the OpenHarmony key event data
+   * @param isKeyUp - Whether this is a key up event (true) or key down event (false)
+   * @param responseHandler - Handler to receive the response from Flutter indicating if the event was handled
+   */
   sendFlutterKeyEvent(keyEvent: FlutterKeyEvent,
     isKeyUp: boolean,
     responseHandler: EventResponseHandler): void {
     this.channel.send(this.encodeKeyEvent(keyEvent, isKeyUp),
-      (message: Map<String, Object>) => {
+      (message: Object) => {
         let isEventHandled = false;
         try {
           if (message != null) {
-            isEventHandled = message.get("handled") as boolean;
+            const tmp: Record<string, Any> = message as Record<string, Any>;
+            isEventHandled = tmp["handled"] || false;
           }
         } catch (e) {
           Log.e(KeyEventChannel.TAG, "Unable to unpack JSON message: " + e);
@@ -58,16 +78,24 @@ export default class KeyEventChannel {
     return message;
   }
 
-  // simulate the hardware key event in soft-keyboard text-editing function of the inputMethod
+  /**
+   * Sends a simulated key event for soft-keyboard text-editing in the input method.
+   * This method is used for virtual keyboard events (e.g., arrow keys, selection keys)
+   * that are generated programmatically rather than from hardware input.
+   * @param keyEvent - The SimulateKeyEvent containing the simulated key data
+   * @param isKeyUp - Whether this is a key up event (true) or key down event (false)
+   * @param responseHandler - Handler to receive the response from Flutter indicating if the event was handled
+   */
   simulateSendFlutterKeyEvent(keyEvent: SimulateKeyEvent,
     isKeyUp: boolean,
     responseHandler: EventResponseHandler): void {
     this.channel.send(this.encodeSimulatedKeyEvent(keyEvent, isKeyUp),
-      (message: Map<String, Object>) => {
+      (message: Object) => {
         let isEventHandled = false;
         try {
           if (message !== null) {
-            isEventHandled = message.get("handled") as boolean;
+            const tmp: Record<string, Any> = message as Record<string, Any>;
+            isEventHandled = tmp["handled"] || false;
           }
         } catch (e) {
           Log.e(KeyEventChannel.TAG, "Unable to unpack JSON message: " + e);
@@ -87,17 +115,39 @@ export default class KeyEventChannel {
   }
 }
 
+/**
+ * Interface for handling event responses from the Flutter framework.
+ * Implementations of this interface receive callbacks when Flutter processes
+ * key events and indicates whether the event was handled.
+ */
 export interface EventResponseHandler {
+  /**
+   * Called when Flutter responds to a key event.
+   * This callback is invoked asynchronously after Flutter processes the key event.
+   * @param isEventHandled - Whether Flutter handled the event (true) or not (false)
+   */
   onFrameworkResponse: (isEventHandled: boolean) => void;
 }
 
+/**
+ * Wrapper for OpenHarmony KeyEvent that provides Flutter-compatible meta state information.
+ * OpenHarmony KeyEvent does not natively support meta state tracking for modifier keys
+ * (Ctrl, Alt, Shift) in the same way Flutter expects. This class supplements the missing
+ * functionality by tracking modifier key states and providing a getMetaState() method
+ * that returns a bitmask compatible with Flutter's key event handling.
+ */
 export class FlutterKeyEvent {
+  /** The underlying OpenHarmony KeyEvent instance. */
   event: KeyEvent;
   private mMetaState: number;
   private isCtrlPressed: boolean | undefined = false;
   private isAltPressed: boolean | undefined = false;
   private isShiftPressed: boolean | undefined = false;
 
+  /**
+   * Constructs a new FlutterKeyEvent instance.
+   * @param ohosKeyEvent - The OpenHarmony KeyEvent to wrap
+   */
   constructor(ohosKeyEvent: KeyEvent) {
     this.event = ohosKeyEvent;
     this.mMetaState = ModifierKeyMetaInfo.NONE;
@@ -107,9 +157,14 @@ export class FlutterKeyEvent {
     this.didUpdateOhosMetaState();
   }
 
-  // Supplementing the missing metaState feature of ohos, when long pressing the ‘ctrl’, ‘alt’, ‘shift’ keys
-  // to perform combination key operations across different apps, and returns the updated metaState value
-  // when ctrl/alt/shift key is pressed. Currently only supports metaState updates with Ctrl, Alt, and Shift keys.
+  /**
+   * Gets the meta state value as a bitmask.
+   * This supplements the missing metaState feature of OpenHarmony when pressing
+   * modifier keys (Ctrl, Alt, Shift) to perform combination key operations.
+   * The meta state is a bitmask that indicates which modifier keys are currently pressed.
+   * Currently only supports metaState tracking for Ctrl, Alt, and Shift keys.
+   * @returns The meta state value as a bitmask indicating pressed modifier keys
+   */
   getMetaState(): number {
     return this.mMetaState;
   }
@@ -180,10 +235,23 @@ export class FlutterKeyEvent {
   }
 }
 
-// simulated keyevent applied in soft-keyboard
+/**
+ * Simulated key event used in soft-keyboard text-editing.
+ * This class represents a programmatically generated key event, typically used
+ * for virtual keyboard interactions such as arrow keys, selection keys, or
+ * other input method editor (IME) operations. Unlike FlutterKeyEvent, this
+ * does not wrap a hardware KeyEvent and contains only the essential key information.
+ */
 export class SimulateKeyEvent {
+  /** The key code value identifying which key was pressed. */
   keyCode: number;
+  /** The text representation of the key (e.g., "Arrow Up", "Shift"). */
   keyText: string;
+  /**
+   * Constructs a new SimulateKeyEvent instance.
+   * @param keyCode - The key code value (e.g., KeyCode.KEYCODE_DPAD_UP)
+   * @param keyText - The text representation of the key (e.g., "Arrow Up")
+   */
   constructor(keyCode: number, keyText: string) {
     this.keyCode = keyCode;
     this.keyText = keyText;

@@ -21,7 +21,18 @@ import { ViewportMetrics } from '../../view/FlutterView';
 
 const TAG = "FlutterEnginePreload"
 
+/**
+ * Utility class for preloading Flutter engines.
+ * This class provides static methods to preload and prepare Flutter engines
+ * before they are actually displayed, improving startup performance.
+ */
 export default class FlutterEnginePreload {
+  /**
+   * Preloads a Flutter engine with the specified parameters.
+   * @param context - The application context
+   * @param params - Parameters for engine preloading, including entrypoint, route, etc.
+   * @param nextViewId - Optional view ID for the next Flutter view
+   */
   static async preloadEngine(context: common.Context, params: Record<string, Object> = {},
     nextViewId: string | null = null) {
     let loader: FlutterLoader = FlutterInjector.getInstance().getFlutterLoader();
@@ -76,6 +87,12 @@ export default class FlutterEnginePreload {
     }
   }
 
+  /**
+   * Prepares an existing engine for drawing by setting up viewport metrics and pre-drawing.
+   * @param engine - The FlutterEngine instance to prepare
+   * @param params - Parameters for engine preparation, including viewport metrics
+   * @param nextViewId - Optional view ID for the next Flutter view
+   */
   static predrawEngine(engine: FlutterEngine, params: Record<string, Object> = {}, nextViewId: string | null = null) {
     if (!engine) {
       return;
@@ -121,6 +138,13 @@ export default class FlutterEnginePreload {
     );
   }
 
+  /**
+   * Preloads a FlutterNapi instance with the specified configuration.
+   * @param context - The application context
+   * @param bundlePath - Path to the Flutter bundle
+   * @param params - Parameters for NAPI preloading, including cached engine ID, entrypoint, etc.
+   * @returns The preloaded FlutterNapi instance, or null if preloading fails
+   */
   static preLoadFlutterNapi(context: common.Context, bundlePath: string,
     params: Record<string, Object> = {}): FlutterNapi | null {
 

@@ -10,8 +10,20 @@
 
 import FlutterEngine from '../engine/FlutterEngine';
 
+/**
+ * Interface for configuring FlutterEngine instances.
+ * Implementations can customize engine setup and cleanup.
+ */
 export default interface FlutterEngineConfigurator {
-
+  /**
+   * Configures a FlutterEngine instance.
+   * @param flutterEngine - The FlutterEngine to configure
+   */
   configureFlutterEngine: (flutterEngine: FlutterEngine) => void;
+  
+  /**
+   * Cleans up a FlutterEngine instance.
+   * @param flutterEngine - The FlutterEngine to clean up
+   */
   cleanUpFlutterEngine: (flutterEngine: FlutterEngine) => void;
 }

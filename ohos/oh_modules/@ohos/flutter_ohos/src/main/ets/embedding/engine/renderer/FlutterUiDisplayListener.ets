@@ -8,8 +8,18 @@
 *
 */
 
+/**
+ * Listener interface for Flutter UI display state changes.
+ * Implementations of this interface are notified when Flutter UI is displayed or hidden.
+ */
 export interface FlutterUiDisplayListener {
+  /**
+   * Called when Flutter UI is displayed for the first time.
+   */
   onFlutterUiDisplayed(): void;
 
+  /**
+   * Called when Flutter UI is no longer displayed.
+   */
   onFlutterUiNoLongerDisplayed(): void;
 }

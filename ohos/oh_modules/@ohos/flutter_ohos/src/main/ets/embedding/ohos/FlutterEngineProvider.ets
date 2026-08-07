@@ -11,6 +11,15 @@
 import FlutterEngine from '../engine/FlutterEngine';
 import common from '@ohos.app.ability.common';
 
+/**
+ * Interface for providing FlutterEngine instances.
+ * Implementations of this interface can provide custom FlutterEngine instances.
+ */
 export default interface FlutterEngineProvider {
+  /**
+   * Provides a FlutterEngine instance for the given context.
+   * @param context - The application context
+   * @returns A FlutterEngine instance, or null if no engine should be provided
+   */
   provideFlutterEngine(context: common.Context): FlutterEngine | null;
 }

@@ -8,20 +8,24 @@
 *
 */
 
+/**
+ * Interface for app components that exclusively attach to a FlutterEngine.
+ * @template T - The type of the underlying app component
+ */
 export default interface ExclusiveAppComponent<T> {
   /**
-   * Called when another App Component is about to become attached to the {@link
-   * io.flutter.embedding.engine.FlutterEngine} this App Component is currently attached to.
+   * Called when another App Component is about to become attached to the
+   * {@link FlutterEngine} this App Component is currently attached to.
    *
-   * <p>This App Component's connections to the {@link io.flutter.embedding.engine.FlutterEngine}
+   * This App Component's connections to the {@link FlutterEngine}
    * are still valid at the moment of this call.
    */
   detachFromFlutterEngine(): void;
 
   /**
-   * Retrieve the App Component behind this exclusive App Component.
+   * Retrieves the App Component behind this exclusive App Component.
    *
-   * @return The app component.
+   * @returns The app component
    */
   getAppComponent(): T;
 }

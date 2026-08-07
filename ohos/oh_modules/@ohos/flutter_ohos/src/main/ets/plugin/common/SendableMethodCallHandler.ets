@@ -8,29 +8,31 @@ import { lang } from '@kit.ArkTS';
 import MethodCall from './MethodCall';
 import { MethodResult } from './MethodChannel';
 
-/** A handler of incoming method calls. */
 type ISendable = lang.ISendable;
 
+/**
+ * Interface for sendable method call handlers that can be used in background threads.
+ * This interface extends ISendable to allow handlers to be passed across thread boundaries.
+ */
 export default interface SendableMethodCallHandler extends ISendable {
   /**
    * Handles the specified method call received from Flutter.
    *
-   * <p>Handler implementations must submit a result for all incoming calls, by making a single
-   * call on the given {@link Result} callback. Failure to do so will result in lingering Flutter
+   * Handler implementations must submit a result for all incoming calls, by making a single
+   * call on the given {@link MethodResult} callback. Failure to do so will result in lingering Flutter
    * result handlers. The result may be submitted asynchronously and on any thread. Calls to
-   * unknown or unimplemented methods should be handled using {@link Result#notImplemented()}.
+   * unknown or unimplemented methods should be handled using {@link MethodResult#notImplemented()}.
    *
-   * <p>Any uncaught exception thrown by this method will be caught by the channel implementation
+   * Any uncaught exception thrown by this method will be caught by the channel implementation
    * and logged, and an error result will be sent back to Flutter.
    *
-   * <p>The handler is called on the platform thread (HarmonyOS main thread) by default, or
+   * The handler is called on the platform thread (OpenHarmony main thread) by default, or
    * otherwise on the thread specified by the {@link BinaryMessenger.TaskQueue} provided to the
-   * associated {@link MethodChannel} when it was created. See also <a
-   * href="https://github.com/flutter/flutter/wiki/The-Engine-architecture#threading">Threading in
-   * the Flutter Engine</a>.
+   * associated {@link MethodChannel} when it was created.
    *
-   * @param call A {@link MethodCall}.
-   * @param result A {@link Result} used for submitting the result of the call.
+   * @param call - A {@link MethodCall}
+   * @param result - A {@link MethodResult} used for submitting the result of the call
+   * @param args - Additional arguments
    */
   onMethodCall(call: MethodCall, result: MethodResult, ...args: Object[]): void;
 }

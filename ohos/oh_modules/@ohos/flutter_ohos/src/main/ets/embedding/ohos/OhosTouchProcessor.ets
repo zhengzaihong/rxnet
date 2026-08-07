@@ -7,16 +7,29 @@
 import { TouchEvent } from '@ohos.multimodalInput.touchEvent';
 import Any from '../../plugin/common/Any';
 
+/**
+ * Processor for handling touch events from OpenHarmony.
+ * This class processes touch events and converts them for Flutter.
+ */
 export default class OhosTouchProcessor {
   private static POINTER_DATA_FIELD_COUNT: number = 35;
+  /** Number of bytes per field in pointer data. */
   static BYTES_PER_FIELD: number = 8;
   private static POINTER_DATA_FLAG_BATCHED: number = 1;
 
+  /**
+   * Processes a touch event.
+   * @param event - The touch event from OpenHarmony
+   * @param transformMatrix - The transformation matrix to apply
+   */
   public onTouchEvent(event: TouchEvent, transformMatrix: Any): void {
 
   }
 }
 
+/**
+ * Types of pointer state changes.
+ */
 export enum PointerChange {
   CANCEL = 0,
   ADD = 1,
@@ -30,6 +43,9 @@ export enum PointerChange {
   PAN_ZOOM_END = 9
 }
 
+/**
+ * Types of pointer input devices.
+ */
 export enum PointerDeviceKind {
   TOUCH = 0,
   MOUSE = 1,
@@ -39,6 +55,9 @@ export enum PointerDeviceKind {
   UNKNOWN = 5
 }
 
+/**
+ * Types of pointer signal events.
+ */
 export enum PointerSignalKind {
   NONE = 0,
   SCROLL = 1,

@@ -6,7 +6,13 @@
 
 import UIAbility from '@ohos.app.ability.UIAbility';
 
+/**
+ * Wrapper adapter for window information repository callbacks.
+ */
 export default class WindowInfoRepositoryCallbackAdapterWrapper {
+  /**
+   * Constructs a new WindowInfoRepositoryCallbackAdapterWrapper instance.
+   */
   constructor() {
   }
 }

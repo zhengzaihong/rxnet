@@ -20,18 +20,22 @@ import LinkedList from '@ohos.util.LinkedList';
 import Any from './Any';
 
 /**
- * A {@link MessageCodec} using UTF-8 encoded JSON method calls and result envelopes.
+ * A {@link MessageCodec} using UTF-8 encoded JSON messages.
  *
- * <p>This codec is guaranteed to be compatible with the corresponding <a
- * href="https://api.flutter.dev/flutter/services/JSONMethodCodec-class.html">JSONMethodCodec</a> on
- * the Dart side. These parts of the Flutter SDK are evolved synchronously.
+ * This codec is guaranteed to be compatible with the corresponding `JSONMessageCodec` on the Dart side.
+ * These parts of the Flutter SDK are evolved synchronously.
  *
- * <p>On the Dart side, JSON messages are handled by the JSON facilities of the <a
- * href="https://api.dartlang.org/stable/dart-convert/JSON-constant.html">dart:convert</a> package.
+ * On the Dart side, JSON messages are handled by the JSON facilities of the `dart:convert` package.
  */
 export default class JSONMessageCodec implements MessageCodec<Object> {
+  /** Singleton instance of JSONMessageCodec. */
   static INSTANCE = new JSONMessageCodec();
 
+  /**
+   * Encodes a message into JSON binary format.
+   * @param message - The message to encode, possibly null
+   * @returns The encoded message as an ArrayBuffer
+   */
   encodeMessage(message: Any): ArrayBuffer {
     if (message == null) {
       return StringUtils.stringToArrayBuffer("");
@@ -39,6 +43,12 @@ export default class JSONMessageCodec implements MessageCodec<Object> {
     return StringCodec.INSTANCE.encodeMessage(JSON.stringify(this.toBaseData(message)));
   }
 
+  /**
+   * Decodes a binary message from JSON format.
+   * @param message - The binary message to decode, possibly null
+   * @returns The decoded message object
+   * @throws Error if the JSON is invalid
+   */
   decodeMessage(message: ArrayBuffer | null): Any {
     if (message == null) {
       return StringUtils.stringToArrayBuffer("");
@@ -65,6 +75,11 @@ export default class JSONMessageCodec implements MessageCodec<Object> {
     }
   }
 
+  /**
+   * Converts a message to base data types suitable for JSON serialization.
+   * @param message - The message to convert
+   * @returns The converted message with base data types
+   */
   toBaseData(message: Any): Any {
     if (message == null || message == undefined) {
       return null;

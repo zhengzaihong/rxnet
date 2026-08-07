@@ -19,47 +19,51 @@ import DartExecutor from '../dart/DartExecutor';
 /**
  * System channel to exchange restoration data between framework and engine.
  *
- * <p>The engine can obtain the current restoration data from the framework via this channel to
+ * The engine can obtain the current restoration data from the framework via this channel to
  * store it on disk and - when the app is relaunched - provide the stored data back to the framework
  * to recreate the original state of the app.
  *
- * <p>The channel can be configured to delay responding to the framework's request for restoration
- * data via {@code waitForRestorationData} until the engine-side has provided the data. This is
+ * The channel can be configured to delay responding to the framework's request for restoration
+ * data via waitForRestorationData until the engine-side has provided the data. This is
  * useful when the engine is pre-warmed at a point in the application's life cycle where the
  * restoration data is not available yet. For example, if the engine is pre-warmed as part of the
- * Application before an Ability is created, this flag should be set to true because HarmonyOS will
+ * Application before an Ability is created, this flag should be set to true because OpenHarmony will
  * only provide the restoration data to the Ability during the onCreate callback.
  *
- * <p>The current restoration data provided by the framework can be read via {@code
- * getRestorationData()}.
+ * The current restoration data provided by the framework can be read via getRestorationData.
  */
 export default class RestorationChannel {
   private static TAG = "RestorationChannel";
   private static CHANNEL_NAME = "flutter/restoration";
   /**
    * Whether the channel delays responding to the framework's initial request for restoration data
-   * until {@code setRestorationData} has been called.
+   * until setRestorationData has been called.
    *
-   * <p>If the engine never calls {@code setRestorationData} this flag must be set to false. If set
-   * to true, the engine must call {@code setRestorationData} either with the actual restoration
+   * If the engine never calls setRestorationData this flag must be set to false. If set
+   * to true, the engine must call setRestorationData either with the actual restoration
    * data as argument or null if it turns out that there is no restoration data.
    *
-   * <p>If the response to the framework's request for restoration data is not delayed until the
-   * data has been set via {@code setRestorationData}, the framework may intermittently initialize
+   * If the response to the framework's request for restoration data is not delayed until the
+   * data has been set via setRestorationData, the framework may intermittently initialize
    * itself to default values until the restoration data has been made available. Setting this flag
    * to true avoids that extra work.
    */
   public waitForRestorationData: boolean = false;
+  /** Pending framework restoration channel request waiting for restoration data. */
   public pendingFrameworkRestorationChannelRequest: MethodResult | null = null;
+  /** Whether the engine has provided restoration data. */
   public engineHasProvidedData: boolean = false;
+  /** Whether the framework has requested restoration data. */
   public frameworkHasRequestedData: boolean = false;
-  // Holds the most current restoration data which may have been provided by the engine
-  // via "setRestorationData" or by the framework via the method channel. This is the data the
-  // framework should be restored to in case the app is terminated.
   private restorationData: Uint8Array;
   private channel: MethodChannel | null = null;
   private handler: MethodCallHandler;
 
+  /**
+   * Constructs a new RestorationChannel instance.
+   * @param channelOrExecutor - Either a MethodChannel or DartExecutor instance
+   * @param waitForRestorationData - Whether to wait for restoration data before responding
+   */
   constructor(channelOrExecutor: MethodChannel | DartExecutor, waitForRestorationData: boolean) {
     if (channelOrExecutor instanceof MethodChannel) {
       this.channel = channelOrExecutor;
@@ -73,16 +77,26 @@ export default class RestorationChannel {
     this.channel.setMethodCallHandler(this.handler);
   }
 
-  /** Obtain the most current restoration data that the framework has provided. */
+  /**
+   * Gets the most current restoration data that the framework has provided.
+   * @returns The restoration data as a Uint8Array
+   */
   getRestorationData(): Uint8Array {
     return this.restorationData;
   }
 
+  /**
+   * Sets the restoration data without sending it to the framework.
+   * @param data - The restoration data to set
+   */
   setRestorationDataOnly(data: Uint8Array) {
     this.restorationData = data;
   }
 
-  /** Set the restoration data from which the framework will restore its state. */
+  /**
+   * Sets the restoration data from which the framework will restore its state.
+   * @param data - The restoration data to set
+   */
   setRestorationData(data: Uint8Array) {
     this.engineHasProvidedData = true;
     if (this.pendingFrameworkRestorationChannelRequest != null) {
@@ -122,7 +136,7 @@ export default class RestorationChannel {
   /**
    * Clears the current restoration data.
    *
-   * <p>This should be called just prior to a hot restart. Otherwise, after the hot restart the
+   * This should be called just prior to a hot restart. Otherwise, after the hot restart the
    * state prior to the hot restart will get restored.
    */
   clearData() {
@@ -130,13 +144,25 @@ export default class RestorationChannel {
   }
 }
 
+/**
+ * Method call handler for the restoration channel.
+ */
 class RestorationChannelMethodCallHandler implements MethodCallHandler {
   private channel: RestorationChannel;
 
+  /**
+   * Constructs a new RestorationChannelMethodCallHandler instance.
+   * @param channel - The RestorationChannel instance
+   */
   constructor(channel: RestorationChannel) {
     this.channel = channel;
   }
 
+  /**
+   * Handles method calls from Dart.
+   * @param call - The method call from Dart
+   * @param result - The result callback to send a response
+   */
   onMethodCall(call: MethodCall, result: MethodResult): void {
     const method = call.method;
     const args: Any = call.args;
@@ -166,6 +192,11 @@ class RestorationChannelMethodCallHandler implements MethodCallHandler {
     }
   }
 
+  /**
+   * Packages restoration data into a message format.
+   * @param data - The restoration data to package
+   * @returns A map containing the packaged restoration data
+   */
   static packageData(data: Uint8Array): Map<string, Any> {
     const packaged: Map<string, Any> = new Map();
     packaged.set("enabled", true);

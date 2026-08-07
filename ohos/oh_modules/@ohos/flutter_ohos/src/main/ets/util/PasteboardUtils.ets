@@ -8,10 +8,18 @@ import { abilityAccessCtrl } from "@kit.AbilityKit";
 import FlutterManager from "../embedding/ohos/FlutterManager";
 import Log from "./Log";
 
+/**
+ * Utility class for pasteboard operations.
+ * Provides methods for copying and pasting data to/from the system pasteboard.
+ */
 export class PasteboardUtils {
   private static TAG = "PasteboardUtils";
 
-  static setCopyData(text: string) { // copy date to the ohos pasteboard
+  /**
+   * Copies text data to the OpenHarmony pasteboard.
+   * @param text - The text to copy
+   */
+  static setCopyData(text: string) {
     const pasteData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, text);
     const systemPasteboard: pasteboard.SystemPasteboard = pasteboard.getSystemPasteboard();
     try {
@@ -21,7 +29,12 @@ export class PasteboardUtils {
     }
   }
 
-  static getPasteDataAsync(): Promise<string> { // paste data from the ohos pasteboard
+  /**
+   * Gets paste data from the OpenHarmony pasteboard asynchronously.
+   * Requests READ_PASTEBOARD permission if needed.
+   * @returns A Promise that resolves to the pasted text, or empty string if no text is available.
+   */
+  static getPasteDataAsync(): Promise<string> {
     return new Promise((resolve) => {
       let atManager = abilityAccessCtrl.createAtManager();
       // request the ohos paste operation authority
@@ -42,16 +55,15 @@ export class PasteboardUtils {
               const recordCount: number = pasteData.getRecordCount();
               for (let i = 0; i < recordCount; i++) {
                 const record = pasteData.getRecord(i);
-                if (record.mimeType !== pasteboard.MIMETYPE_TEXT_PLAIN
-                  && record.mimeType !== pasteboard.MIMETYPE_TEXT_HTML) {
-                  continue;
-                }
                 let text: string = '';
-                if (record.mimeType === pasteboard.MIMETYPE_TEXT_PLAIN) {
-                  text = record.plainText;
+                if (typeof record.getValidTypes === 'function') {
+                  // For api14 and above, click here. More formats are supported
+                  text = await PasteboardUtils.getTargetTypesData(record);
                 } else if (record.mimeType === pasteboard.MIMETYPE_TEXT_HTML) {
                   const htmlText: StyledString = await StyledString.fromHtml(record.htmlText);
                   text = htmlText.getString();
+                } else if (record.mimeType === pasteboard.MIMETYPE_TEXT_PLAIN) {
+                  text = record.plainText;
                 }
                 pasteText += text;
               }
@@ -72,5 +84,36 @@ export class PasteboardUtils {
         Log.e(PasteboardUtils.TAG, "Failed to request permissions from user. Cause: " + JSON.stringify(err));
       })
     });
+  }
+
+  static async getTargetTypesData(record: pasteboard.PasteDataRecord): Promise<string> {
+    let targetTypes: string[] = [
+      pasteboard.MIMETYPE_TEXT_PLAIN,
+      pasteboard.MIMETYPE_TEXT_HTML
+    ];
+    let tmpTypes: string[] = record.getValidTypes(targetTypes);
+    let str: string = '';
+    for (let j = 0; j < tmpTypes.length; j++) {
+      let value = '';
+      try {
+        value = await record.getData(tmpTypes[j]) as string;
+      } catch (error) {
+        Log.e(PasteboardUtils.TAG, "Failed to record.getData: " + JSON.stringify(error));
+      }
+      if (value) {
+        if (tmpTypes[j] === pasteboard.MIMETYPE_TEXT_HTML) {
+          try {
+            const htmlText: StyledString = await StyledString.fromHtml(value);
+            str = htmlText.getString();
+          } catch (error) {
+            Log.e(PasteboardUtils.TAG, "Failed to record.getData: " + JSON.stringify(error));
+          }
+        } else {
+          str = value
+        }
+        break;
+      }
+    }
+    return str;
   }
 }

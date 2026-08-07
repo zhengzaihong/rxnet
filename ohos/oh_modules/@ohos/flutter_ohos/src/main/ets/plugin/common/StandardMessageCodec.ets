@@ -23,56 +23,61 @@ import { ArrayList } from '@kit.ArkTS';
 /**
  * MessageCodec using the Flutter standard binary encoding.
  *
- * <p>This codec is guaranteed to be compatible with the corresponding <a
- * href="https://api.flutter.dev/flutter/services/StandardMessageCodec-class.html">StandardMessageCodec</a>
+ * This codec is guaranteed to be compatible with the corresponding `StandardMessageCodec`
  * on the Dart side. These parts of the Flutter SDK are evolved synchronously.
  *
- * <p>Supported messages are acyclic values of these forms:
+ * Supported messages are acyclic values of these forms:
+ *   null
+ *   Booleans
+ *   number
+ *   BigIntegers (see below)
+ *   Int8Array, Int32Array, Float32Array, Float64Array
+ *   Strings
+ *   Array[]
+ *   Lists of supported values
+ *   Maps with supported keys and values
  *
- * <ul>
- *   <li>null
- *   <li>Booleans
- *   <li>number
- *   <li>BigIntegers (see below)
- *   <li>Int8Array, Int32Array, Float32Array, Float64Array
- *   <li>Strings
- *   <li>Array[]
- *   <li>Lists of supported values
- *   <li>Maps with supported keys and values
- * </ul>
  *
- * <p>On the Dart side, these values are represented as follows:
+ * On the Dart side, these values are represented as follows:
+ *   null: null
+ *   Boolean: bool
+ *   Byte, Short, Integer, Long: int
+ *   Float, Double: double
+ *   String: String
+ *   byte[]: Uint8List
+ *   int[]: Int32List
+ *   long[]: Int64List
+ *   float[]: Float32List
+ *   double[]: Float64List
+ *   List: List
+ *   Map: Map
  *
- * <ul>
- *   <li>null: null
- *   <li>Boolean: bool
- *   <li>Byte, Short, Integer, Long: int
- *   <li>Float, Double: double
- *   <li>String: String
- *   <li>byte[]: Uint8List
- *   <li>int[]: Int32List
- *   <li>long[]: Int64List
- *   <li>float[]: Float32List
- *   <li>double[]: Float64List
- *   <li>List: List
- *   <li>Map: Map
- * </ul>
- *
- * <p>BigIntegers are represented in Dart as strings with the hexadecimal representation of the
+ * BigIntegers are represented in Dart as strings with the hexadecimal representation of the
  * integer's value.
  *
- * <p>To extend the codec, overwrite the writeValue and readValueOfType methods.
+ * To extend the codec, overwrite the writeValue and readValueOfType methods.
  */
 export default class StandardMessageCodec implements MessageCodec<Any> {
   private static TAG = "StandardMessageCodec#";
+  /** Singleton instance of StandardMessageCodec. */
   static INSTANCE = new StandardMessageCodec();
 
+  /**
+   * Encodes a message into binary format using the standard encoding.
+   * @param message - The message to encode
+   * @returns The encoded message as an ArrayBuffer
+   */
   encodeMessage(message: Any): ArrayBuffer {
     const stream = ByteBuffer.from(new ArrayBuffer(1024))
     this.writeValue(stream, message);
     return stream.buffer
   }
 
+  /**
+   * Decodes a binary message from the standard encoding.
+   * @param message - The binary message to decode, possibly null
+   * @returns The decoded message
+   */
   decodeMessage(message: ArrayBuffer | null): Any {
     if (message == null) {
       return null
@@ -99,6 +104,12 @@ export default class StandardMessageCodec implements MessageCodec<Any> {
   private INT64_MAX = 9223372036854775807;
   private INT64_MIN = -9223372036854775808;
 
+  /**
+   * Writes a value to the byte buffer using the standard encoding.
+   * @param stream - The ByteBuffer to write to
+   * @param value - The value to write
+   * @returns The ByteBuffer stream
+   */
   writeValue(stream: ByteBuffer, value: Any): Any {
     if (value == null || value == undefined) {
       stream.writeInt8(StandardMessageCodec.NULL);
@@ -123,8 +134,6 @@ export default class StandardMessageCodec implements MessageCodec<Any> {
         stream.writeFloat64(value, true);
       }
     } else if (typeof value === "bigint") {
-      // https://api.flutter.dev/flutter/services/StandardMessageCodec/writeValue.html
-      //
       // The format is first the type byte (0x05), then the actual number
       // as an ASCII string giving the hexadecimal representation of the
       // integer, with the string's length as encoded by writeSize
@@ -201,6 +210,11 @@ export default class StandardMessageCodec implements MessageCodec<Any> {
     return stream;
   }
 
+  /**
+   * Writes alignment padding to the stream.
+   * @param stream - The ByteBuffer to write to
+   * @param alignment - The alignment requirement (e.g., 4, 8)
+   */
   writeAlignment(stream: ByteBuffer, alignment: number) {
     let mod: number = stream.byteOffset % alignment;
     if (mod != 0) {
@@ -210,6 +224,11 @@ export default class StandardMessageCodec implements MessageCodec<Any> {
     }
   }
 
+  /**
+   * Writes a size value to the stream using compact encoding.
+   * @param stream - The ByteBuffer to write to
+   * @param value - The size value to write
+   */
   writeSize(stream: ByteBuffer, value: number) {
     if (value < 254) {
       stream.writeUint8(value);
@@ -222,11 +241,21 @@ export default class StandardMessageCodec implements MessageCodec<Any> {
     }
   }
 
+  /**
+   * Writes a byte array to the stream.
+   * @param stream - The ByteBuffer to write to
+   * @param bytes - The byte array to write
+   */
   writeBytes(stream: ByteBuffer, bytes: Uint8Array) {
     this.writeSize(stream, bytes.length)
     stream.writeUint8Array(bytes);
   }
 
+  /**
+   * Reads a size value from the buffer using compact encoding.
+   * @param buffer - The ByteBuffer to read from
+   * @returns The size value
+   */
   readSize(buffer: ByteBuffer) {
     let value = buffer.readUint8() & 0xff;
     if (value < 254) {
@@ -238,6 +267,11 @@ export default class StandardMessageCodec implements MessageCodec<Any> {
     }
   }
 
+  /**
+   * Reads alignment padding from the buffer.
+   * @param buffer - The ByteBuffer to read from
+   * @param alignment - The alignment requirement (e.g., 4, 8)
+   */
   readAlignment(buffer: ByteBuffer, alignment: number) {
     let mod = buffer.byteOffset % alignment;
     if (mod != 0) {
@@ -245,11 +279,21 @@ export default class StandardMessageCodec implements MessageCodec<Any> {
     }
   }
 
+  /**
+   * Reads a value from the buffer using the standard encoding.
+   * @param buffer - The ByteBuffer to read from
+   * @returns The decoded value
+   */
   readValue(buffer: ByteBuffer): Any {
     let type = buffer.readUint8()
     return this.readValueOfType(type, buffer);
   }
 
+  /**
+   * Reads a byte array from the buffer.
+   * @param buffer - The ByteBuffer to read from
+   * @returns The byte array
+   */
   readBytes(buffer: ByteBuffer): Uint8Array {
     let length = this.readSize(buffer);
     let bytesBuffer = new ArrayBuffer(length);
@@ -258,6 +302,13 @@ export default class StandardMessageCodec implements MessageCodec<Any> {
     return bytes;
   }
 
+  /**
+   * Reads a value of a specific type from the buffer.
+   * @param type - The type code to read
+   * @param buffer - The ByteBuffer to read from
+   * @returns The decoded value
+   * @throws Error if the type is unknown or the message is corrupted
+   */
   readValueOfType(type: number, buffer: ByteBuffer): Any {
     let result: Any;
     switch (type) {

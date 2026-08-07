@@ -12,7 +12,7 @@ export { default as FlutterEngineGroupCache } from './src/main/ets/embedding/eng
 export { default as FlutterNapi } from './src/main/ets/embedding/engine/FlutterNapi';
 export * from './src/main/ets/embedding/engine/FlutterOverlaySurface';
 export { default as FlutterShellArgs } from './src/main/ets/embedding/engine/FlutterShellArgs';
-export { default as DartExecutor } from './src/main/ets/embedding/engine/dart/DartExecutor';
+export { default as DartExecutor, DartCallback } from './src/main/ets/embedding/engine/dart/DartExecutor';
 export * from './src/main/ets/embedding/engine/dart/DartMessenger';
 export * from './src/main/ets/embedding/engine/dart/PlatformMessageHandler';
 export { default as ApplicationInfoLoader } from './src/main/ets/embedding/engine/loader/ApplicationInfoLoader';
@@ -32,6 +32,7 @@ export { default as KeyEventChannel } from './src/main/ets/embedding/engine/syst
 export { default as LifecycleChannel } from './src/main/ets/embedding/engine/systemchannels/LifecycleChannel';
 export { default as LocalizationChannel } from './src/main/ets/embedding/engine/systemchannels/LocalizationChannel';
 export { default as MouseCursorChannel } from './src/main/ets/embedding/engine/systemchannels/MouseCursorChannel';
+export { default as DisplayMetricsChannel } from './src/main/ets/embedding/engine/systemchannels/DisplayMetricsChannel';
 export { default as NavigationChannel } from './src/main/ets/embedding/engine/systemchannels/NavigationChannel';
 export { default as PlatformChannel } from './src/main/ets/embedding/engine/systemchannels/PlatformChannel';
 export { default as PlatformViewsChannel } from './src/main/ets/embedding/engine/systemchannels/PlatformViewsChannel';
@@ -40,6 +41,7 @@ export { default as SettingsChannel } from './src/main/ets/embedding/engine/syst
 export { default as SystemChannel } from './src/main/ets/embedding/engine/systemchannels/SystemChannel';
 export { default as TestChannel } from './src/main/ets/embedding/engine/systemchannels/TestChannel';
 export { default as TextInputChannel } from './src/main/ets/embedding/engine/systemchannels/TextInputChannel';
+export { default as NativeVsyncChannel } from './src/main/ets/embedding/engine/systemchannels/NativeVsyncChannel';
 export { default as ExclusiveAppComponent } from './src/main/ets/embedding/ohos/ExclusiveAppComponent';
 export * from './src/main/ets/embedding/ohos/FlutterAbility';
 export * from './src/main/ets/embedding/ohos/FlutterAbilityAndEntryDelegate';

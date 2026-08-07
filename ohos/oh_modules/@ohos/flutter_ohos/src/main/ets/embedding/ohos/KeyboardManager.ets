@@ -17,12 +17,22 @@ import { KeyEventHandler } from './KeyEventHandler';
 import HashSet from '@ohos.util.HashSet';
 import { KeyCode } from '@kit.InputKit';
 
+/**
+ * Manages keyboard events and state for Flutter.
+ * This class coordinates between key event channels, keyboard channels, and text input handling.
+ */
 export default class KeyboardManager {
   private keyEventChannel: KeyEventChannel | null = null;
   private keyboardChannel: KeyboardChannel | null = null;
+  /** The key embedder responder for handling key events. */
   protected keyEmbedderResponder: KeyEmbedderResponder;
   private keyEventHandler: KeyEventHandler;
 
+  /**
+   * Constructs a new KeyboardManager instance.
+   * @param engine - The FlutterEngine instance
+   * @param textInputPlugin - The TextInputPlugin instance
+   */
   constructor(engine: FlutterEngine, textInputPlugin: TextInputPlugin) {
     this.keyEventChannel = new KeyEventChannel(engine.dartExecutor);
     this.keyboardChannel = new KeyboardChannel(engine.dartExecutor);
@@ -31,10 +41,20 @@ export default class KeyboardManager {
     this.keyEventHandler = new KeyEventHandler(textInputPlugin);
   }
 
+  /**
+   * Handles key events before they are processed by the input method editor.
+   * @param event - The key event
+   * @returns Whether the event was handled
+   */
   onKeyPreIme(event: KeyEvent) : boolean {
     return false;
   }
 
+  /**
+   * Handles key events.
+   * @param event - The key event
+   * @returns Whether the event was handled
+   */
   onKeyEvent(event: KeyEvent) : boolean {
     this.keyEmbedderResponder.handleKeyEvent(event);
 
@@ -46,11 +66,22 @@ export default class KeyboardManager {
     return false;
   }
 
+  /**
+   * Gets the current keyboard state (pressed keys).
+   * @returns A map of pressed key codes
+   */
   public getKeyboardState(): Map<number, number> {
     return this.keyEmbedderResponder.getPressedKeys();
   }
 }
 
+/**
+ * Interface for handling key events.
+ */
 export interface Responder {
+  /**
+   * Handles a key event.
+   * @param keyEvent - The key event to handle
+   */
   handleKeyEvent(keyEvent: KeyEvent): void;
 }

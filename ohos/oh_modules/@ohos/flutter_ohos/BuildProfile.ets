@@ -1,9 +1,9 @@
 /**
  * Use these variables when you tailor your ArkTS code. They must be of the const type.
  */
-export const HAR_VERSION = '1.0.0-a97ffb0c09';
-export const BUILD_MODE_NAME = 'release';
-export const DEBUG = false;
+export const HAR_VERSION = '1.0.0-97a3efd6c9d';
+export const BUILD_MODE_NAME = 'debug';
+export const DEBUG = true;
 export const TARGET_NAME = 'default';
 
 /**

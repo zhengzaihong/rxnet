@@ -18,9 +18,9 @@ export default class Log {
   private static _logLevel = HiLog.LogLevel.WARN;
 
   /**
-   * Set log level.
+   * Sets the log level.
    *
-   * @param level Indecated the log level.
+   * @param level - The log level
    */
   public static setLogLevel(level: HiLog.LogLevel) {
     Log._logLevel = level;
@@ -29,9 +29,9 @@ export default class Log {
   /**
    * Outputs debug-level logs.
    *
-   * @param tag Identifies the log tag.
-   * @param format Indicates the log format string.
-   * @param args Indicates the log parameters.
+   * @param tag - The log tag
+   * @param format - The log format string
+   * @param args - The log parameters
    * @since 7
    */
   static d(tag: string, format: string, ...args: Object[]) {
@@ -43,9 +43,9 @@ export default class Log {
   /**
    * Outputs info-level logs.
    *
-   * @param tag Identifies the log tag.
-   * @param format Indicates the log format string.
-   * @param args Indicates the log parameters.
+   * @param tag - The log tag
+   * @param format - The log format string
+   * @param args - The log parameters
    * @since 7
    */
   static i(tag: string, format: string, ...args: Object[]) {
@@ -57,9 +57,9 @@ export default class Log {
   /**
    * Outputs warning-level logs.
    *
-   * @param tag Identifies the log tag.
-   * @param format Indicates the log format string.
-   * @param args Indicates the log parameters.
+   * @param tag - The log tag
+   * @param format - The log format string
+   * @param args - The log parameters
    * @since 7
    */
   static w(tag: string, format: string, ...args: Object[]) {
@@ -71,9 +71,9 @@ export default class Log {
   /**
    * Outputs error-level logs.
    *
-   * @param tag Identifies the log tag.
-   * @param format Indicates the log format string.
-   * @param args Indicates the log parameters.
+   * @param tag - The log tag
+   * @param format - The log format string
+   * @param args - The log parameters
    * @since 7
    */
   static e(tag: string, format: string, ...args: Object[]) {
@@ -91,9 +91,9 @@ export default class Log {
   /**
    * Outputs fatal-level logs.
    *
-   * @param tag Identifies the log tag.
-   * @param format Indicates the log format string.
-   * @param args Indicates the log parameters.
+   * @param tag - The log tag
+   * @param format - The log format string
+   * @param args - The log parameters
    * @since 7
    */
   static f(tag: string, format: string, ...args: Object[]) {
@@ -103,10 +103,10 @@ export default class Log {
   }
 
   /**
-   * Checks whether logs of the specified tag, and level can be printed.
+   * Checks whether logs of the specified tag and level can be printed.
    *
-   * @param tag Identifies the log tag.
-   * @param level log level
+   * @param level - The log level
+   * @returns True if logs can be printed, false otherwise
    * @since 7
    */
   private static isLoggable(level: HiLog.LogLevel): boolean {

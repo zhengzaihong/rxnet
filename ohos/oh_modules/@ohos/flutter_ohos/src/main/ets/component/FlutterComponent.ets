@@ -5,10 +5,15 @@
 */
 
 /**
- * 基础component，还未封装，看情况是否使用
+ * Basic Flutter component, not yet fully encapsulated.
+ * This is a placeholder component that may be used as needed.
  */
 @Component
 export default struct FlutterComponent {
+  /**
+   * Builds the component UI.
+   * @returns The component tree
+   */
   build() {
     Row() {
       Column() {

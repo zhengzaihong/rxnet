@@ -9,13 +9,28 @@
 */
 import Any from './Any';
 
+/**
+ * Exception class for Flutter platform channel errors.
+ * This class represents errors that occur during communication between Flutter and the platform.
+ */
 export default class FlutterException implements Error {
+  /** Optional stack trace for the error. */
   stack?: string;
+  /** The error message. */
   message: string;
+  /** The error name. */
   name: string = "";
+  /** The error code. */
   code: string;
+  /** Additional error details. */
   details: Any
 
+  /**
+   * Constructs a new FlutterException instance.
+   * @param code - The error code
+   * @param message - The error message
+   * @param details - Additional error details
+   */
   constructor(code: string, message: string, details: Any) {
     this.message = message;
     this.code = code;

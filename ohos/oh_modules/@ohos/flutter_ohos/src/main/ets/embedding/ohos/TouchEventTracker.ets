@@ -8,11 +8,19 @@ import PlainArray from '@ohos.util.PlainArray';
 import { TouchEvent } from '@ohos.multimodalInput.touchEvent';
 import Queue from '@ohos.util.Queue';
 
+/**
+ * Tracks touch events and provides unique identifiers for them.
+ * This class maintains a singleton instance for managing touch event tracking.
+ */
 export class TouchEventTracker {
   private eventById: PlainArray<TouchEvent>;
   private unusedEvents: Queue<number>;
   private static INSTANCE: TouchEventTracker;
 
+  /**
+   * Gets the singleton instance of TouchEventTracker.
+   * @returns The singleton TouchEventTracker instance
+   */
   public static getInstance(): TouchEventTracker {
     if (TouchEventTracker.INSTANCE == null) {
       TouchEventTracker.INSTANCE = new TouchEventTracker();
@@ -20,12 +28,19 @@ export class TouchEventTracker {
     return TouchEventTracker.INSTANCE;
   }
 
+  /**
+   * Constructs a new TouchEventTracker instance.
+   */
   constructor() {
     this.eventById = new PlainArray();
     this.unusedEvents = new Queue();
   }
 
-  /** Tracks the event and returns a unique MotionEventId identifying the event. */
+  /**
+   * Tracks the event and returns a unique TouchEventId identifying the event.
+   * @param event - The touch event to track
+   * @returns A unique TouchEventId for the event
+   */
   public track(event: TouchEvent): TouchEventId {
     const eventId: TouchEventId = TouchEventId.createUnique();
     this.eventById.add(eventId.getId(), event);
@@ -34,9 +49,10 @@ export class TouchEventTracker {
   }
 
   /**
-   * Returns the MotionEvent corresponding to the eventId while discarding all the motion events
-   * that occurred prior to the event represented by the eventId. Returns null if this event was
-   * popped or discarded.
+   * Returns the TouchEvent corresponding to the eventId while discarding all the motion events
+   * that occurred prior to the event represented by the eventId.
+   * @param eventId - The TouchEventId to retrieve
+   * @returns The TouchEvent corresponding to the eventId
    */
   public pop(eventId: TouchEventId): TouchEvent {
     // remove all the older events.
@@ -55,23 +71,42 @@ export class TouchEventTracker {
   }
 }
 
-/** Represents a unique identifier corresponding to a motion event. */
+/**
+ * Represents a unique identifier corresponding to a touch event.
+ */
 export class TouchEventId {
   private static ID_COUNTER: number = 0;
   private id: number;
 
+  /**
+   * Constructs a new TouchEventId instance.
+   * @param id - The ID value
+   */
   constructor(id: number) {
     this.id = id;
   }
 
+  /**
+   * Creates a TouchEventId from a given ID.
+   * @param id - The ID value
+   * @returns A new TouchEventId instance
+   */
   public static from(id: number): TouchEventId {
     return new TouchEventId(id);
   }
 
+  /**
+   * Creates a unique TouchEventId with an auto-incremented ID.
+   * @returns A new unique TouchEventId instance
+   */
   public static createUnique(): TouchEventId {
     return new TouchEventId(TouchEventId.ID_COUNTER++);
   }
 
+  /**
+   * Gets the ID value.
+   * @returns The ID value
+   */
   public getId(): number {
     return this.id;
   }

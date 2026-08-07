@@ -8,6 +8,16 @@ import { Reply } from './BasicMessageChannel';
 
 type ISendable = lang.ISendable;
 
+/**
+ * Interface for sendable message handlers that can be used in background threads.
+ * This interface extends ISendable to allow handlers to be passed across thread boundaries.
+ * @template T - The type of message being handled
+ */
 export default interface SendableMessageHandler<T> extends ISendable {
+  /**
+   * Handles a message received from Flutter.
+   * @param message - The message received
+   * @param reply - The reply callback to send a response
+   */
   onMessage(message: T, reply: Reply<T>): void;
 }

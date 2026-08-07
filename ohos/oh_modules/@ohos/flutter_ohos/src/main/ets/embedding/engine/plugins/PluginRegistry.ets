@@ -10,59 +10,64 @@
 
 import { FlutterPlugin } from './FlutterPlugin';
 
+/**
+ * Registry for managing Flutter plugins.
+ * This interface provides methods to add, remove, and query plugins attached to a FlutterEngine.
+ */
 export default interface PluginRegistry {
   /**
-   * Attaches the given {@code plugin} to the {@link io.flutter.embedding.engine.FlutterEngine}
-   * associated with this {@code PluginRegistry}.
+   * Attaches the given plugin to the FlutterEngine associated with this PluginRegistry.
+   * @param plugin - The FlutterPlugin to attach
    */
   add(plugin: FlutterPlugin): void;
 
   /**
-   * Attaches the given {@code plugins} to the {@link io.flutter.embedding.engine.FlutterEngine}
-   * associated with this {@code PluginRegistry}.
+   * Attaches the given plugins to the FlutterEngine associated with this PluginRegistry.
+   * @param plugins - The set of FlutterPlugins to attach
    */
   addList(plugins: Set<FlutterPlugin>): void;
 
   /**
-   * Returns true if a plugin of the given type is currently attached to the {@link
-   * io.flutter.embedding.engine.FlutterEngine} associated with this {@code PluginRegistry}.
+   * Checks if a plugin of the given type is currently attached to the FlutterEngine
+   * associated with this PluginRegistry.
+   * @param pluginClassName - The class name of the plugin to check
+   * @returns True if the plugin is attached, false otherwise
    */
-  //Class<? extends FlutterPlugin>
   has(pluginClassName: string): boolean;
 
   /**
-   * Returns the instance of a plugin that is currently attached to the {@link
-   * io.flutter.embedding.engine.FlutterEngine} associated with this {@code PluginRegistry}, which
-   * matches the given {@code pluginClass}.
+   * Gets the instance of a plugin that is currently attached to the FlutterEngine
+   * associated with this PluginRegistry, which matches the given pluginClassName.
    *
-   * <p>If no matching plugin is found, {@code null} is returned.
+   * If no matching plugin is found, null is returned.
+   * @param pluginClassName - The class name of the plugin to get
+   * @returns The FlutterPlugin instance, or null if not found
    */
-  //Class<? extends FlutterPlugin>
   get(pluginClassName: string): FlutterPlugin;
 
   /**
-   * Detaches the plugin of the given type from the {@link
-   * io.flutter.embedding.engine.FlutterEngine} associated with this {@code PluginRegistry}.
+   * Detaches the plugin of the given type from the FlutterEngine
+   * associated with this PluginRegistry.
    *
-   * <p>If no such plugin exists, this method does nothing.
+   * If no such plugin exists, this method does nothing.
+   * @param pluginClassName - The class name of the plugin to remove
    */
-  //Class<? extends FlutterPlugin>
   remove(pluginClassName: string): void;
 
   /**
-   * Detaches the plugins of the given types from the {@link
-   * io.flutter.embedding.engine.FlutterEngine} associated with this {@code PluginRegistry}.
+   * Detaches the plugins of the given types from the FlutterEngine
+   * associated with this PluginRegistry.
    *
-   * <p>If no such plugins exist, this method does nothing.
+   * If no such plugins exist, this method does nothing.
+   * @param pluginClassNames - The set of plugin class names to remove
    */
-  //Class<? extends FlutterPlugin>
   removeList(pluginClassNames: Set<string>): void;
 
   /**
-   * Detaches all plugins that are currently attached to the {@link
-   * io.flutter.embedding.engine.FlutterEngine} associated with this {@code PluginRegistry}.
+   * Detaches all plugins that are currently attached to the FlutterEngine
+   * associated with this PluginRegistry.
    *
-   * <p>If no plugins are currently attached, this method does nothing.
+   * If no plugins are currently attached, this method does nothing.
    */
   removeAll(): void;
 }

@@ -4,14 +4,20 @@
 * found in the LICENSE_KHZG file.
 */
 
-/** The mode of the background of a Flutter {@code Activity}, either opaque or transparent. */
+/**
+ * The mode of the background of a Flutter Ability, either opaque or transparent.
+ */
 enum BackgroundMode {
-  /** Indicates a FlutterActivity with an opaque background. This is the default. */
+  /** Indicates a Flutter Ability with an opaque background. This is the default. */
   opaque,
-  /** Indicates a FlutterActivity with a transparent background. */
+  /** Indicates a Flutter Ability with a transparent background. */
   transparent
 }
 
+/**
+ * Configuration constants for Flutter Ability launch parameters.
+ * This class contains metadata keys, Want extras, and default values for launching Flutter abilities.
+ */
 export default class FlutterAbilityLaunchConfigs {
   static DART_ENTRYPOINT_META_DATA_KEY = "io.flutter.Entrypoint";
   static DART_ENTRYPOINT_URI_META_DATA_KEY = "io.flutter.EntrypointUri";
@@ -19,7 +25,7 @@ export default class FlutterAbilityLaunchConfigs {
   static SPLASH_SCREEN_META_DATA_KEY = "io.flutter.embedding.android.SplashScreenDrawable";
   static NORMAL_THEME_META_DATA_KEY = "io.flutter.embedding.android.NormalTheme";
   static HANDLE_DEEPLINKING_META_DATA_KEY = "flutter_deeplinking_enabled";
-  // Intent extra arguments.
+  // Want extra arguments.
   static EXTRA_DART_ENTRYPOINT = "dart_entrypoint";
   static EXTRA_DART_ENTRYPOINT_LIBRARY_URI = "dart_entrypoint_library_uri";
   static EXTRA_INITIAL_ROUTE = "route";

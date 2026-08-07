@@ -12,13 +12,26 @@ import { MediaQuery } from '@ohos.arkui.UIContext';
 
 const TAG = "Settings";
 
+/**
+ * Manages and sends system settings to Flutter.
+ * This class handles theme mode, text scale factor, and other system preferences.
+ */
 export default class Settings {
+  /** The SettingsChannel for sending settings to Flutter, or null if not set. */
   settingsChannel: SettingsChannel | null;
 
+  /**
+   * Constructs a new Settings instance.
+   * @param settingsChannel - The SettingsChannel instance, or null
+   */
   constructor(settingsChannel: SettingsChannel | null) {
     this.settingsChannel = settingsChannel;
   }
 
+  /**
+   * Sends current system settings to Flutter.
+   * @param mediaQuery - The MediaQuery instance for detecting theme mode
+   */
   sendSettings(mediaQuery: MediaQuery): void {
     this.settingsChannel?.startMessage()
       .setAlwaysUse24HourFormat(I18n.System.is24HourClock())
@@ -29,6 +42,11 @@ export default class Settings {
       .send();
   }
 
+  /**
+   * Gets the current theme mode (light or dark).
+   * @param mediaQuery - The MediaQuery instance for detecting dark mode
+   * @returns The platform brightness mode
+   */
   getThemeMode(mediaQuery: MediaQuery): PlatformBrightness {
 
     let listener = mediaQuery.matchMediaSync('(dark-mode: true)');
@@ -41,6 +59,10 @@ export default class Settings {
     }
   }
 
+  /**
+   * Gets the text scale factor from system settings.
+   * @returns The text scale factor value
+   */
   getTextScaleFactor() : number {
     let sysTextScaleFactor = AppStorage.get<number>('fontSizeScale');
     if(sysTextScaleFactor == undefined) {

@@ -8,13 +8,25 @@
 *
 */
 
+/**
+ * Represents an overlay surface in the Flutter rendering system.
+ * Overlay surfaces are used for displaying content above the main Flutter view.
+ */
 export class FlutterOverlaySurface {
   private id: number;
 
+  /**
+   * Constructs a new FlutterOverlaySurface instance.
+   * @param id - The unique identifier for this overlay surface
+   */
   constructor(id: number) {
     this.id = id
   }
 
+  /**
+   * Gets the unique identifier of this overlay surface.
+   * @returns The overlay surface ID
+   */
   getId(): number {
     return this.id;
   }

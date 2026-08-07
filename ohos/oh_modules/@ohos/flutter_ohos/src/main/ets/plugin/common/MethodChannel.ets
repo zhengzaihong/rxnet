@@ -20,23 +20,29 @@ import StandardMethodCodec from './StandardMethodCodec';
 /**
  * A named channel for communicating with the Flutter application using asynchronous method calls.
  *
- * <p>Incoming method calls are decoded from binary on receipt, and Java results are encoded into
+ * Incoming method calls are decoded from binary on receipt, and results are encoded into
  * binary before being transmitted back to Flutter. The {@link MethodCodec} used must be compatible
- * with the one used by the Flutter application. This can be achieved by creating a <a
- * href="https://api.flutter.dev/flutter/services/MethodChannel-class.html">MethodChannel</a>
- * counterpart of this channel on the Dart side. The Java type of method call arguments and results
- * is {@code Object}, but only values supported by the specified {@link MethodCodec} can be used.
+ * with the one used by the Flutter application. This can be achieved by creating a `MethodChannel` counterpart of this
+ * channel on the Dart side. The type of method call arguments and results is {@code Any},
+ * but only values supported by the specified {@link MethodCodec} can be used.
  *
- * <p>The logical identity of the channel is given by its name. Identically named channels will
+ * The logical identity of the channel is given by its name. Identically named channels will
  * interfere with each other's communication.
  */
 
 export default class MethodChannel {
+  /** Tag for logging. */
   static TAG = "MethodChannel#";
   private messenger: BinaryMessenger;
   private name: string;
   private codec: MethodCodec;
 
+  /**
+   * Constructs a new MethodChannel instance.
+   * @param messenger - The BinaryMessenger to use for communication
+   * @param name - The channel name
+   * @param codec - The MethodCodec to use for encoding/decoding, defaults to StandardMethodCodec.INSTANCE
+   */
   constructor(messenger: BinaryMessenger, name: string, codec: MethodCodec = StandardMethodCodec.INSTANCE) {
     this.messenger = messenger
     this.name = name
@@ -46,11 +52,11 @@ export default class MethodChannel {
   /**
    * Invokes a method on this channel, optionally expecting a result.
    *
-   * <p>Any uncaught exception thrown by the result callback will be caught and logged.
+   * Any uncaught exception thrown by the result callback will be caught and logged.
    *
-   * @param method the name String of the method.
-   * @param arguments the arguments for the invocation, possibly null.
-   * @param callback a {@link Result} callback for the invocation result, or null.
+   * @param method - The name of the method
+   * @param args - The arguments for the invocation, possibly null
+   * @param callback - A {@link MethodResult} callback for the invocation result, or null
    */
   invokeMethod(method: string, args: Any, callback?: MethodResult): void {
     this.messenger.send(this.name, this.codec.encodeMethodCall(new MethodCall(method, args)),
@@ -60,16 +66,13 @@ export default class MethodChannel {
   /**
    * Registers a method call handler on this channel.
    *
-   * <p>Overrides any existing handler registration for (the name of) this channel.
+   * Overrides any existing handler registration for (the name of) this channel.
    *
-   * <p>If no handler has been registered, any incoming method call on this channel will be handled
-   * silently by sending a null reply. This results in a <a
-   * href="https://api.flutter.dev/flutter/services/MissingPluginException-class.html">MissingPluginException</a>
-   * on the Dart side, unless an <a
-   * href="https://api.flutter.dev/flutter/services/OptionalMethodChannel-class.html">OptionalMethodChannel</a>
-   * is used.
-   *
-   * @param handler a {@link MethodCallHandler}, or null to deregister.
+   * If no handler has been registered, any incoming method call on this channel will be handled
+   * silently by sending a null reply. This results in a `MissingPluginException` on the Dart side, unless an
+   * `OptionalMethodChannel` is used.
+   * 
+   * @param handler - A {@link MethodCallHandler}, or null to deregister
    */
   setMethodCallHandler(handler: MethodCallHandler | null): void {
     this.messenger.setMessageHandler(this.name,
@@ -80,6 +83,7 @@ export default class MethodChannel {
    * Adjusts the number of messages that will get buffered when sending messages to channels that
    * aren't fully set up yet. For example, the engine isn't running yet or the channel's message
    * handler isn't set up on the Dart side yet.
+   * @param newSize - The new buffer size
    */
   resizeChannelBuffer(newSize: number): void {
     MessageChannelUtils.resizeChannelBuffer(this.messenger, this.name, newSize);
@@ -91,22 +95,19 @@ export interface MethodCallHandler {
   /**
    * Handles the specified method call received from Flutter.
    *
-   * <p>Handler implementations must submit a result for all incoming calls, by making a single
-   * call on the given {@link Result} callback. Failure to do so will result in lingering Flutter
+   * Handler implementations must submit a result for all incoming calls, by making a single
+   * call on the given {@link MethodResult} callback. Failure to do so will result in lingering Flutter
    * result handlers. The result may be submitted asynchronously and on any thread. Calls to
-   * unknown or unimplemented methods should be handled using {@link Result#notImplemented()}.
+   * unknown or unimplemented methods should be handled using the notImplemented method of {@link MethodResult}.
    *
-   * <p>Any uncaught exception thrown by this method will be caught by the channel implementation
+   * Any uncaught exception thrown by this method will be caught by the channel implementation
    * and logged, and an error result will be sent back to Flutter.
    *
-   * <p>The handler is called on the platform thread (HarmonyOS main thread) by default, or
-   * otherwise on the thread specified by the {@link BinaryMessenger.TaskQueue} provided to the
-   * associated {@link MethodChannel} when it was created. See also <a
-   * href="https://github.com/flutter/flutter/wiki/The-Engine-architecture#threading">Threading in
-   * the Flutter Engine</a>.
+   * The handler is called on the platform thread (OpenHarmony main thread) by default, or otherwise on the thread
+   * specified by the {@link TaskQueue} provided to the associated {@link MethodChannel} when it was created.
    *
-   * @param call A {@link MethodCall}.
-   * @param result A {@link Result} used for submitting the result of the call.
+   * @param call - A {@link MethodCall}
+   * @param result - A {@link MethodResult} used for submitting the result of the call
    */
   onMethodCall(call: MethodCall, result: MethodResult): void;
 }
@@ -117,13 +118,13 @@ export interface MethodCallHandler {
  * Flutter methods provide implementations of this interface for handling results received from
  * Flutter.
  *
- * <p>All methods of this class can be invoked on any thread.
+ * All methods of this class can be invoked on any thread.
  */
 export interface MethodResult {
   /**
    * Handles a successful result.
    *
-   * @param result The result, possibly null. The result must be an Object type supported by the
+   * @param result - The result, possibly null. The result must be an Object type supported by the
    *     codec. For instance, if you are using {@link StandardMessageCodec} (default), please see
    *     its documentation on what types are supported.
    */
@@ -132,9 +133,9 @@ export interface MethodResult {
   /**
    * Handles an error result.
    *
-   * @param errorCode An error code String.
-   * @param errorMessage A human-readable error message String, possibly null.
-   * @param errorDetails Error details, possibly null. The details must be an Object type
+   * @param errorCode - An error code string
+   * @param errorMessage - A human-readable error message, possibly null
+   * @param errorDetails - Error details, possibly null. The details must be an Object type
    *     supported by the codec. For instance, if you are using {@link StandardMessageCodec}
    *     (default), please see its documentation on what types are supported.
    */
@@ -144,15 +145,27 @@ export interface MethodResult {
   notImplemented: () => void;
 }
 
+/**
+ * Internal handler for incoming method call results from Flutter.
+ */
 export class IncomingResultHandler implements BinaryReply {
   private callback: MethodResult;
   private codec: MethodCodec;
 
+  /**
+   * Constructs a new IncomingResultHandler instance.
+   * @param callback - The MethodResult callback to invoke
+   * @param codec - The MethodCodec to use for decoding
+   */
   constructor(callback: MethodResult, codec: MethodCodec) {
     this.callback = callback;
     this.codec = codec
   }
 
+  /**
+   * Handles a binary reply from Flutter.
+   * @param reply - The binary reply, possibly null
+   */
   reply(reply: ArrayBuffer | null): void {
     try {
       if (reply == null) {
@@ -170,15 +183,28 @@ export class IncomingResultHandler implements BinaryReply {
   }
 }
 
+/**
+ * Internal handler for incoming method calls from Flutter.
+ */
 export class IncomingMethodCallHandler implements BinaryMessageHandler {
   private handler: MethodCallHandler;
   private codec: MethodCodec;
 
+  /**
+   * Constructs a new IncomingMethodCallHandler instance.
+   * @param handler - The MethodCallHandler to delegate to
+   * @param codec - The MethodCodec to use for encoding/decoding
+   */
   constructor(handler: MethodCallHandler, codec: MethodCodec) {
     this.handler = handler;
     this.codec = codec
   }
 
+  /**
+   * Handles a binary method call from Flutter.
+   * @param message - The binary message containing the method call
+   * @param reply - The BinaryReply callback to send a response
+   */
   onMessage(message: ArrayBuffer, reply: BinaryReply): void {
     const call = this.codec.decodeMethodCall(message);
     try {
@@ -199,7 +225,9 @@ export class IncomingMethodCallHandler implements BinaryMessageHandler {
       });
     } catch (e) {
       Log.e(MethodChannel.TAG, "Failed to handle method call", e);
-      reply.reply(this.codec.encodeErrorEnvelopeWithStacktrace("error", e.getMessage(), null, e));
+      const errMsg = e instanceof Error ? (e.message ?? '') : String(e);
+      const errStack = e instanceof Error ? (e.stack ?? '') : '';
+      reply.reply(this.codec.encodeErrorEnvelopeWithStacktrace("error", errMsg, null, errStack));
     }
   }
 }

@@ -19,16 +19,21 @@ import MethodCodec from './MethodCodec';
 /**
  * A {@link MethodCodec} using UTF-8 encoded JSON method calls and result envelopes.
  *
- * <p>This codec is guaranteed to be compatible with the corresponding <a
- * href="https://api.flutter.dev/flutter/services/JSONMethodCodec-class.html">JSONMethodCodec</a> on
+ * This codec is guaranteed to be compatible with the corresponding `JSONMethodCodec` on
  * the Dart side. These parts of the Flutter SDK are evolved synchronously.
  *
- * <p>Values supported as methods arguments and result payloads are those supported by {@link
- * JSONMessageCodec}.
+ * Values supported as methods arguments and result payloads are those supported by {@link JSONMessageCodec}.
  */
 export default class JSONMethodCodec implements MethodCodec {
+  /** Singleton instance of JSONMethodCodec. */
   static INSTANCE = new JSONMethodCodec();
 
+  /**
+   * Encodes a method call into JSON binary format.
+   * @param methodCall - The MethodCall to encode
+   * @returns The encoded method call as an ArrayBuffer
+   * @throws Error if encoding fails
+   */
   encodeMethodCall(methodCall: MethodCall): ArrayBuffer {
     try {
       const map: Record<string, Any> = {
@@ -41,6 +46,12 @@ export default class JSONMethodCodec implements MethodCodec {
     }
   }
 
+  /**
+   * Decodes a method call from JSON binary format.
+   * @param message - The binary message to decode
+   * @returns The decoded MethodCall
+   * @throws Error if decoding fails or the message is invalid
+   */
   decodeMethodCall(message: ArrayBuffer): MethodCall {
     try {
       const json: Any = JSONMessageCodec.INSTANCE.decodeMessage(message);
@@ -57,19 +68,46 @@ export default class JSONMethodCodec implements MethodCodec {
     }
   }
 
+  /**
+   * Encodes a successful result into a JSON envelope.
+   * @param result - The result value, possibly null
+   * @returns The encoded envelope as an ArrayBuffer
+   */
   encodeSuccessEnvelope(result: Any): ArrayBuffer {
     return JSONMessageCodec.INSTANCE.encodeMessage([result]);
   }
 
+  /**
+   * Encodes an error result into a JSON envelope.
+   * @param errorCode - The error code
+   * @param errorMessage - The error message, possibly null
+   * @param errorDetails - Error details, possibly null
+   * @returns The encoded envelope as an ArrayBuffer
+   */
   encodeErrorEnvelope(errorCode: Any, errorMessage: string, errorDetails: Any): ArrayBuffer {
     return JSONMessageCodec.INSTANCE.encodeMessage([errorCode, errorMessage, errorDetails]);
   }
 
+  /**
+   * Encodes an error result into a JSON envelope with stacktrace.
+   * @param errorCode - The error code
+   * @param errorMessage - The error message, possibly null
+   * @param errorDetails - Error details, possibly null
+   * @param errorStacktrace - The platform stacktrace, possibly null
+   * @returns The encoded envelope as an ArrayBuffer
+   */
   encodeErrorEnvelopeWithStacktrace(errorCode: string, errorMessage: string, errorDetails: Any,
     errorStacktrace: string): ArrayBuffer {
     return JSONMessageCodec.INSTANCE.encodeMessage([errorCode, errorMessage, errorDetails, errorStacktrace])
   }
 
+  /**
+   * Decodes a result envelope from JSON binary format.
+   * @param envelope - The binary envelope to decode
+   * @returns The decoded result value
+   * @throws FlutterException if the envelope contains an error
+   * @throws Error if the envelope is invalid
+   */
   decodeEnvelope(envelope: ArrayBuffer): Any {
     try {
       const json: Any = JSONMessageCodec.INSTANCE.decodeMessage(envelope);

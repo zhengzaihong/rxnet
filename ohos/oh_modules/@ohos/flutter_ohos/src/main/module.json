@@ -1,19 +1,19 @@
 {
 	"app": {
 		"bundleName": "com.example.config",
-		"debug": false,
+		"debug": true,
 		"versionCode": 1000000,
 		"versionName": "1.0.0",
 		"minAPIVersion": 50000012,
-		"targetAPIVersion": 60000020,
-		"apiReleaseType": "Beta5",
+		"targetAPIVersion": 60100023,
+		"apiReleaseType": "Release",
 		"targetMinorAPIVersion": 0,
 		"targetPatchAPIVersion": 0,
-		"compileSdkVersion": "6.0.0.47",
+		"compileSdkVersion": "6.1.0.105",
 		"compileSdkType": "HarmonyOS",
 		"appEnvironments": [],
 		"bundleType": "app",
-		"buildMode": "release"
+		"buildMode": "debug"
 	},
 	"module": {
 		"name": "flutter",

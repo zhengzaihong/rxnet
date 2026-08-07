@@ -15,24 +15,45 @@ import TextInputChannel, {
 } from '../../embedding/engine/systemchannels/TextInputChannel';
 import inputMethod from '@ohos.inputMethod';
 import Log from '../../util/Log';
-import { EditingStateWatcher, ListenableEditingState } from './ListenableEditingState';
+import { EditingStateWatcher, ListenableEditingState, PreviewInsertOptions } from './ListenableEditingState';
 import Any from '../common/Any';
 import { inputDevice } from '@kit.InputKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { PointerDeviceKind } from '../../embedding/ohos/OhosTouchProcessor';
 import deviceInfo from '@ohos.deviceInfo';
 import KeyEventChannel from '../../embedding/engine/systemchannels/KeyEventChannel';
+import { appManager, bundleManager } from '@kit.AbilityKit';
+import { PreviewTextCoordinator } from './PreviewTextCoordinator';
+import { isPreviewTextSupported } from './PreviewTextSupport';
+import ArrayList from '@ohos.util.ArrayList';
+import { TextEditingDelta } from './TextEditingDelta';
 
 const INPUT_SUPPORT_API = 15;
-const PREIVEW_TEXT_SUPPORT_API = 17;
-const sdkApiVersion: number = deviceInfo.sdkApiVersion;
 
+/** Document half-open [rangeStart, rangeEnd) for Latin finishTextPreview commit (ArkTS: no inline object types). */
+interface LatinFinishPreviewRange {
+  rangeStart: number;
+  rangeEnd: number;
+  mode: string;
+}
+
+/**
+ * Plugin for handling text input in Flutter applications.
+ * This class manages the interaction between Flutter's text input system
+ * and the OpenHarmony input method framework.
+ */
 export default class TextInputPlugin implements EditingStateWatcher {
   private static TAG = "TextInputPlugin";
   private textInputChannel: TextInputChannel;
   private keyEventChannel: KeyEventChannel | undefined;
   private mTextInputHandler: TextInputMethodHandlerImpl;
 
+  /**
+   * Constructs a new TextInputPlugin instance.
+   * @param textInputChannel - The TextInputChannel for communication with Flutter
+   * @param viewId - The view ID for focus management
+   * @param keyEventChannel - Optional KeyEventChannel for key event handling
+   */
   constructor(textInputChannel: TextInputChannel, viewId: string, keyEventChannel?: KeyEventChannel) {
     this.textInputChannel = textInputChannel;
     this.keyEventChannel = keyEventChannel;
@@ -41,56 +62,55 @@ export default class TextInputPlugin implements EditingStateWatcher {
     this.textInputChannel.setTextInputMethodHandler(this.mTextInputHandler);
   }
 
+  /**
+   * Clears the current text input client.
+   */
   public clearTextInputClient() {
     this.textInputChannel.textInputMethodHandler?.clearClient();
   }
 
-  setTextInputEditingState(state: TextEditState) {
-
-  }
-
+  /**
+   * Gets the current editing state.
+   * @returns The current ListenableEditingState instance
+   */
   getEditingState() {
     return this.mTextInputHandler.mEditable;
   }
 
-  // do preview the text in the editing widget
-  didChangePreviewTextEditingState(inputTarget: InputTarget, editable: ListenableEditingState): void {
-    let stringCache: string = editable.getStringCache();
-    // obtain the start index of editing preview text
-    let startIdx: number = editable.getLeftIdxOfPreviewTextRange();
-    let leftStringCache  = stringCache.substring(0, startIdx);
-    let rightStringCache = stringCache.substring(startIdx, stringCache.length);
-    // concat the string cache and preview text and show on the TextField
-    let finalStringCache = leftStringCache + editable.getPreviewText() + rightStringCache;
-    // update the selection range
-    let newSelectionStart: number = startIdx + editable.getPreviewText().length;
-    let newSelectionEnd: number = startIdx + editable.getPreviewText().length;
-
-    this.textInputChannel.updateEditingState(inputTarget.id, finalStringCache,
-      newSelectionStart, newSelectionEnd,
-      editable.getComposingStart(), editable.getComposingEnd())
-    // notify current cursor index to the InputMethodFramework
-    this.mTextInputHandler.inputMethodController.changeSelection(finalStringCache,
-      newSelectionStart, newSelectionEnd);
-  }
-
+  /**
+   * Called when the editing state changes. Delegates sync strategy to PreviewTextCoordinator.
+   * @param textChanged - Whether the text has changed
+   * @param selectionChanged - Whether the selection has changed
+   * @param composingRegionChanged - Whether the composing region has changed
+   */
   didChangeEditingState(textChanged: boolean, selectionChanged: boolean, composingRegionChanged: boolean): void {
-    let editable = this.mTextInputHandler.mEditable;
-    let inputTarget = this.mTextInputHandler.inputTarget;
-    let configuration = this.mTextInputHandler.configuration;
-    if (configuration != null && configuration.enableDeltaModel) {
-      this.textInputChannel.updateEditingStateWithDeltas(inputTarget.id, editable.extractBatchTextEditingDeltas());
-      editable.clearBatchDeltas();
-    } else if (sdkApiVersion >= PREIVEW_TEXT_SUPPORT_API && editable.getPreviewText() != "") {
-      this.didChangePreviewTextEditingState(inputTarget, editable);
-    }
-    else {
-      this.textInputChannel.updateEditingState(inputTarget.id, editable.getStringCache(),
-        editable.getSelectionStart(), editable.getSelectionEnd(),
-        editable.getComposingStart(), editable.getComposingEnd())
-    }
+    const editable = this.mTextInputHandler.mEditable;
+    const inputTarget = this.mTextInputHandler.inputTarget;
+    const configuration = this.mTextInputHandler.configuration;
+    const handler = this.mTextInputHandler;
+    PreviewTextCoordinator.syncEditingState(
+      editable,
+      inputTarget.id,
+      configuration,
+      (id, text, selStart, selEnd, composingStart, composingEnd) =>
+        this.textInputChannel.updateEditingState(id, text, selStart, selEnd, composingStart, composingEnd),
+      (id, batchDeltas: ArrayList<TextEditingDelta>) => {
+        this.textInputChannel.updateEditingStateWithDeltas(id, batchDeltas);
+        editable.clearBatchDeltas();
+      },
+      (text, start, end) => this.mTextInputHandler.notifySelectionToFramework(text, start, end),
+      {
+        lastOutgoing: handler.mLastOutgoingFrameworkState,
+        onOutgoingCommitted: (s: TextEditState): void => {
+          handler.mLastOutgoingFrameworkState = s;
+        }
+      }
+    );
   }
 
+  /**
+   * Detaches the text input plugin from the input method framework.
+   */
   detach(): void {
     this.mTextInputHandler.inputMethodController.detach((err) => {
       if (err) {
@@ -99,6 +119,9 @@ export default class TextInputPlugin implements EditingStateWatcher {
     })
   }
 
+  /**
+   * Destroys the text input plugin, hiding the keyboard and cleaning up resources.
+   */
   destroy() {
     // Since the Dart side no longer listens to the lifecycle,
     // the keyboard must be explicitly hidden before the engine is destroyed.
@@ -110,15 +133,97 @@ export default class TextInputPlugin implements EditingStateWatcher {
 const INPUT_TYPE_NAME =
   ['NONE', 'TEXT', 'MULTILINE', 'NUMBER', 'PHONE', 'DATETIME', 'EMAIL_ADDRESS', 'URL', 'VISIBLE_PASSWORD']
 
+/**
+ * Implementation of TextInputMethodHandler for OpenHarmony input method framework.
+ * This class handles all interactions with the system input method.
+ */
 class TextInputMethodHandlerImpl implements TextInputMethodHandler {
   private static TAG = "TextInputMethodHandlerImpl";
+
+  /**
+   * Document [rangeStart, rangeEnd) to replace with committed Latin preview: stacked | dup | lr.
+   */
+  private static latinFinishPreviewReplaceRange(
+    leftIdx: number,
+    rightIdx: number,
+    previewText: string,
+    cache: string,
+    imcStart: number,
+    imcEnd: number,
+  ): LatinFinishPreviewRange {
+    const imcW = imcEnd - imcStart;
+    const previewLen = previewText.length;
+    if (previewLen > 0 && leftIdx === imcW && leftIdx < rightIdx && imcStart >= 0 && imcEnd > imcStart && imcW > 0) {
+      const rangeEnd = Math.min(cache.length, Math.max(rightIdx, imcW));
+      const out: LatinFinishPreviewRange = { rangeStart: 0, rangeEnd: rangeEnd, mode: 'stacked' };
+      return out;
+    }
+    if (
+      previewLen > 0 &&
+      cache.length >= rightIdx &&
+      leftIdx === previewLen &&
+      rightIdx === leftIdx + previewLen &&
+      cache.startsWith(previewText) &&
+      cache.substring(leftIdx, rightIdx) === previewText
+    ) {
+      const out: LatinFinishPreviewRange = { rangeStart: 0, rangeEnd: rightIdx, mode: 'dup' };
+      return out;
+    }
+    const out: LatinFinishPreviewRange = { rangeStart: leftIdx, rangeEnd: rightIdx, mode: 'lr' };
+    return out;
+  }
+
+  private static isImeSegmentApostropheLike(ch: string): boolean {
+    if (ch === "'" || ch.charCodeAt(0) === 0x2019 || ch.charCodeAt(0) === 0x02bc || ch.charCodeAt(0) === 0xff07) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * True when preview text contains a segment apostrophe immediately after a Latin letter (e.g. ni'hao).
+   * Leading `'` alone (e.g. `'hao` after deleting a syllable prefix) must not defer finishTextPreview:
+   * otherwise [leftIdx, rightIdx) is never committed before the CJK insertText candidate.
+   */
+  private static previewTextHasInternalSegmentApostrophe(previewText: string): boolean {
+    for (let idx = 0; idx < previewText.length; idx++) {
+      if (!TextInputMethodHandlerImpl.isImeSegmentApostropheLike(previewText.charAt(idx))) {
+        continue;
+      }
+      if (idx > 0) {
+        const prev = previewText.charAt(idx - 1);
+        if ((prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z')) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /** Leading IME syllable marker before the remaining Latin body (e.g. `'hao`). */
+  private static previewStartsWithImeSegmentMarker(previewText: string): boolean {
+    if (previewText.length < 1) {
+      return false;
+    }
+    return TextInputMethodHandlerImpl.isImeSegmentApostropheLike(previewText.charAt(0));
+  }
+
   private textConfig: inputMethod.TextConfig;
+  /** The input method controller for managing the keyboard. */
   inputMethodController: inputMethod.InputMethodController;
+  /** The current input target. */
   inputTarget: InputTarget;
+  /** The current text input configuration, or null if not set. */
   public configuration: Configuration | null = null;
   private lastKind?: PointerDeviceKind;
+  /** The editable state for text input. */
   mEditable: ListenableEditingState;
   private mRestartInputPending: boolean = false;
+  /**
+   * Last full editing state pushed from native to Flutter (aligned with Android mLastKnownFrameworkTextEditingState),
+   * used to skip duplicate channel updates and to detect Framework echo that mutates the composing region.
+   */
+  mLastOutgoingFrameworkState: TextEditState | null = null;
   private plugin: EditingStateWatcher | Any;
   private imcFlag: boolean = false;
   private keyboardStatus: inputMethod.KeyboardStatus = inputMethod.KeyboardStatus.HIDE;
@@ -126,7 +231,25 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
     { textInputType: inputMethod.TextInputType.TEXT, enterKeyType: inputMethod.EnterKeyType.NONE };
   private keyboardFocusState: boolean = false;
   private focusViewId: string = "";
+  // Record the type of soft keyboard that was triggered last time
+  private lastInputType?: inputMethod.TextInputType;
+  private isInputMethodAttached: boolean = false;
+  /**
+   * After finishTextPreview commits Latin preview using document [leftIdx, rightIdx), OHOS may still deliver insertText(same).
+   * One matching insertText is skipped to avoid duplicate words (e.g. "This This").
+   */
+  private mConsumeNextInsertTextIfEquals: string | null = null;
+  /**
+   * finishTextPreview committed with retainPreviewRangeAfterCommit; clear staging on duplicate insertText skip
+   * or after the real follow-up insertText.
+   */
+  private mFinishRetainedPreviewRangePending: boolean = false;
 
+  /**
+   * Constructs a new TextInputMethodHandlerImpl instance.
+   * @param plugin - The TextInputPlugin instance
+   * @param viewId - The view ID for focus management
+   */
   constructor(plugin: TextInputPlugin | Any, viewId: string) {
     this.textConfig = {
       inputAttribute: this.inputAttribute
@@ -138,7 +261,10 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
     this.focusViewId = viewId;
   }
 
-  /// 通过判断是否是TextInputType.none来决定是否弹出键盘
+  /**
+   * Shows the text input keyboard if appropriate.
+   * The keyboard is only shown if the input type is not NONE.
+   */
   show(): void {
     try {
       let isPhysicalKeyboard = false;
@@ -151,7 +277,7 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
             break;
           }
         }
-        // 适配api20，在外接键盘状态下，阻止软键盘重复拉起
+        // API 20+: with physical keyboard attached, avoid repeatedly raising the soft keyboard.
         if (isPhysicalKeyboard) {
           this.keyboardStatus = inputMethod.KeyboardStatus.SHOW;
         }
@@ -170,6 +296,9 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
     }
   }
 
+  /**
+   * Hides the text input keyboard.
+   */
   hide(): void {
     // Ensure the Xcomponent loses focus before the soft keyboard is hided.
     focusControl.requestFocus("unfocus-xcomponent-node");
@@ -177,22 +306,90 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
     this.hideTextInput();
   }
 
+  /**
+   * Gets the current keyboard focus state.
+   * @returns True if the keyboard has focus, false otherwise
+   */
   getKeyboardFocusState() {
     return this.keyboardFocusState;
   }
 
+  /**
+   * Notifies the input method framework of current display text and selection.
+   * Used by PreviewTextCoordinator so that Plugin does not depend on inputMethodController.
+   */
+  notifySelectionToFramework(displayText: string, selectionStart: number, selectionEnd: number): void {
+    this.inputMethodController.changeSelection(displayText, selectionStart, selectionEnd);
+  }
+
+  /** After native edit: `updateEditingState` + `changeSelection`; preview path uses `composeDisplayState` (composing -1). */
+  syncImcSelectionAfterEditableChange(): void {
+    if (PreviewTextCoordinator.shouldSyncWithPreview(this.mEditable)) {
+      const displayState = PreviewTextCoordinator.composeDisplayState(this.mEditable);
+      this.plugin.textInputChannel.updateEditingState(
+        this.inputTarget.id,
+        displayState.text,
+        displayState.selectionStart,
+        displayState.selectionEnd,
+        displayState.composingStart,
+        displayState.composingEnd
+      );
+      this.mLastOutgoingFrameworkState = PreviewTextCoordinator.displayStateToTextEditState(displayState);
+      this.inputMethodController.changeSelection(displayState.text, displayState.selectionStart, displayState.selectionEnd);
+    } else {
+      this.inputMethodController.changeSelection(
+        this.mEditable.getStringCache(),
+        this.mEditable.getSelectionStart(),
+        this.mEditable.getSelectionEnd());
+    }
+  }
+
+  /**
+   * After commitLeadingLatinPreviewWhenCaretOutsideSpan replaces `'+latin` with Han locally, OHOS IME may still
+   * emit SetPreviewText for a suffix of the old Latin (e.g. "ha"). Empty-then-full changeSelection clears that state.
+   */
+  private notifyImcFlushComposingAfterLatinOutsideSpanCommit(): void {
+    this.inputMethodController.changeSelection("", -1, -1, (err: BusinessError) => {
+      if (err) {
+        Log.e(TextInputMethodHandlerImpl.TAG,
+          `Failed to changeSelection (flush composing), code: ${err.code}, message: ${err.message}`);
+        return;
+      }
+      const text = this.mEditable.getStringCache();
+      const start = this.mEditable.getSelectionStart();
+      const end = this.mEditable.getSelectionEnd();
+      this.inputMethodController.changeSelection(text, start, end);
+    });
+  }
+
+  /**
+   * Requests autofill functionality.
+   */
   requestAutofill(): void {
 
   }
 
+  /**
+   * Finishes the autofill context.
+   * @param shouldSave - Whether to save the autofill data
+   */
   finishAutofillContext(shouldSave: boolean): void {
 
   }
 
+  /**
+   * Sets the text input client.
+   * @param textInputClientId - The client ID
+   * @param configuration - The input configuration
+   */
   setClient(textInputClientId: number, configuration: Configuration | null): void {
     this.setTextInputClient(textInputClientId, configuration);
   }
 
+  /**
+   * Updates the input configuration.
+   * @param configuration - The new input configuration
+   */
   updateConfig(configuration: Configuration | null) {
     if (configuration) {
       this.lastKind = this.configuration?.deviceKind;
@@ -204,14 +401,29 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
     }
   }
 
+  /**
+   * Sets the platform view client for text input.
+   * @param id - The platform view ID
+   * @param usesVirtualDisplay - Whether the platform view uses a virtual display
+   */
   setPlatformViewClient(id: number, usesVirtualDisplay: boolean): void {
 
   }
 
+  /**
+   * Sets the editable size and transform.
+   * @param width - The width of the editable area
+   * @param height - The height of the editable area
+   * @param transform - The transformation matrix
+   */
   setEditableSizeAndTransform(width: number, height: number, transform: number[]): void {
 
   }
 
+  /**
+   * Sets the cursor size and position.
+   * @param cursorInfo - The cursor information
+   */
   setCursorSizeAndPosition(cursorInfo: inputMethod.CursorInfo) {
     try {
       this.inputMethodController.updateCursor(cursorInfo, (err: BusinessError) => {
@@ -225,69 +437,234 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
     }
   }
 
+  /**
+   * Sets the editing state from Flutter.
+   * @param editingState - The new editing state
+   */
   setEditingState(editingState: TextEditState): void {
-    Log.d(TextInputMethodHandlerImpl.TAG,
-      "text:" + editingState.text + " selectionStart:" + editingState.selectionStart + " selectionEnd:"
-        + editingState.selectionEnd + " composingStart:" + editingState.composingStart + " composingEnd" +
-      editingState.composingEnd);
-    this.mEditable.setPreviewText("");
+    let reconnectImeForComposingDrift = false;
+    if (this.mLastOutgoingFrameworkState !== null && this.mLastOutgoingFrameworkState.hasComposing()) {
+      if (TextInputMethodHandlerImpl.composingRegionMutatedByFramework(
+        this.mLastOutgoingFrameworkState, editingState)) {
+        reconnectImeForComposingDrift = true;
+      }
+    }
+
+    // Preview staging: handle taps inside [leftIdx, rightIdx), strictly before leftIdx, or strictly after rightIdx without falling through to raw Flutter apply.
+    if (isPreviewTextSupported() && this.mEditable.isPreviewStagingActive()) {
+      const leftIdx = this.mEditable.getLeftIdxOfPreviewTextRange();
+      const rightIdx = this.mEditable.getRightIdxOfPreviewTextRange();
+      const selStart = editingState.selectionStart;
+      const selEnd = editingState.selectionEnd;
+      const cursorInsidePreview = (leftIdx !== rightIdx) &&
+        selStart >= leftIdx && selStart <= rightIdx && selEnd >= leftIdx && selEnd <= rightIdx;
+      if (cursorInsidePreview) {
+        const localSelStart = this.mEditable.getSelectionStart();
+        const localSelEnd = this.mEditable.getSelectionEnd();
+        const displayNow = PreviewTextCoordinator.composeDisplayState(this.mEditable);
+        const flutterSelMin = Math.min(selStart, selEnd);
+        const flutterSelMax = Math.max(selStart, selEnd);
+        const flutterPinsCaretAtPreviewEnd =
+          selStart === rightIdx && selEnd === rightIdx;
+        const localCaretStrictlyBeforePreviewEnd = localSelStart < rightIdx || localSelEnd < rightIdx;
+        const staleEchoSkipsLeft = this.mEditable.getSkipFlutterStaleEndEchoRemaining();
+        const skipFlutterSelAsStaleEndEcho =
+          staleEchoSkipsLeft > 0 &&
+          flutterPinsCaretAtPreviewEnd &&
+          localCaretStrictlyBeforePreviewEnd;
+        if (skipFlutterSelAsStaleEndEcho) {
+          this.mEditable.consumeStaleEndEchoSkipCredit();
+        }
+        const localPinsCaretAtPreviewEnd =
+          localSelStart === rightIdx && localSelEnd === rightIdx;
+        const invertedFullPreviewRange =
+          selStart === rightIdx && selEnd === leftIdx && rightIdx > leftIdx;
+        const skipFlutterSelAsInvertedFullPreviewWhileLocalAtEnd =
+          localPinsCaretAtPreviewEnd &&
+          invertedFullPreviewRange &&
+          editingState.text === displayNow.text;
+        const flutterSelectsEntirePreviewRange =
+          flutterSelMin === leftIdx &&
+          flutterSelMax === rightIdx &&
+          selStart !== selEnd;
+        const skipFlutterSelAsStaleFullPreviewWhileLocalCaretAtEnd =
+          localPinsCaretAtPreviewEnd &&
+          flutterSelectsEntirePreviewRange &&
+          editingState.text === displayNow.text;
+        const skipApplyFlutterSelection =
+          skipFlutterSelAsStaleEndEcho ||
+          skipFlutterSelAsInvertedFullPreviewWhileLocalAtEnd ||
+          skipFlutterSelAsStaleFullPreviewWhileLocalCaretAtEnd;
+        if (!skipApplyFlutterSelection) {
+          this.mEditable.applyExternalDocumentSelectionWhilePreviewStaging(selStart, selEnd);
+        }
+        const displayState = PreviewTextCoordinator.composeDisplayState(this.mEditable);
+        this.plugin.textInputChannel.updateEditingState(
+          this.inputTarget.id,
+          displayState.text,
+          displayState.selectionStart,
+          displayState.selectionEnd,
+          displayState.composingStart,
+          displayState.composingEnd
+        );
+        this.mLastOutgoingFrameworkState = PreviewTextCoordinator.displayStateToTextEditState(displayState);
+        this.notifySelectionToFramework(displayState.text, displayState.selectionStart, displayState.selectionEnd);
+        return;
+      }
+      const outerSelMin = Math.min(selStart, selEnd);
+      const outerSelMax = Math.max(selStart, selEnd);
+      const caretStrictlyBeforePreview =
+        leftIdx < rightIdx && selStart >= 0 && selEnd >= 0 && outerSelMax < leftIdx;
+      if (caretStrictlyBeforePreview) {
+        this.mEditable.applyExternalDocumentSelectionWhilePreviewStaging(outerSelMin, outerSelMax);
+        const committedLatinPrefix = this.mEditable.commitLeadingLatinPreviewWhenCaretOutsideSpan();
+        const displayState = PreviewTextCoordinator.composeDisplayState(this.mEditable);
+        this.plugin.textInputChannel.updateEditingState(
+          this.inputTarget.id,
+          displayState.text,
+          displayState.selectionStart,
+          displayState.selectionEnd,
+          displayState.composingStart,
+          displayState.composingEnd,
+        );
+        this.mLastOutgoingFrameworkState = PreviewTextCoordinator.displayStateToTextEditState(displayState);
+        if (committedLatinPrefix) {
+          this.notifyImcFlushComposingAfterLatinOutsideSpanCommit();
+        } else {
+          this.notifySelectionToFramework(displayState.text, displayState.selectionStart, displayState.selectionEnd);
+        }
+        return;
+      }
+      const caretStrictlyAfterPreview =
+        leftIdx < rightIdx && selStart >= 0 && selEnd >= 0 && outerSelMin > rightIdx;
+      if (caretStrictlyAfterPreview) {
+        // Same shape as “before”: apply selection, `commitLeadingLatin` then `commitPreviewWhenCursorOutOfRange`, push display, return.
+        this.mEditable.applyExternalDocumentSelectionWhilePreviewStaging(outerSelMin, outerSelMax);
+        const committedLatinSuffix = this.mEditable.commitLeadingLatinPreviewWhenCaretOutsideSpan();
+        let committedCoordinatorOut = false;
+        if (!committedLatinSuffix) {
+          committedCoordinatorOut = PreviewTextCoordinator.commitPreviewWhenCursorOutOfRange(
+            this.mEditable,
+            editingState,
+            (text, start, end) => this.notifySelectionToFramework(text, start, end)
+          );
+        }
+        if (committedCoordinatorOut) {
+          this.mEditable.setIsCursorIdxOutOfPreviewTextRange(false);
+          this.inputMethodController.changeSelection("", -1, -1, (err: BusinessError) => {
+            if (err) {
+              Log.e(TextInputMethodHandlerImpl.TAG, `Failed to changeSelection, code: ${err.code}, message: ${err.message}`);
+              return;
+            }
+            const text = this.mEditable.getStringCache();
+            const start = this.mEditable.getSelectionStart();
+            const end = this.mEditable.getSelectionEnd();
+            this.inputMethodController.changeSelection(text, start, end);
+          });
+          return;
+        }
+        const displayState = PreviewTextCoordinator.composeDisplayState(this.mEditable);
+        this.plugin.textInputChannel.updateEditingState(
+          this.inputTarget.id,
+          displayState.text,
+          displayState.selectionStart,
+          displayState.selectionEnd,
+          displayState.composingStart,
+          displayState.composingEnd,
+        );
+        this.mLastOutgoingFrameworkState = PreviewTextCoordinator.displayStateToTextEditState(displayState);
+        if (committedLatinSuffix) {
+          this.notifyImcFlushComposingAfterLatinOutsideSpanCommit();
+        } else {
+          this.notifySelectionToFramework(displayState.text, displayState.selectionStart, displayState.selectionEnd);
+        }
+        return;
+      }
+    }
+
+    if (isPreviewTextSupported() &&
+      PreviewTextCoordinator.commitPreviewWhenCursorOutOfRange(
+        this.mEditable,
+        editingState,
+        (text, start, end) => this.notifySelectionToFramework(text, start, end)
+      )) {
+      this.mEditable.setIsCursorIdxOutOfPreviewTextRange(false);
+      this.inputMethodController.changeSelection("",
+        -1, -1, (err: BusinessError) => {
+          if (err) {
+            Log.e(TextInputMethodHandlerImpl.TAG, `Failed to changeSelection, code: ${err.code}, message: ${err.message}`);
+            return;
+          }
+          const text = this.mEditable.getStringCache();
+          const start = this.mEditable.getSelectionStart();
+          const end = this.mEditable.getSelectionEnd();
+          this.inputMethodController.changeSelection(text, start, end);
+        });
+      return;
+    }
+
+    const flutterEchoesCache = editingState.text === this.mEditable.getStringCache();
+    const previewMetaActive = isPreviewTextSupported() &&
+      (this.mEditable.getPreviewText() !== '' ||
+        this.mEditable.getLeftIdxOfPreviewTextRange() !== this.mEditable.getRightIdxOfPreviewTextRange());
+    const previewStagingHeld = isPreviewTextSupported() && this.mEditable.isPreviewStagingActive();
+    if ((!flutterEchoesCache && !previewStagingHeld) || !previewMetaActive) {
+      this.mEditable.discardPreviewStagingMetadata();
+    }
     this.mEditable.setIsCursorIdxOutOfPreviewTextRange(false);
     this.mEditable.updateTextInputState(editingState);
-    // notify current cursor index or selection range to the InputMethodFramework
-    this.inputMethodController.changeSelection(editingState.text,
-      editingState.selectionStart, editingState.selectionEnd);
-    if (sdkApiVersion >= PREIVEW_TEXT_SUPPORT_API) {
-      this.previewTextChangeSelection(editingState);
+    if (reconnectImeForComposingDrift) {
+      this.scheduleImeReconnectAfterFrameworkComposingChange();
     }
+    this.inputMethodController.changeSelection("",
+      -1, -1, (err: BusinessError) => {
+        if (err) {
+          Log.e(TextInputMethodHandlerImpl.TAG, `Failed to changeSelection, code: ${err.code}, message: ${err.message}`);
+          return;
+        }
+        const text = this.mEditable.getStringCache();
+        const start = this.mEditable.getSelectionStart();
+        const end = this.mEditable.getSelectionEnd();
+        this.inputMethodController.changeSelection(text, start, end);
+      });
   }
 
-  previewTextChangeSelection(editingState: TextEditState): void {
-    // if users only modify the cursor index without typing new preview text,
-    // clear the current preview text cache for avoiding inserting redundant preview text
-    // to insert at the current cursor position
-    let currCursorIndex: number = editingState.selectionStart;
-    let leftIdxOfPreviewText: number = this.mEditable.getLeftIdxOfPreviewTextRange();
-    let rightIdxOfPreviewText: number = this.mEditable.getRightIdxOfPreviewTextRange();
-
-    let isCursorIdxOutOfPreviewTextRange = (leftIdxOfPreviewText != rightIdxOfPreviewText) &&
-      (currCursorIndex < leftIdxOfPreviewText || currCursorIndex > rightIdxOfPreviewText)
-    // if user move the current cursor index out of editing preview text range,
-    // immediately inserting the first candidate word into the editing widget
-    if (isCursorIdxOutOfPreviewTextRange) {
-      // change selection async callback
-      this.inputMethodController.changeSelection(editingState.text, leftIdxOfPreviewText, rightIdxOfPreviewText)
-        .then(() => {
-          // force the cursor position at the end of editing preview text
-          editingState.selectionStart = rightIdxOfPreviewText;
-          editingState.selectionEnd = rightIdxOfPreviewText;
-          // update TextInputState and reset the preview text state
-          this.mEditable.updateTextInputState(editingState);
-          this.mEditable.setPreviewText("");
-        })
-        .catch((err: BusinessError) => {
-          console.error(`Failed to previewTextChangeSelection: ${JSON.stringify(err)}`);
-        })
-    }
-  }
-
+  /**
+   * Clears the current text input client.
+   */
   clearClient(): void {
     this.clearTextInputClient();
   }
 
   private async showTextInput(): Promise<void> {
+    if (!this.lastInputType) {
+      this.setLastInputType(this.configuration?.inputType?.type);
+    }
+    if (this.lastKind === undefined && this.configuration?.deviceKind !== undefined) {
+      this.lastKind = this.configuration.deviceKind;
+    }
     if (this.keyboardStatus == inputMethod.KeyboardStatus.SHOW) {
-      // 增加键盘拉起状态时也调用attach，参数false则attach不会拉起键盘
+      // When keyboard is already SHOW, still call attach; false means attach does not show the keyboard again.
       await this.attach(false);
-      if (this.lastKind != this.configuration?.deviceKind) {
+      if (this.lastKind != this.configuration?.deviceKind ||
+        this.hasSecureKeyboardInSwitch()) {
         if (deviceInfo.sdkApiVersion >= INPUT_SUPPORT_API) {
           await this.inputMethodController.showTextInput(this.getRequestReason());
         } else {
           await this.inputMethodController.showTextInput();
         }
+        if (this.configuration?.deviceKind !== undefined) {
+          this.lastKind = this.configuration.deviceKind;
+        }
       }
+      this.setLastInputType(this.configuration?.inputType?.type);
       return;
     }
+    this.setLastInputType(this.configuration?.inputType?.type);
     await this.attach(true);
+    if (this.configuration?.deviceKind !== undefined) {
+      this.lastKind = this.configuration.deviceKind;
+    }
     if (!this.imcFlag) {
       this.listenKeyBoardEvent();
     }
@@ -303,27 +680,83 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
     });
   }
 
+  /**
+   * Attaches to the input method controller.
+   * @param showKeyboard - Whether to show the keyboard immediately
+   * @private
+   */
   async attach(showKeyboard: boolean): Promise<void> {
     try {
-      // must register previewtext callbacks before attachment
-      if (sdkApiVersion >= PREIVEW_TEXT_SUPPORT_API) {
+      // must register preview text callbacks before attachment
+      if (isPreviewTextSupported()) {
         this.registerPreviewTextCallbacks();
       }
       if (deviceInfo.sdkApiVersion >= INPUT_SUPPORT_API) {
-        await this.inputMethodController.attach(showKeyboard, this.textConfig, this.getRequestReason());
+        await this.inputMethodController.attach(showKeyboard, this.textConfig, this.getRequestReason()).then(async () => {
+          await this.handleAttach(showKeyboard);
+        });
       } else {
-        await this.inputMethodController.attach(showKeyboard, this.textConfig);
+        await this.inputMethodController.attach(showKeyboard, this.textConfig).then(async () => {
+          await this.handleAttach(showKeyboard);
+        });
       }
-      this.keyboardStatus = inputMethod.KeyboardStatus.SHOW;
     } catch (err) {
       Log.e(TextInputMethodHandlerImpl.TAG, "Failed to attach:" + JSON.stringify(err));
       this.keyboardStatus = inputMethod.KeyboardStatus.NONE;
     }
   }
 
+  private async handleAttach(showKeyboard: boolean): Promise<void> {
+    let isDetached = false;
+    if (showKeyboard) {
+      isDetached = await this.detachIfBackground();
+    }
+    if (isDetached) {
+      this.isInputMethodAttached = false;
+      this.keyboardStatus = inputMethod.KeyboardStatus.NONE;
+    } else {
+      this.isInputMethodAttached = true;
+      this.cacheMethodCall();
+      this.keyboardStatus = inputMethod.KeyboardStatus.SHOW;
+    }
+  }
+
+  private async detachIfBackground(): Promise<boolean> {
+    try {
+      const bundleFlags = bundleManager.BundleFlag.GET_BUNDLE_INFO_WITH_APPLICATION;
+      const bundleInfo: bundleManager.BundleInfo  = await bundleManager.getBundleInfoForSelf(bundleFlags);
+      const currentInfo = await appManager.getRunningProcessInformation();
+      const targetBundleName = bundleInfo?.name;
+      const currentProcess = currentInfo.find(info => info.bundleNames?.includes(targetBundleName));
+      // STATE_FOREGROUND: process in foreground; when UI is focused and visible the state is often STATE_ACTIVE.
+      // See HarmonyOS appManager ProcessState docs.
+      if (
+        currentProcess &&
+        (currentProcess.state === appManager.ProcessState.STATE_FOREGROUND ||
+          currentProcess.state === appManager.ProcessState.STATE_BACKGROUND)
+      ) {
+          await this.inputMethodController.hideTextInput();
+          return true;
+      }
+    } catch (err) {
+      Log.e(
+        TextInputMethodHandlerImpl.TAG,
+        `detachIfBackground error: ${JSON.stringify(err)}`,
+      );
+    }
+    return false;
+  }
+
+  cacheMethodCall(): void {
+    // Cache method calls when input method is attached; no-op if not used by this version
+  }
+
+  /**
+   * Gets the request reason for showing the keyboard based on the input device kind.
+   * @returns The request reason for keyboard display
+   */
   getRequestReason() : inputMethod.RequestKeyboardReason {
     let deviceKind : PointerDeviceKind = this.configuration?.deviceKind ?? PointerDeviceKind.UNKNOWN
-    Log.i(TextInputMethodHandlerImpl.TAG, "getRequestReason: deviceKind=" + deviceKind);
     switch (deviceKind) {
       case PointerDeviceKind.TOUCH:
         return inputMethod.RequestKeyboardReason.TOUCH;
@@ -338,6 +771,10 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
     }
   }
 
+  /**
+   * Handles focus state changes.
+   * @param focusState - The new focus state
+   */
   handleChangeFocus(focusState: boolean) {
     if (focusState && this.keyboardFocusState) {
       // When the app loses focus, the system automatically detaches the input method.
@@ -368,6 +805,9 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
     }
   }
 
+  /**
+   * Updates the input attribute configuration.
+   */
   async updateAttribute(): Promise<void> {
     if (this.keyboardStatus != inputMethod.KeyboardStatus.SHOW) {
       return;
@@ -379,8 +819,14 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
     }
   }
 
+  /**
+   * Sets the text input client with the given configuration.
+   * @param client - The client ID
+   * @param configuration - The input configuration
+   */
   setTextInputClient(client: number, configuration: Configuration | null): void {
     if (configuration) {
+      this.lastKind = this.configuration?.deviceKind;
       this.configuration = configuration;
       if (configuration.inputType) {
         this.textConfig.inputAttribute.textInputType = configuration.inputType.type;
@@ -398,6 +844,7 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
       this.plugin.textInputChannel, this.inputTarget.id, this.plugin.keyEventChannel);
 
     this.mRestartInputPending = true;
+    this.mLastOutgoingFrameworkState = null;
     this.mEditable.addEditingStateListener(this.plugin);
 
     this.inputAttribute = this.textConfig.inputAttribute;
@@ -405,6 +852,25 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
     this.updateAttribute();
   }
 
+  setLastInputType(inputType?: inputMethod.TextInputType): void {
+    this.lastInputType = inputType;
+  }
+
+  // It is used to determine whether there is a safe keyboard for the keyboard type
+  // awakened by the two input boxes when a soft keyboard is already suspended
+  // and switching input boxes
+  hasSecureKeyboardInSwitch(): boolean {
+    // Since this method is called in showTextInput to determine whether a secure 
+ 	  // keyboard needs to be pulled up, the parameter must be true
+    this.handleAttach(true);
+    return this.lastInputType === inputMethod.TextInputType.VISIBLE_PASSWORD ||
+    this.configuration?.inputType?.type === inputMethod.TextInputType.VISIBLE_PASSWORD;
+  }
+
+  /**
+   * Checks if text input can be shown.
+   * @returns True if text input can be shown, false if input type is NONE
+   */
   canShowTextInput(): boolean {
     if (this.configuration == null || this.configuration.inputType == null) {
       return true;
@@ -412,6 +878,9 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
     return this.configuration.inputType.type != inputMethod.TextInputType.NONE;
   }
 
+  /**
+   * Registers callbacks for preview text functionality.
+   */
   registerPreviewTextCallbacks(): void {
     try {
       this.inputMethodController.on("setPreviewText", this.setPreviewTextCallback)
@@ -430,11 +899,17 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
     }
   }
 
+  /**
+   * Unregisters preview text callbacks.
+   */
   unregisterPreviewTextCallbacks(): void {
     this.inputMethodController?.off("setPreviewText", this.setPreviewTextCallback)
     this.inputMethodController?.off("finishTextPreview", this.finishPreviewTextCallback);
   }
 
+  /**
+   * Registers listeners for keyboard events from the input method framework.
+   */
   listenKeyBoardEvent(): void {
     try {
       this.inputMethodController.on('insertText', this.insertTextCallback);
@@ -528,53 +1003,117 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
       return;
     }
 
-    Log.d(TextInputMethodHandlerImpl.TAG, "listenKeyBoardEvent success");
     this.imcFlag = true;
   }
 
   private setPreviewTextCallback = (text: string, range: inputMethod.Range) => {
-    Log.i(TextInputMethodHandlerImpl.TAG,
-      "setPreviewTextCallback: text = " + text + " range = " + JSON.stringify(range));
     this.mEditable.handleInsertPreviewTextEvent(text, range);
+    // Same as insertText/deleteLeft: if merge corrected away from raw IME text, push IMC+Flutter again or IME buffer keeps old tail-delete
+    // semantics and suggestions diverge from the field (e.g. field shows abcefg while suggestions still include d).
+    if (this.mEditable.consumeImcFullSyncAfterPreviewInsert()) {
+      this.syncImcSelectionAfterEditableChange();
+    }
   }
 
   private finishPreviewTextCallback = () => {
-    Log.i(TextInputMethodHandlerImpl.TAG, "finishPreviewTextCallback");
+    const previewText = this.mEditable.getPreviewText();
+    if (typeof previewText !== 'string' || previewText.length === 0) {
+      const leftIdx = this.mEditable.getLeftIdxOfPreviewTextRange();
+      const rightIdx = this.mEditable.getRightIdxOfPreviewTextRange();
+      if (leftIdx < rightIdx) {
+        this.mEditable.setPreviewText('');
+        return;
+      }
+      this.mEditable.clearPreviewTextContents();
+      return;
+    }
+    const rawImcStart = this.mEditable.getPreviewTextStart();
+    const rawImcEnd = this.mEditable.getPreviewTextEnd();
+    let imcStart = rawImcStart;
+    let imcEnd = rawImcEnd;
     // When editing preview text, meanwhile switch the app to the background and
-    // the preview text will automatically insert into the string cache of TextField
-    this.mEditable.handleInsertTextEvent(this.mEditable.getPreviewText());
-    this.mEditable.clearPreviewTextContents();
+    // the preview text will automatically insert into the string cache of TextField.
+    // imcMeta start/end are often preview-relative (e.g. 0/4); replacement in the document must use [leftIdx, rightIdx), not imcMeta.
+    // OHOS sometimes reports (-1,-1) on finishTextPreview; latinFinishPreviewReplaceRange still needs a half-open
+    // preview-relative span — default to [0, previewText.length) so we commit instead of waiting for insertText that never arrives.
+    if (imcStart < 0 || imcEnd < 0) {
+      imcStart = 0;
+      imcEnd = previewText.length;
+    }
+    // Match `finishTextPreview` defer: internal syllable `'` — wait for `insertText`, no local substitute here.
+    if (TextInputMethodHandlerImpl.previewTextHasInternalSegmentApostrophe(previewText)) {
+      return;
+    }
+    const leftIdx = this.mEditable.getLeftIdxOfPreviewTextRange();
+    const rightIdx = this.mEditable.getRightIdxOfPreviewTextRange();
+    if (!(leftIdx < rightIdx && this.mEditable.isPreviewStagingActive())) {
+      return;
+    }
+    // Caret entirely before span: defer (retainSpan commit with preview cleared breaks in-preview delete UI).
+    const selStart = this.mEditable.getSelectionStart();
+    const selEnd = this.mEditable.getSelectionEnd();
+    if (selStart >= 0 && selEnd >= 0 && Math.max(selStart, selEnd) < leftIdx) {
+      return;
+    }
+    const committedPreview = previewText;
+    const cache = this.mEditable.getStringCache();
+    const commitRange = TextInputMethodHandlerImpl.latinFinishPreviewReplaceRange(
+      leftIdx,
+      rightIdx,
+      committedPreview,
+      cache,
+      imcStart,
+      imcEnd,
+    );
+    const retainSpan = TextInputMethodHandlerImpl.previewStartsWithImeSegmentMarker(committedPreview);
+    const opts: PreviewInsertOptions = {
+      usePreviewRange: true,
+      previewStart: commitRange.rangeStart,
+      previewEnd: commitRange.rangeEnd,
+      retainPreviewRangeAfterCommit: retainSpan,
+    };
+    this.mEditable.handleInsertTextEvent(committedPreview, opts);
+    this.mFinishRetainedPreviewRangePending = retainSpan;
+    // Leading-segment tail (e.g. 'hao): IME often sends insertText(same Latin) after finishTextPreview to align
+    // the client buffer. Skipping it as "duplicate" can prevent the follow-up insertText(CJK candidate).
+    // English / non-retain finish still arms consume to drop the echo word once.
+    this.mConsumeNextInsertTextIfEquals = retainSpan ? null : committedPreview;
   }
 
   private insertTextCallback = (text: string) => {
+    if (this.mConsumeNextInsertTextIfEquals !== null) {
+      if (text === this.mConsumeNextInsertTextIfEquals) {
+        this.mConsumeNextInsertTextIfEquals = null;
+        this.syncImcSelectionAfterEditableChange();
+        return;
+      }
+      this.mConsumeNextInsertTextIfEquals = null;
+    }
     this.mEditable.handleInsertTextEvent(text);
-    // notify the current cursor index to InputMethodFramework for preview mode
-    this.inputMethodController.changeSelection(this.mEditable.getStringCache(), this.mEditable.getSelectionStart(),
-      this.mEditable.getSelectionEnd());
+    this.mFinishRetainedPreviewRangePending = false;
+    this.syncImcSelectionAfterEditableChange();
   }
 
   private deleteLeftCallback = (length: number) => {
     this.mEditable.handleDeleteEvent(false, length, this.configuration?.enableDeltaModel);
-    this.inputMethodController.changeSelection(this.mEditable.getStringCache(), this.mEditable.getSelectionStart(),
-      this.mEditable.getSelectionEnd());
+    this.syncImcSelectionAfterEditableChange();
   }
 
   private deleteRightCallback = (length: number) => {
     this.mEditable.handleDeleteEvent(true, length, this.configuration?.enableDeltaModel);
-    this.inputMethodController.changeSelection(this.mEditable.getStringCache(), this.mEditable.getSelectionStart(),
-      this.mEditable.getSelectionEnd());
+    this.syncImcSelectionAfterEditableChange();
   }
 
   private sendFunctionKeyCallback = (functionKey: inputMethod.FunctionKey) => {
     if (functionKey.enterKeyType == inputMethod.EnterKeyType.NEWLINE) {
-      // insertText回调不会通知换行事件，需要在这里进行处理
+      // insertText callback does not deliver newline; handle it here.
       this.mEditable.handleNewlineEvent();
     }
     this.mEditable.handleFunctionKey(functionKey);
   }
 
   private sendKeyboardStatusCallback = (state: inputMethod.KeyboardStatus) => {
-    // api20开始，外接键盘状态下，点击输入框会拉起软键盘，此时要阻止onConnectionClosed，否则输入框会无法输入
+    // Since API 20, tapping the field with physical keyboard can show soft keyboard; avoid onConnectionClosed then or the field stops accepting input.
     try {
       let isPhysicalKeyboard = false;
       inputDevice.getDeviceList((Error: Error, ids: Array<number>) => {
@@ -600,52 +1139,45 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
   // obtain the range to update cursor idx to start/end of text cache
   private selectByRangeCallback = (range: inputMethod.Range) => {
     this.mEditable.handleSelectByRangeEvent(range);
-    this.inputMethodController.changeSelection(this.mEditable.getStringCache(), this.mEditable.getSelectionStart(),
-      this.mEditable.getSelectionEnd());
+    this.syncImcSelectionAfterEditableChange();
   }
 
   // move cursor postion with left, right, up and down in editing widget
   private moveCursorCallback = (direction: inputMethod.Direction) => {
     this.mEditable.handleMoveCursorEvent(direction);
-    this.inputMethodController.changeSelection(this.mEditable.getStringCache(), this.mEditable.getSelectionStart(),
-      this.mEditable.getSelectionEnd());
+    this.syncImcSelectionAfterEditableChange();
   }
 
   // handle extend clipboard actions, like 'select all', 'cut', 'copy' and 'paste'
   private handleExtendActionCallback = (action: inputMethod.ExtendAction) => {
     this.mEditable.handleExtendActionEvent(action);
-    this.inputMethodController.changeSelection(this.mEditable.getStringCache(), this.mEditable.getSelectionStart(),
-      this.mEditable.getSelectionEnd());
+    this.syncImcSelectionAfterEditableChange();
   }
 
   // text selection range changed with cursor direction movement
   private selectByMovementCallback = (movement: inputMethod.Movement) => {
     this.mEditable.handleSelectByMovementEvent(movement);
-    this.inputMethodController.changeSelection(this.mEditable.getStringCache(), this.mEditable.getSelectionStart(),
-      this.mEditable.getSelectionEnd());
+    this.syncImcSelectionAfterEditableChange();
   }
 
   // return the left-side text string of current cursor index ("abc|345" -> return "abc")
   private getLeftTextOfCursorCallback = (length: number) : string => {
-    const retText = this.mEditable.getLeftTextOfCursor(length);
-    Log.i(TextInputMethodHandlerImpl.TAG, "getLeftTextOfCursor: " + retText);
-    return retText;
+    return this.mEditable.getLeftTextOfCursor(length);
   }
 
   // return the right-side text string of current cursor index ("abc|345" -> return "345")
   private getRightTextOfCursorCallback = (length: number) : string => {
-    const retText = this.mEditable.getRightTextOfCursor(length);
-    Log.i(TextInputMethodHandlerImpl.TAG, "getRightTextOfCursor: " + retText);
-    return retText;
+    return this.mEditable.getRightTextOfCursor(length);
   }
 
   // return the current cursor index of editing text
   private getTextIndexAtCursorCallback = () => {
-    const cursorIdx = this.mEditable.getSelectionStart();
-    Log.i(TextInputMethodHandlerImpl.TAG, "getTextIndexAtCursor: " + cursorIdx);
-    return cursorIdx;
+    return this.mEditable.getSelectionStart();
   }
 
+  /**
+   * Cancels all keyboard event listeners.
+   */
   cancelListenKeyBoardEvent(): void {
     this.inputMethodController?.off('insertText', this.insertTextCallback);
     this.inputMethodController?.off('deleteLeft', this.deleteLeftCallback);
@@ -662,6 +1194,9 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
     this.imcFlag = false;
   }
 
+  /**
+   * Clears the text input client.
+   */
   public clearTextInputClient(): void {
     if (this.inputTarget.type == Type.VIRTUAL_DISPLAY_PLATFORM_VIEW) {
       return;
@@ -669,23 +1204,69 @@ class TextInputMethodHandlerImpl implements TextInputMethodHandler {
     this.mEditable.removeEditingStateListener(this.plugin);
     this.configuration = null;
     this.inputTarget = new InputTarget(Type.NO_TARGET, 0);
+    this.mLastOutgoingFrameworkState = null;
+  }
+
+  /**
+   * Same idea as Android TextInputPlugin.composingChanged: compare only composing region content and length between two TextEditStates.
+   */
+  private static composingRegionMutatedByFramework(before: TextEditState, after: TextEditState): boolean {
+    const regionLen = before.composingEnd - before.composingStart;
+    if (regionLen !== (after.composingEnd - after.composingStart)) {
+      return true;
+    }
+    for (let i = 0; i < regionLen; i++) {
+      if (before.text.charAt(before.composingStart + i) !== after.text.charAt(after.composingStart + i)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Same idea as Android InputMethodManager.restartInput: reset IME session when Framework mutates composing unexpectedly. */
+  private scheduleImeReconnectAfterFrameworkComposingChange(): void {
+    if (this.keyboardStatus !== inputMethod.KeyboardStatus.SHOW) {
+      return;
+    }
+    this.inputMethodController.detach()
+      .then(() => this.attach(false))
+      .then(() => {
+        this.listenKeyBoardEvent();
+      })
+      .catch((err: BusinessError) => {
+        Log.e(TextInputMethodHandlerImpl.TAG, 'IME reconnect failed: ' + JSON.stringify(err));
+      });
   }
 }
 
+/**
+ * Enumeration of input target types.
+ */
 enum Type {
+  /** No input target */
   NO_TARGET,
-  // InputConnection is managed by the TextInputPlugin, and events are forwarded to the Flutter
-  // framework.
+  /** InputConnection is managed by the TextInputPlugin, and events are forwarded to the Flutter framework. */
   FRAMEWORK_CLIENT,
-  // InputConnection is managed by a platform view that is presented on a virtual display.
+  /** InputConnection is managed by a platform view that is presented on a virtual display. */
   VIRTUAL_DISPLAY_PLATFORM_VIEW,
+  /** InputConnection is managed by a platform view that is presented on a physical display. */
   PHYSICAL_DISPLAY_PLATFORM_VIEW,
 }
 
+/**
+ * Represents a target for text input operations.
+ */
 export class InputTarget {
+  /** The type of input target. */
   type: Type;
+  /** The unique identifier for this input target. */
   id: number;
 
+  /**
+   * Constructs a new InputTarget instance.
+   * @param type - The type of input target
+   * @param id - The target ID
+   */
   constructor(type: Type, id: number) {
     this.type = type;
     this.id = id;

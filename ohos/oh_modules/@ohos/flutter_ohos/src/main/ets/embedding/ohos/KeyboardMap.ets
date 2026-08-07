@@ -4,28 +4,52 @@
  * found in the LICENSE_HW file.
  */
 
+/**
+ * Represents a pair of physical and logical key codes.
+ */
 export class KeyPair {
+  /** The physical key code. */
   public physicalKey: number;
+  /** The logical key code. */
   public logicalKey: number;
 
+  /**
+   * Constructs a new KeyPair instance.
+   * @param physicalKey - The physical key code
+   * @param logicalKey - The logical key code
+   */
   constructor(physicalKey: number, logicalKey: number) {
     this.physicalKey = physicalKey;
     this.logicalKey = logicalKey;
   }
 }
 
+/**
+ * Represents a modifier key goal with associated key pairs.
+ */
 export class ModifierGoal {
+  /** The modifier name (e.g., "Ctrl", "Shift", "Alt"). */
   public name: string;
+  /** Array of KeyPair instances for this modifier. */
   public keys: KeyPair[];
 
+  /**
+   * Constructs a new ModifierGoal instance.
+   * @param name - The modifier name (e.g., "Ctrl", "Shift", "Alt")
+   * @param keys - Array of KeyPair instances for this modifier
+   */
   constructor(name: string, keys: KeyPair[]) {
     this.name = name;
     this.keys = keys;
   }
 }
 
+/**
+ * Maps OpenHarmony KeyCodes to Flutter LogicalKeys and PhysicalKeys.
+ * This class provides static mappings for keyboard key translation between OpenHarmony and Flutter.
+ */
 export default class KeyboardMap {
-  /**  Map OH KeyCode to Flutter LogicalKey. */
+  /** Map from OpenHarmony KeyCode to Flutter LogicalKey. */
   public static toLogicalKey: Map<number, number> =
     new Map<number, number>([
       [0x000000007D0, 0x00000000030], // digit0
@@ -405,7 +429,7 @@ export default class KeyboardMap {
       [0x00000000B0F, 0x00000000014], // suspend
       [0x00000000017, 0x0000007007F] // audioVolumeMute
     ]);
-  /* Map Oh KeyCode to ScanCode since cannot access ScanCode directly from KeyEvent */
+  /** Map OpenHarmony KeyCode to ScanCode since cannot access ScanCode directly from KeyEvent. */
   public static ohKeyToScanCode: Map<number, number> =
     new Map<number, number>([
       [0x000000007D0, 0x0000000000B], // digit0
@@ -575,9 +599,13 @@ export default class KeyboardMap {
       [0x00000000B0F, 0x000000000CD], // suspend
       [0x00000000017, 0x00000000071], // audioVolumeMute
     ]);
+  /** Bitmask for extracting key values. */
   public static kValueMask: number = 0x000FFFFFFFF;
+  /** Unicode plane identifier. */
   public static kUnicodePlane: number = 0x00000000000;
+  /** OpenHarmony plane identifier. */
   public static kOhosPlane: number = 0x01900000000;
+  /** Array of modifier key goals for synchronization. */
   public static modifierGoals: ModifierGoal[] = [
     new ModifierGoal(
       "Ctrl",

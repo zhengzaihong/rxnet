@@ -4,62 +4,48 @@
  * found in the LICENSE file.
 */
 
-/**
- * {@link io.flutter.embedding.engine.plugins.FlutterPlugin} that is interested in {@link
- * ohos.app.ability.UIAbility} lifecycle events related to a {@link
- * io.flutter.embedding.engine.FlutterEngine} running within the given {@link ohos.app.ability.UIAbility}.
- */
 import { AbilityPluginBinding } from './AbilityPluginBinding';
 
+/**
+ * FlutterPlugin that is interested in UIAbility lifecycle events related to a FlutterEngine
+ * running within the given UIAbility.
+ */
 export default interface AbilityAware {
   /**
-   * This {@code AbilityAware} {@link io.flutter.embedding.engine.plugins.FlutterPlugin} is now
-   * associated with an {@link ohos.app.ability.UIAbility}.
+   * This AbilityAware FlutterPlugin is now associated with a UIAbility.
    *
-   * <p>This method can be invoked in 1 of 2 situations:
+   * This method can be invoked in 1 of 2 situations:
    *
-   * <ul>
-   *   <li>This {@code AbilityAware} {@link io.flutter.embedding.engine.plugins.FlutterPlugin} was
-   *       just added to a {@link io.flutter.embedding.engine.FlutterEngine} that was already
-   *       connected to a running {@link ohos.app.ability.UIAbility}.
-   *   <li>This {@code AbilityAware} {@link io.flutter.embedding.engine.plugins.FlutterPlugin} was
-   *       already added to a {@link io.flutter.embedding.engine.FlutterEngine} and that {@link
-   *       io.flutter.embedding.engine.FlutterEngine} was just connected to an {@link
-   *       ohos.app.ability.UIAbility}.
-   * </ul>
+   * This AbilityAware FlutterPlugin was just added to a FlutterEngine that was already
+   * connected to a running UIAbility.
+   * This AbilityAware FlutterPlugin was already added to a FlutterEngine and that
+   * FlutterEngine was just connected to a UIAbility.
    *
-   * The given {@link AbilityPluginBinding} contains {@link ohos.app.ability.UIAbility}-related
-   * references that an {@code AbilityAware} {@link
-   * io.flutter.embedding.engine.plugins.FlutterPlugin} may require, such as a reference to the
-   * actual {@link ohos.app.ability.UIAbility} in question. The {@link AbilityPluginBinding} may be
-   * referenced until either {@link #onDetachedFromAbilityForConfigChanges()} or {@link
-   * #onDetachedFromAbility()} is invoked. At the conclusion of either of those methods, the
+   * The given AbilityPluginBinding contains UIAbility-related references that an AbilityAware
+   * FlutterPlugin may require, such as a reference to the actual UIAbility in question.
+   * The AbilityPluginBinding may be referenced until either onDetachedFromAbilityForConfigChanges
+   * or onDetachedFromAbility is invoked. At the conclusion of either of those methods, the
    * binding is no longer valid. Clear any references to the binding or its resources, and do not
    * invoke any further methods on the binding or its resources.
+   * @param binding - The AbilityPluginBinding providing access to UIAbility resources
    */
   onAttachedToAbility(binding: AbilityPluginBinding): void;
 
   /**
-   * This plugin has been detached from an {@link ohos.app.ability.UIAbility}.
+   * This plugin has been detached from a UIAbility.
    *
-   * <p>Detachment can occur for a number of reasons.
+   * Detachment can occur for a number of reasons:
    *
-   * <ul>
-   *   <li>The app is no longer visible and the {@link ohos.app.ability.UIAbility} instance has been
-   *       destroyed.
-   *   <li>The {@link io.flutter.embedding.engine.FlutterEngine} that this plugin is connected to
-   *       has been detached from its {@link io.flutter.embedding.android.FlutterView}.
-   *   <li>This {@code AbilityAware} plugin has been removed from its {@link
-   *       io.flutter.embedding.engine.FlutterEngine}.
-   * </ul>
+   * The app is no longer visible and the UIAbility instance has been destroyed.
+   * The FlutterEngine that this plugin is connected to has been detached from its FlutterView.
+   * This AbilityAware plugin has been removed from its FlutterEngine.
    *
-   * By the end of this method, the {@link ohos.app.ability.UIAbility} that was made available in {@link
-   * #onAttachedToAbility(AbilityPluginBinding)} is no longer valid. Any references to the
-   * associated {@link ohos.app.ability.UIAbility} or {@link AbilityPluginBinding} should be cleared.
+   * By the end of this method, the UIAbility that was made available in
+   * onAttachedToAbility is no longer valid. Any references to the
+   * associated UIAbility or AbilityPluginBinding should be cleared.
    *
-   * <p>Any {@code Lifecycle} listeners that were registered in {@link
-   * #onAttachedToAbility(AbilityPluginBinding)} or {@link
-   * #onReattachedToAbilityForConfigChanges(AbilityPluginBinding)} should be deregistered here to
+   * Any Lifecycle listeners that were registered in onAttachedToAbility or
+   * onReattachedToAbilityForConfigChanges should be deregistered here to
    * avoid a possible memory leak and other side effects.
    */
   onDetachedFromAbility(): void;

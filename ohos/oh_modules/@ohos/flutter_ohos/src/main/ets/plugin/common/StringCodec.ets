@@ -14,13 +14,18 @@ import MessageCodec from './MessageCodec';
 /**
  * A {@link MessageCodec} using UTF-8 encoded String messages.
  *
- * <p>This codec is guaranteed to be compatible with the corresponding <a
- * href="https://api.flutter.dev/flutter/services/StringCodec-class.html">StringCodec</a> on the
+ * This codec is guaranteed to be compatible with the corresponding `StringCodec` on the
  * Dart side. These parts of the Flutter SDK are evolved synchronously.
  */
 export default class StringCodec implements MessageCodec<string> {
+  /** Singleton instance of StringCodec. */
   static readonly INSTANCE = new StringCodec();
 
+  /**
+   * Encodes a string message into binary format.
+   * @param message - The string message to encode, possibly null
+   * @returns The encoded message as an ArrayBuffer
+   */
   encodeMessage(message: string): ArrayBuffer {
     if (message == null) {
       return StringUtils.stringToArrayBuffer("");
@@ -28,6 +33,11 @@ export default class StringCodec implements MessageCodec<string> {
     return StringUtils.stringToArrayBuffer(message);
   }
 
+  /**
+   * Decodes a binary message into a string.
+   * @param message - The binary message to decode, possibly null
+   * @returns The decoded string
+   */
   decodeMessage(message: ArrayBuffer | null): string {
     if (message == null) {
       return "";
