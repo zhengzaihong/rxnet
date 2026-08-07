@@ -45,6 +45,12 @@ void main() async {
           baseCheckNet: checkNet,
           adapter: adapter,
           cacheInvalidationTime: 365 * 24 * 60 * 60 * 1000,
+          adapterBaseOptions: const AdapterBaseOptions(
+            connectTimeout: Duration(seconds: 10),
+            sendTimeout:  Duration(seconds: 10),
+            receiveTimeout: Duration(seconds: 30),
+            headers: {'Authorization': 'Bearer token'},
+          ),
           interceptors: [
             RxNetLogAdapterInterceptor(),
       ]));

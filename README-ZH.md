@@ -65,6 +65,7 @@ await RxNet.init(config: RxNetConfig(
   cacheEvictionPolicy: CacheEvictionPolicy.lru,
   adapterBaseOptions: AdapterBaseOptions(
     connectTimeout: Duration(seconds: 10),
+    sendTimeout:  Duration(seconds: 10),
     receiveTimeout: Duration(seconds: 30),
   ),
   interceptors: [
@@ -84,6 +85,7 @@ await RxNet.init(config: RxNetConfig.builder()
   .cacheEvictionPolicy(CacheEvictionPolicy.lru)
   .baseOptions(AdapterBaseOptions(
     connectTimeout: Duration(seconds: 10),
+    sendTimeout:  Duration(seconds: 10),
     receiveTimeout: Duration(seconds: 30),
   ))
   .addInterceptor(RxNetLogAdapterInterceptor())
@@ -104,6 +106,7 @@ final config = RxNetConfig(
   adapter: DioAdapter(),                        // 可选，默认 DioAdapter
   adapterBaseOptions: AdapterBaseOptions(       // 可选，全局请求默认配置
     connectTimeout: Duration(seconds: 10),
+    sendTimeout:  Duration(seconds: 10),
     receiveTimeout: Duration(seconds: 30),
     headers: {'Authorization': 'Bearer token'},
   ),
@@ -229,6 +232,7 @@ await RxNet.init(config: RxNetConfig(
   baseUrl: "https://api.example.com",
   adapterBaseOptions: AdapterBaseOptions(
     connectTimeout: Duration(seconds: 10),
+    sendTimeout:  Duration(seconds: 10),
     receiveTimeout: Duration(seconds: 30),
     sendTimeout: Duration(seconds: 30),
     headers: {'Authorization': 'Bearer token'},
@@ -242,14 +246,7 @@ await RxNet.init(config: RxNetConfig(
 ));
 ```
 
-请求级参数始终优先于全局默认值：
-
-```dart
-RxNet.get()
-  .setPath("/api/data")
-  .setConnectTimeout(Duration(seconds: 5))  // 覆盖全局 10s
-  .request();
-```
+请求级参数始终优先于全局默认值
 
 ---
 

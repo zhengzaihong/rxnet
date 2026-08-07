@@ -64,6 +64,7 @@ await RxNet.init(config: RxNetConfig(
   cacheEvictionPolicy: CacheEvictionPolicy.lru,
   adapterBaseOptions: AdapterBaseOptions(
     connectTimeout: Duration(seconds: 10),
+    sendTimeout:  Duration(seconds: 10),
     receiveTimeout: Duration(seconds: 30),
   ),
   interceptors: [
@@ -83,7 +84,9 @@ await RxNet.init(config: RxNetConfig.builder()
   .cacheEvictionPolicy(CacheEvictionPolicy.lru)
   .baseOptions(AdapterBaseOptions(
     connectTimeout: Duration(seconds: 10),
+    sendTimeout:  Duration(seconds: 10),
     receiveTimeout: Duration(seconds: 30),
+    
   ))
   .addInterceptor(RxNetLogAdapterInterceptor())
   .build());
@@ -104,6 +107,7 @@ final config = RxNetConfig(
   adapterBaseOptions: AdapterBaseOptions(       // Optional, global request defaults
     connectTimeout: Duration(seconds: 10),
     receiveTimeout: Duration(seconds: 30),
+    sendTimeout:  Duration(seconds: 10),
     headers: {'Authorization': 'Bearer token'},
   ),
   cacheMode: CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST,
@@ -249,14 +253,7 @@ await RxNet.init(config: RxNetConfig(
 ));
 ```
 
-Request-level parameters always override global defaults:
-
-```dart
-RxNet.get()
-  .setPath("/api/data")
-  .setConnectTimeout(Duration(seconds: 5))  // Overrides global 10s
-  .request();
-```
+Request-level parameters always override global defaults
 
 ---
 
