@@ -11,4 +11,8 @@ ios/Runner/GeneratedPluginRegistrant.*
 pubspec.lock
 .vscode/launch.json
 coverage/
+example/ohos/entry/build/
+example/ohos/.hvigor/
+example/ohos/oh_modules/
+example/ohos/node_modules/
 

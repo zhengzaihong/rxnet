@@ -44,3 +44,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+example/ohos/entry/build/
+example/ohos/.hvigor/
+example/ohos/oh_modules/
+example/ohos/node_modules/
