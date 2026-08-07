@@ -669,7 +669,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
 
       // 通过 tag 获取结果
       final weather = results.getRequestByTag<NewWeatherInfo>('weather');
-      final user = results.getRequestByTag<Map<String, dynamic>>('user');
+      // final user = results.getRequestByTag<Map<String, dynamic>>('user');
       // final products = results.getRequestByTag<Map<String, dynamic>>('products');
       setState(() {
         result = "✅ 回调合并请求成功\n\n"
@@ -895,7 +895,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     // 为这个实例进行独立的初始化配置
     final apiService = RxNet.create();
     await apiService.initNet(
-      config: RxNetConfig(
+      config: const RxNetConfig(
           baseUrl: "https://api.xxx.com"
       )
     );
@@ -908,7 +908,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     // final weatherInfo = response.value;
 
     final testApi = RxNet.create();
-    await testApi.initNet( config: RxNetConfig(
+    await testApi.initNet( config: const RxNetConfig(
         baseUrl: "https://api.xxx.com"
     ));
 
