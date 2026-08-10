@@ -507,7 +507,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
   }
 
   void basicExample3() async {
-    final data = await RxNet.get<RxResult<NewWeatherInfo>>()
+    final data = await RxNet.get<NewWeatherInfo>()
         .setPath('api/weather/city/{id}')
         .setPathParam("id", "101030100")
         .setRetryCount(2) //重试次数
@@ -515,6 +515,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         .setJsonConvert(NewWeatherInfo.fromJson)
         .request();
     setState(() {
+      // data.requiredValue.;
       count++;
       result =
       "${sourcesType == SourcesType.net ? "网络请求" : "缓存请求"}-$count : ${jsonEncode(data.value)}";
