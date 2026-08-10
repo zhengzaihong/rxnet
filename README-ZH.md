@@ -419,7 +419,27 @@ RxNet.post().setPath("/api/upload")
 
 
 ## 证书校验
+
+#### 使用 DioAdapter（dio 包方式）
+```dart
+adapter.dio.httpClientAdapter = IOHttpClientAdapter(
+  createHttpClient: () {
+    final client = HttpClient();
+    client.badCertificateCallback = (cert, host, port) {
+      // // 获取证书 DER
+      // final der = cert.der;
+      // final sha256 = sha256Convert(der);
+      // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
+      // return sha256 == trustedFingerprint;
+      return true;
+    };
+    return client;
+  },
+);
+```
+
 #### 使用 HttpAdapter（http 包方式）
+
 
 ```dart
 import 'dart:io';

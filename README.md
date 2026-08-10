@@ -425,6 +425,26 @@ RxNet.post().setPath("/api/upload")
 
 
 ## certificate verification
+
+
+
+#### Using DioAdapter (dio package method)
+```dart
+adapter.dio.httpClientAdapter = IOHttpClientAdapter(
+  createHttpClient: () {
+    final client = HttpClient();
+    client.badCertificateCallback = (cert, host, port) {
+      // final der = cert.der;
+      // final sha256 = sha256Convert(der);
+      // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
+      // return sha256 == trustedFingerprint;
+      return true;
+    };
+    return client;
+  },
+);
+```
+
 #### Using HttpAdapter (http package method)
 
 ```dart
