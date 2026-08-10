@@ -51,7 +51,7 @@ class AdapterResponse<T> {
   /// [name] 响应头名称（不区分大小写）
   /// Returns: 第一个匹配的响应头值，如果不存在则返回 null
   String? getHeader(String name) {
-    final values = headers[name.toLowerCase()];
+    final values = _findHeaderValues(name);
     return values?.isNotEmpty == true ? values!.first : null;
   }
   
@@ -60,7 +60,18 @@ class AdapterResponse<T> {
   /// [name] 响应头名称（不区分大小写）
   /// Returns: 所有匹配的响应头值列表，如果不存在则返回 null
   List<String>? getHeaders(String name) {
-    return headers[name.toLowerCase()];
+    return _findHeaderValues(name);
+  }
+
+  /// 大小写不敏感地查找 header 值
+  List<String>? _findHeaderValues(String name) {
+    final lowerName = name.toLowerCase();
+    for (final entry in headers.entries) {
+      if (entry.key.toLowerCase() == lowerName) {
+        return entry.value;
+      }
+    }
+    return null;
   }
   
   /// 复制并修改

@@ -161,7 +161,7 @@ class RxNet {
 
   /// 缓存管理器，提供缓存的读写、清理等高级操作
   late RxNetCache cacheManager;
-  
+
   late final LogManager logManager;
   late final DebugManager debugManager;
 
@@ -197,42 +197,39 @@ class RxNet {
 
   Future<void> initNet({required RxNetConfig config}) async {
     LogUtil.init(systemLog: config.systemLog,debug: config.isDebug);
-    this._rxNetConfig = config;
+    _rxNetConfig = config;
     debugWindow = ValueNotifier(Size(config.debugWindowWidth, config.debugWindowHeight));
 
     // 如果提供了自定义适配器，使用它；否则使用默认的 DioAdapter
     // If custom adapter provided, use it; otherwise use default DioAdapter
     if (adapter != null) {
       _adapter = adapter;
-    } else if (_adapter == null) {
-      // 只在 _adapter 为 null 时创建默认适配器
-      // Only create default adapter when _adapter is null
-      _adapter = DioAdapter();
+    } else {
+      _adapter ??= DioAdapter();
     }
     if (config.adapterBaseOptions != null) {
       _adapter?.applyBaseOptions(config.adapterBaseOptions!);
     }
     // 设置 baseUrl（所有适配器统一处理）
     _adapter?.setBaseUrl(baseUrl);
-    
+
     // 添加适配器拦截器（适用于所有适配器）
     if (config.interceptors != null && config.interceptors!.isNotEmpty) {
       for (var interceptor in config.interceptors!) {
         _adapter?.addInterceptor(interceptor);
       }
     }
-    
     _database = RxNetDataBase();
-    // 立即绑定数据库引用，确保 init 期间的缓存操作也能通过 cacheManager 访问
-    cacheManager.setDatabase(_database!);
-    cacheManager.setCacheInvalidationTime(config.cacheInvalidationTime);
-    cacheManager.setMaxCacheSize(config.cacheMaxSize);
-    cacheManager.setEvictionPolicy(config.cacheEvictionPolicy);
     await _database!.init(
       databasePath: config.cachePath,
       databaseName: config.databaseName,
       cacheName: config.cacheName,
     );
+    // 立即绑定数据库引用，确保 init 期间的缓存操作也能通过 cacheManager 访问
+    cacheManager.setDatabase(_database!);
+    cacheManager.setCacheInvalidationTime(config.cacheInvalidationTime);
+    cacheManager.setMaxCacheSize(config.cacheMaxSize);
+    cacheManager.setEvictionPolicy(config.cacheEvictionPolicy);
   }
 
   NetworkAdapter? getAdapter() => _adapter;
@@ -252,9 +249,9 @@ class RxNet {
       I._adapter?.setBaseUrl(baseUrl);
     }
   }
-  
+
   void setEnv(String env) {
-    final baseUrl = this._rxNetConfig?.baseUrlEnv?[env];
+    final baseUrl = _rxNetConfig?.baseUrlEnv?[env];
     if (baseUrl != null) {
       _adapter?.setBaseUrl(baseUrl);
     }
@@ -283,89 +280,61 @@ class RxNet {
   BuildRequest<T> optionsRequest<T>() => BuildRequest(HttpMethod.OPTIONS, this);
 
   //键值对存储数据 — 委托给 cacheManager
-  static Future<void> saveCache(String key, dynamic value) async {
-    await I.cacheManager.put(key, value);
-  }
+  static Future<void> saveCache(String key, dynamic value)=> I.cacheManager.put(key, value);
 
   //通过key获取缓存数据 — 委托给 cacheManager
-  static Future<T?> readCache<T>(String key) async {
-    return await I.cacheManager.get<T>(key);
-  }
-  
+  static Future<T?> readCache<T>(String key)=>I.cacheManager.get<T>(key);
+
   //获取数据库实例
   //Get database instance
-  RxNetDataBase? getDatabase() {
-    return _database;
-  }
-  
+  RxNetDataBase? getDatabase()=>_database;
+
   //获取默认数据库实例
   //Get default database instance
-  static RxNetDataBase? getDefaultDatabase() {
-    return I._database;
-  }
+  static RxNetDataBase? getDefaultDatabase()=> I._database;
 
   //默认实列的全局请求头，你也可以在拦截器中进行处理
-  static void setGlobalHeaders(Map<String, dynamic> header) {
-     I._globalHeader = header;
-  }
+  static void setGlobalHeaders(Map<String, dynamic> header)=>I._globalHeader = header;
 
-  static Map<String, dynamic> getGlobalHeaders() {
-    return I._globalHeader;
-  }
+  static Map<String, dynamic> getGlobalHeaders()=>I._globalHeader;
 
   //多实例的全局请求头，你也可以在拦截器中进行处理
   //Global request headers, you can also process them in interceptors
-  void setHeaders(Map<String, dynamic> header) {
-    _globalHeader = header;
-  }
+  void setHeaders(Map<String, dynamic> header)=> _globalHeader = header;
 
-  Map<String, dynamic> getHeaders() {
-    return _globalHeader;
-  }
+  Map<String, dynamic> getHeaders()=>_globalHeader;
 
-  CheckNetWork? getCheckNetWork() {
-    return this._rxNetConfig?.baseCheckNet;
-  }
+  CheckNetWork? getCheckNetWork()=>_rxNetConfig?.baseCheckNet;
 
-  CacheMode? getBaseCacheMode() {
-    return this._rxNetConfig?.cacheMode;
-  }
+  CacheMode? getBaseCacheMode()=>_rxNetConfig?.cacheMode;
 
-  int getCacheInvalidationTime() {
-    return this._rxNetConfig!.cacheInvalidationTime;
-  }
+  int getCacheInvalidationTime()=>_rxNetConfig!.cacheInvalidationTime;
 
-  List<String>? getIgnoreCacheKeys() {
-    return this._rxNetConfig?.ignoreCacheKeys;
-  }
+  List<String>? getIgnoreCacheKeys()=>_rxNetConfig?.ignoreCacheKeys;
 
-  void setCollectLogs(bool collect) {
-    logManager.setCollectLogs(collect);
-  }
+  void setCollectLogs(bool collect)=>logManager.setCollectLogs(collect);
 
   ValueNotifier<List<String>> get logsNotifier => logManager.logsNotifier;
 
-  static void showDebugWindow(BuildContext context){
-    I.debugManager.showDebugWindow(context);
-  }
+  static void showDebugWindow(BuildContext context)=>I.debugManager.showDebugWindow(context);
 
   static ValueNotifier<Size> debugWindow = ValueNotifier(const Size(800, 600));
 
   /// 并发执行多个基于回调的请求并返回聚合结果。
   /// Executes multiple callback-based requests concurrently and returns aggregated results.
   static Future<ZipResults> zipRequest(
-    List<ZipRequest> requests, {
-    bool eagerError = true,
-    CancelToken? cancelToken,
-    Duration? timeout,
-  }) {
-    return I.zipRequestInstance(requests, 
-      eagerError: eagerError, 
+      List<ZipRequest> requests, {
+        bool eagerError = true,
+        CancelToken? cancelToken,
+        Duration? timeout,
+      }) {
+    return I.zipRequestInstance(requests,
+      eagerError: eagerError,
       cancelToken: cancelToken,
       timeout: timeout,
     );
   }
-  
+
   /// 实例方法,用于执行具有多实例支持的并发请求。
   /// Instance method for executing concurrent requests with multi-instance support.
   /// 
@@ -383,13 +352,13 @@ class RxNet {
   /// - [zipRequest] for the static method
   /// - [getInstance] for creating named instances
   Future<ZipResults> zipRequestInstance(
-    List<ZipRequest> requests, {
-    bool eagerError = true,
-    CancelToken? cancelToken,
-    Duration? timeout,
-  }) async {
-    return zip_impl.zipRequest(requests, 
-      eagerError: eagerError, 
+      List<ZipRequest> requests, {
+        bool eagerError = true,
+        CancelToken? cancelToken,
+        Duration? timeout,
+      }) async {
+    return zip_impl.zipRequest(requests,
+      eagerError: eagerError,
       cancelToken: cancelToken,
       timeout: timeout,
     );

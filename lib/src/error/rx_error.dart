@@ -14,7 +14,7 @@ abstract class RxError implements Exception {
   RxError(this.message, [this.cause]);
 
   @override
-  String toString() => '$runtimeType: $message' + (cause == null ? '' : '\nCause: $cause');
+  String toString() => '$runtimeType: $message${cause == null ? '' : '\nCause: $cause'}';
 }
 
 /// 网络异常

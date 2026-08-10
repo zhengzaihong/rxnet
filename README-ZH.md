@@ -11,6 +11,8 @@ RxNet：极简易用、强大、原生风格的 Flutter 网络通信框架
 RxNet 是专为 Flutter 构建的跨平台网络请求工具，贴合原生开发习惯，几乎零学习成本即可上手，支持丰富的功能组合，助你构建高性能、可维护的应用程序。
 
 ---
+[使用说明文档](docs/USAGE_GUIDE.md)
+
 
 ## 0.7.0 更新 - 配置类、缓存淘汰、重试策略等
 
@@ -468,3 +470,4 @@ RxNet.showDebugWindow(context);
 ## HarmonyOS 支持
 
 ![HarmonyOS](https://github.com/ZhengZaiHong/rxnet/blob/master/images/HarmonyOS-example.gif)
+

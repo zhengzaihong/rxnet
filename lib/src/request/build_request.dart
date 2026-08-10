@@ -170,8 +170,7 @@ class BuildRequest<T> {
 
   // 参数管理 / Parameter Management
   // 优化：分离路径参数和查询参数 / Optimization: Separate path and query parameters
-  Map<String, dynamic> _pathParams =
-      {}; // RESTful 路径参数 / RESTful path parameters
+  Map<String, dynamic> _pathParams = {}; // RESTful 路径参数 / RESTful path parameters
   Map<String, dynamic> _queryParams = {}; // URL 查询参数 / URL query parameters
   Map<String, dynamic> _bodyParams = {}; // Body 参数 / Body parameters
   dynamic _rawBody; // 原始 body 数据（用于自定义 body）/ Raw body data (for custom body)
@@ -489,6 +488,7 @@ class BuildRequest<T> {
   adapter_models.AdapterRequest _buildAdapterRequest({
     required String url,
     Map<String, dynamic>? queryParams,
+    Map<String, dynamic>? pathParams,
     dynamic data,
     Map<String, dynamic>? headers,
     String? contentType,
@@ -500,6 +500,7 @@ class BuildRequest<T> {
     return adapter_models.AdapterRequest(
       baseUrl: baseUrl,
       path: url,
+      pathParams: pathParams??_pathParams,
       method: _httpMethod,
       queryParams: queryParams ?? {},
       bodyParams: _bodyParams, // 传递 bodyParams 以便拦截器可以访问
@@ -1020,6 +1021,7 @@ class BuildRequest<T> {
 
       final adapterRequest = _buildAdapterRequest(
         url: url,
+
         queryParams: payload.queryParams,
         data: payload.body,
         contentType: payload.contentType,
@@ -1038,17 +1040,17 @@ class BuildRequest<T> {
       if (response.isSuccess) {
         return RxResult(value: savePath, model: SourcesType.net);
       } else {
-        throw NetworkException(
-            "Download failed with status code ${response.statusCode}", null);
+        return RxResult.error(NetworkException(
+            "Download failed with status code ${response.statusCode}", null));
       }
     } on AdapterException catch (e) {
       if (e.type == AdapterExceptionType.cancel) {
-        throw CancellationException("Download was cancelled", e);
+        return RxResult.error(CancellationException("Download was cancelled", e));
       }
-      throw NetworkException(e.message, e);
+      return RxResult.error(NetworkException(e.message, e));
     } catch (e) {
       if (e is RxError) rethrow;
-      throw NetworkException("Download failed: $e", e);
+      return RxResult.error(NetworkException("Download failed: $e", e));
     }
   }
 
@@ -1265,17 +1267,16 @@ class BuildRequest<T> {
         }
         return RxResult(value: data, model: SourcesType.net);
       } else {
-        throw NetworkException(
-            "Upload failed with status code ${response.statusCode}", null);
+        return RxResult.error(NetworkException("Upload failed with status code ${response.statusCode}", null));
       }
     } on AdapterException catch (e) {
       if (e.type == AdapterExceptionType.cancel) {
-        throw CancellationException("Upload was cancelled", e);
+        return RxResult.error(CancellationException("Upload was cancelled", e));
       }
-      throw NetworkException(e.message, e);
+      return RxResult.error(NetworkException(e.message, e));
     } catch (e) {
       if (e is RxError) rethrow;
-      throw NetworkException("Upload failed: $e", e);
+      return RxResult.error(NetworkException("Upload failed: $e", e));
     }
   }
 
@@ -1382,6 +1383,7 @@ class BuildRequest<T> {
       // 构建 AdapterRequest，内部会复用统一参数解析逻辑
       final adapterRequest = _buildAdapterRequest(
         url: url,
+        pathParams: _pathParams,
         queryParams: payload.queryParams,
         data: data,
         headers: headers,

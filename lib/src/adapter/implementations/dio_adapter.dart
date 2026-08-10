@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
-import 'package:dio/dio.dart' as adapter_model hide ResponseType;
+// import 'package:dio/dio.dart' as adapter_model hide ResponseType;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../type/response_type.dart' as adapter_model;
 import '../../type/http_method.dart';

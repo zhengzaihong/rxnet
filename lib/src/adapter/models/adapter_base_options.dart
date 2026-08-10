@@ -163,7 +163,7 @@ class AdapterBaseOptions {
       contentType: dioBaseOptions.contentType,
       responseType: _convertDioResponseType(dioBaseOptions.responseType),
       followRedirects: dioBaseOptions.followRedirects,
-      maxRedirects: dioBaseOptions.maxRedirects ?? 5,
+      maxRedirects: dioBaseOptions.maxRedirects,
       receiveDataWhenStatusError: dioBaseOptions.receiveDataWhenStatusError,
       persistentConnection: dioBaseOptions.persistentConnection,
       extra: {},

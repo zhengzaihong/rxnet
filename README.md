@@ -11,6 +11,7 @@ RxNet: Extremely Easy-to-Use, Powerful, Native-Style Flutter Network Communicati
 RxNet is a cross-platform network request tool specially built for Flutter. It conforms to native development habits, can be started with almost zero learning cost, and supports rich function combinations to help you build high-performance, maintainable applications.
 
 ---
+[instructions for use document](docs/USAGE_GUIDE.md)
 
 ## 0.7.0 Update - Config, Cache Eviction, Retry Policies & More
 
