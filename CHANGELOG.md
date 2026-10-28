@@ -1,3 +1,26 @@
+## 0.7.1
+
+### Fixed
+
+- **Web compile failure (dart2js)** - Corrected a wrong conditional-import path in `rxnet_log_adapter_interceptor.dart`
+  - **0.7.0 bug**: used `../../src/adapter/implementations/http_adapter_web_stub.dart`, which resolved to a non-existent `src/src/...` path and broke Web builds
+  - **Fix**: use `../../adapter/implementations/http_adapter_web_stub.dart`
+  - **Action**: If you are on **0.7.0** and targeting Web, upgrade to **0.7.1** (or later)
+
+- **HttpAdapter Web name clash** - Avoid `IOClient` being imported from both `package:http` and the Web stub
+  - Default client creation is now split via conditional imports (`http_adapter_io.dart` / `http_adapter_web.dart`)
+
+### Migration
+
+Drop-in upgrade from 0.7.0. No API changes.
+
+```yaml
+dependencies:
+  rxnet_plus: ^0.7.1
+```
+
+---
+
 ## 0.7.0
 
 ### New Features
