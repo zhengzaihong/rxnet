@@ -13,11 +13,14 @@ RxNet is a cross-platform network request tool specially built for Flutter. It c
 ---
 [instructions for use document](docs/USAGE_GUIDE.md)
 
-## 0.7.0 Update - Config, Cache Eviction, Retry Policies & More
+## Latest: 0.7.1
 
-RxNet 0.7.0 introduces structured configuration, advanced cache management, intelligent retry strategies, and built-in interceptors.
+```yaml
+dependencies:
+  rxnet_plus: ^0.7.1
+```
 
-**New in 0.7.0:**
+**New in :**
 
 - **RxNetConfig** - Clean configuration class with Builder pattern, replacing long parameter lists
 - **Cache Eviction** - LRU / LFU / FIFO policies with configurable `cacheMaxSize`
@@ -32,6 +35,7 @@ RxNet 0.7.0 introduces structured configuration, advanced cache management, inte
 
 ### Previous Highlights
 
+- **0.7.1**: Web compile fix (stub import path) — prefer this over 0.7.0 for Web
 - **0.6.x**: Pluggable Adapter Architecture (DioAdapter, HttpAdapter, MockAdapter)
 - **0.5.0**: RESTful auto-detection, parameter separation, breakpoint upload/download
 
@@ -407,18 +411,55 @@ final weather = results.getRequestByTag<Weather>('weather');
 
 ## Upload & Download
 
+### Recommended usage by platform
+
+| Feature | IO (Android / iOS / desktop, etc.) | Web |
+|---|---|---|
+| `download` / `downloadFile` | Save to a real local path (`savePath`) | Prefer `Downloader.downloadFile(url: ...)`. With **DioAdapter**, `savePath` is only a **suggested filename** (browser chooses the real location). **HttpAdapter** download is not supported on Web. |
+| `breakPointDownload` | Supported (local file read/write) | Not supported (no filesystem) |
+| `upload` / `uploadFile` | `MultipartFile.fromFile` / path-based APIs OK | Use `MultipartFile.fromBytes` / `fromStream` (e.g. with `file_picker`). Do **not** use `fromFile` / `fromPath` / raw `dart:io File`. |
+| `breakPointUpload` | Supported | Not supported (no filesystem) |
+
+Web requests are still subject to browser rules (CORS, mixed content, etc.).
+
+### IO examples
+
 ```dart
-// Download
+// Download to a local path
 await RxNet.get().setPath("https://example.com/file.zip")
   .downloadFile(savePath: "${appDocPath}/file.zip");
 
-// Breakpoint Download
+// Breakpoint download
 RxNet.get().setPath("https://example.com/large-file.zip")
   .breakPointDownload(savePath: "...", onReceiveProgress: (len, total) {});
 
-// Breakpoint Upload
+// Upload from a local file path
+final file = await MultipartFile.fromFile("/path/to/file.jpg");
+await RxNet.post()
+  .setPath("/api/upload")
+  .setBodyParam("file", file)
+  .asFormData()
+  .uploadFile();
+
+// Breakpoint upload
 RxNet.post().setPath("/api/upload")
   .breakPointUpload(filePath: "/path/to/file.jpg", onSendProgress: (len, total) {});
+```
+
+### Web examples
+
+```dart
+// Preferred: trigger a browser download
+Downloader.downloadFile(url: "https://example.com/file.zip");
+
+// Upload: read bytes first, then build MultipartFile (do not use fromFile / paths)
+final bytes = selectedFileBytes; // e.g. from file_picker
+final file = MultipartFile.fromBytes(bytes, filename: "file.jpg");
+await RxNet.post()
+  .setPath("/api/upload")
+  .setBodyParam("file", file)
+  .asFormData()
+  .uploadFile();
 ```
 
 ---

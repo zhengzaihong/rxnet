@@ -522,7 +522,7 @@ class BuildRequest<T> {
     }
 
     final hasFile = _bodyParams.values
-        .any((element) => element is MultipartFile || element is File);
+        .any((element) => element is dio.MultipartFile || element is File);
     if (hasFile) {
       return RequestBodyType.formData;
     }

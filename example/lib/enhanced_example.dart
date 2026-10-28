@@ -452,7 +452,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
     // .setLoop(true) // 循环
         .setContentType(ContentTypes.json) //application/json
         .setResponseType(ResponseType.json) //json
-        .setCacheInvalidationTime(1000 * 5) //本次请求的缓存失效时间-毫秒
+        // .setCacheInvalidationTime(1000 * 5) //本次请求的缓存失效时间-毫秒
     // .setRequestIgnoreCacheTime(true)  // 是否直接忽略缓存失效时间
     // .setJsonConvert(NewWeatherInfo.fromJson) //解析成NewWeatherInfo对象
     // .setJsonConvert((data)=> BaseBean<Data>.fromJson(data).data) // 如果你只关心data实体部分

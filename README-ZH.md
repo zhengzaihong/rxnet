@@ -14,11 +14,18 @@ RxNet 是专为 Flutter 构建的跨平台网络请求工具，贴合原生开�
 [使用说明文档](docs/USAGE_GUIDE.md)
 
 
-## 0.7.0 更新 - 配置类、缓存淘汰、重试策略等
+## 最新版本：0.7.1
 
-RxNet 0.7.0 引入了结构化配置类、高级缓存管理、智能重试策略和内置拦截器。
+请使用 **rxnet_plus ^0.7.1**（或更高版本）。
 
-**0.7.0 新特性：**
+```yaml
+dependencies:
+  rxnet_plus: ^0.7.1
+```
+
+
+
+** 新特性：**
 
 - **RxNetConfig** - 清晰的配置类，支持 Builder 模式，替代冗长的参数列表
 - **缓存淘汰策略** - 支持 LRU / LFU / FIFO，可配置 `cacheMaxSize`
@@ -32,6 +39,7 @@ RxNet 0.7.0 引入了结构化配置类、高级缓存管理、智能重试策�
 
 ### 历史亮点
 
+- **0.7.1**: 修复 Web 编译错误— Web 请优先使用，勿停留在 0.7.0
 - **0.6.x**: 可插拔适配器架构（DioAdapter、HttpAdapter、MockAdapter）
 - **0.5.0**: RESTful 自动检测、参数分离、断点上传/下载
 
@@ -401,8 +409,21 @@ final weather = results.getRequestByTag<Weather>('weather');
 
 ## 上传与下载
 
+### 按平台的建议用法
+
+| 能力 | IO（Android / iOS / 桌面等） | Web |
+|---|---|---|
+| `download` / `downloadFile` | 下载到真实本地路径（`savePath`） | 优先使用 `Downloader.downloadFile(url: ...)`。使用 **DioAdapter** 时，`savePath` 仅作为浏览器的**建议文件名**（实际保存位置由浏览器决定）。**HttpAdapter** 在 Web 上下载不支持。 |
+| `breakPointDownload` | 支持（依赖本地文件读写） | 不支持（无本地文件系统） |
+| `upload` / `uploadFile` | 可使用 `MultipartFile.fromFile` / 路径类 API | 使用 `MultipartFile.fromBytes` / `fromStream`（可配合 `file_picker`）。**不要**使用 `fromFile` / `fromPath` 或直接传 `dart:io File`。 |
+| `breakPointUpload` | 支持 | 不支持（无本地文件系统） |
+
+Web 请求仍受浏览器限制（CORS、混合内容等）。
+
+### IO 示例
+
 ```dart
-// 下载
+// 下载到本地路径
 await RxNet.get().setPath("https://example.com/file.zip")
   .downloadFile(savePath: "${appDocPath}/file.zip");
 
@@ -410,9 +431,33 @@ await RxNet.get().setPath("https://example.com/file.zip")
 RxNet.get().setPath("https://example.com/large-file.zip")
   .breakPointDownload(savePath: "...", onReceiveProgress: (len, total) {});
 
+// 从本地路径上传
+final file = await MultipartFile.fromFile("/path/to/file.jpg");
+await RxNet.post()
+  .setPath("/api/upload")
+  .setBodyParam("file", file)
+  .asFormData()
+  .uploadFile();
+
 // 断点上传
 RxNet.post().setPath("/api/upload")
   .breakPointUpload(filePath: "/path/to/file.jpg", onSendProgress: (len, total) {});
+```
+
+### Web 示例
+
+```dart
+// 推荐：触发浏览器下载
+Downloader.downloadFile(url: "https://example.com/file.zip");
+
+// 上传：先拿到 bytes，再构造 MultipartFile（不要用 fromFile / 本地路径）
+final bytes = selectedFileBytes; // 例如来自 file_picker
+final file = MultipartFile.fromBytes(bytes, filename: "file.jpg");
+await RxNet.post()
+  .setPath("/api/upload")
+  .setBodyParam("file", file)
+  .asFormData()
+  .uploadFile();
 ```
 
 ---

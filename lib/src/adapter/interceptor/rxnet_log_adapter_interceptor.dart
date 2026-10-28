@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:io' if (dart.library.html) '../../src/adapter/implementations/http_adapter_web_stub.dart';
-import 'package:dio/dio.dart' show MultipartFile;
+import 'dart:io' if (dart.library.html) '../../adapter/implementations/http_adapter_web_stub.dart';
+import 'package:dio/dio.dart' as dio_show show MultipartFile;
 import '../../../rxnet_lib.dart';
 
 ///
@@ -223,7 +223,7 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
   /// 检查是否是文件类型
   bool _isFileType(dynamic value) {
     // 使用类型检查而非字符串匹配，避免误判类名中含 "File" 的业务实体
-    if (value is MultipartFile) return true;
+    if (value is dio_show.MultipartFile) return true;
     if (value is File) return true;
     // 兜底：检查是否是持有文件内容的 Map（如 Dio 的 FormData 场景）
     if (value is Map && value.containsKey('filename') && value.containsKey('length')) {
@@ -235,7 +235,7 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
   /// 获取文件描述信息
   String _getFileDescription(dynamic file) {
     try {
-      if (file is MultipartFile) {
+      if (file is dio_show.MultipartFile) {
         // MultipartFile 没有公开的 filename 字段，从 filename 参数或 runtimeType 获取
         return file.runtimeType.toString();
       }

@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:dio/dio.dart' show MultipartFile;
+import 'package:dio/dio.dart' as dio;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:rxnet_plus/src/type/http_method.dart';
-import '../../../rxnet_lib.dart';
 import '../../type/response_type.dart';
 import '../network_adapter.dart';
 import '../models/adapter_request.dart';
@@ -17,6 +16,11 @@ import '../cancel_token.dart' as adapter_cancel;
 // 条件导入：仅在非 Web 平台导入 dart:io
 // Conditional import: Only import dart:io on non-Web platforms
 import 'dart:io' if (dart.library.html) 'http_adapter_web_stub.dart';
+// 条件导入：IO 平台用 IOClient，Web 平台用普通 http.Client
+// Conditional import: IOClient on IO, plain http.Client on Web
+import 'http_adapter_io.dart'
+    if (dart.library.html) 'http_adapter_web.dart'
+    show createDefaultHttpClient;
 
 ///
 /// author: ZhengZaiHong
@@ -292,7 +296,7 @@ class HttpAdapter implements NetworkAdapter {
   /// final adapter = HttpAdapter(httpClient: httpClient);
   /// ```
   HttpAdapter({http.Client? client, HttpClient? httpClient})
-      : _client = client ?? IOClient(httpClient ?? HttpClient()),
+      : _client = client ?? createDefaultHttpClient(httpClient),
         _nativeHttpClient = httpClient;
 
   /// Gets the underlying http.Client instance.
@@ -701,7 +705,7 @@ class HttpAdapter implements NetworkAdapter {
   bool _isMultipartValue(dynamic value) {
     return value is File ||
         value is http.MultipartFile ||
-        value is MultipartFile;
+        value is dio.MultipartFile;
   }
 
   Future<void> _applyMultipartBody(
@@ -726,7 +730,7 @@ class HttpAdapter implements NetworkAdapter {
     if (value is http.MultipartFile) {
       return value;
     }
-    if (value is MultipartFile) {
+    if (value is dio.MultipartFile) {
       return http.MultipartFile(
         field,
         value.finalize(),
