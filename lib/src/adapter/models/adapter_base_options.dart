@@ -52,6 +52,15 @@ import 'adapter_request.dart';
 /// | `receiveDataWhenStatusError` | 对应字段             | 通过 extra 传递                       |
 ///
 class AdapterBaseOptions {
+  /// 默认连接超时
+  static const Duration defaultConnectTimeout = Duration(seconds: 15);
+
+  /// 默认响应超时
+  static const Duration defaultReceiveTimeout = Duration(seconds: 30);
+
+  /// 默认发送超时
+  static const Duration defaultSendTimeout = Duration(seconds: 30);
+
   /// 连接超时时间
   ///
   /// 如果在此时间内无法建立连接，将抛出 [AdapterExceptionType.connectTimeout] 错误。
@@ -203,6 +212,7 @@ class AdapterBaseOptions {
     bool clearValidateStatus = false,
     bool? receiveDataWhenStatusError,
     Map<String, dynamic>? extra,
+    bool? persistentConnection,
   }) {
     return AdapterBaseOptions(
       connectTimeout: clearConnectTimeout ? null : (connectTimeout ?? this.connectTimeout),
@@ -216,6 +226,7 @@ class AdapterBaseOptions {
       validateStatus: clearValidateStatus ? null : (validateStatus ?? this.validateStatus),
       receiveDataWhenStatusError: receiveDataWhenStatusError ?? this.receiveDataWhenStatusError,
       extra: extra ?? this.extra,
+      persistentConnection: persistentConnection ?? this.persistentConnection,
     );
   }
 
@@ -238,6 +249,7 @@ class AdapterBaseOptions {
       validateStatus: other.validateStatus,
       clearValidateStatus: other.validateStatus == null && validateStatus != null,
       receiveDataWhenStatusError: other.receiveDataWhenStatusError,
+      persistentConnection: other.persistentConnection,
       extra: {...extra, ...other.extra},
     );
   }
@@ -255,6 +267,7 @@ class AdapterBaseOptions {
       responseType: request.responseType != ResponseType.json
           ? request.responseType
           : responseType,
+      extra: {...extra, ...request.extra},
     );
   }
 

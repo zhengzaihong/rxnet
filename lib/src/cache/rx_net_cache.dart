@@ -32,6 +32,11 @@ class RxNetCache {
     _database = database;
   }
 
+  /// 解除数据库引用（用于 RxNet.dispose）
+  void detachDatabase() {
+    _database = null;
+  }
+
   void setCacheInvalidationTime(int time) {
     _cacheInvalidationTime = time;
   }

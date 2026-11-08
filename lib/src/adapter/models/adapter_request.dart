@@ -249,28 +249,45 @@ class AdapterRequest {
   }
   
   /// 规范化 URL，移除路径中的多余斜杠
-  /// 
+  ///
+  /// 只处理 path 部分，不会破坏 query / fragment 中的 `//`
+  /// （例如 `?redirect=http://a//b`）。
+  ///
   /// 例如：
   /// - `https://example.com//api///users` -> `https://example.com/api/users`
   /// - `http://example.com/api//v1/` -> `http://example.com/api/v1/`
-  /// 
+  ///
   /// 注意：协议后的双斜杠（`://`）会被保留
   String _normalizeUrl(String url) {
-    // 分离协议和路径
+    // 分离协议和剩余部分
     final protocolEndIndex = url.indexOf('://');
-    if (protocolEndIndex == -1) {
-      // 没有协议，直接处理整个 URL
-      return url.replaceAll(RegExp(r'/+'), '/');
-    }
-    
-    // 保留协议部分（包括 ://）
-    final protocol = url.substring(0, protocolEndIndex + 3);
-    final pathPart = url.substring(protocolEndIndex + 3);
-    
-    // 替换路径部分的多斜杠为单斜杠
-    final normalizedPath = pathPart.replaceAll(RegExp(r'/+'), '/');
-    
-    return protocol + normalizedPath;
+    final protocol = protocolEndIndex == -1
+        ? ''
+        : url.substring(0, protocolEndIndex + 3);
+    final rest = protocolEndIndex == -1
+        ? url
+        : url.substring(protocolEndIndex + 3);
+
+    // fragment 原样保留
+    final fragmentIndex = rest.indexOf('#');
+    final fragment =
+        fragmentIndex == -1 ? '' : rest.substring(fragmentIndex);
+    final withoutFragment = fragmentIndex == -1
+        ? rest
+        : rest.substring(0, fragmentIndex);
+
+    // query 原样保留
+    final queryIndex = withoutFragment.indexOf('?');
+    final query = queryIndex == -1
+        ? ''
+        : withoutFragment.substring(queryIndex);
+    final path = queryIndex == -1
+        ? withoutFragment
+        : withoutFragment.substring(0, queryIndex);
+
+    final normalizedPath = path.replaceAll(RegExp(r'/+'), '/');
+
+    return protocol + normalizedPath + query + fragment;
   }
   
   /// Creates a copy of this request with some fields replaced.

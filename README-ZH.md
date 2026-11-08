@@ -62,6 +62,21 @@ dependencies:
 
 ---
 
+## 依赖说明
+
+当前版本同时内置两套适配器，以下依赖均为硬依赖，无法通过配置剔除：
+
+- `dio` — 默认适配器（`DioAdapter`）
+- `http` — 轻量适配器（`HttpAdapter`）
+- `sembast` / `sembast_web` — 持久化缓存
+- `path_provider` — 缓存目录解析
+- `web` — 浏览器下载辅助
+
+如果对包体敏感，可将适配器拆分为联邦包，或实现自定义适配器并在 fork 中依赖。
+`rxnet_lib.dart` 目前会同时导出两套适配器。
+
+---
+
 ## 快速开始
 
 ### 方式一：RxNetConfig（推荐）
@@ -373,13 +388,13 @@ TokenRefreshInterceptor(
 ### DeduplicateInterceptor
 
 ```dart
-DeduplicateInterceptor(windowDuration: Duration(milliseconds: 500))
+DeduplicateInterceptor(duration: Duration(milliseconds: 500))
 ```
 
 ### ThrottleInterceptor
 
 ```dart
-ThrottleInterceptor(throttleDuration: Duration(seconds: 1))
+ThrottleInterceptor(duration: Duration(seconds: 1))
 ```
 
 ---
@@ -399,11 +414,14 @@ final (weather, user) = await (
 
 ```dart
 final results = await RxNet.zipRequest([
-  ZipRequest<Weather>(request: ..., tag: 'weather'),
-  ZipRequest<User>(request: ..., tag: 'user'),
+  ZipRequest<Weather>(request: fetchWeather, tag: 'weather'),
+  ZipRequest<User>(request: fetchUser, tag: 'user'),
 ]);
 final weather = results.getRequestByTag<Weather>('weather');
 ```
+
+`fetchWeather` / `fetchUser` 必须是回调式函数，接收
+`{success, failure, completed}` 命名参数。
 
 ---
 
@@ -466,17 +484,23 @@ await RxNet.post()
 ## 证书校验
 
 #### 使用 DioAdapter（dio 包方式）
+
+> ⚠️ `badCertificateCallback` 会在正常证书校验失败后触发。
+> **生产环境绝不能直接 `return true`**，必须校验固定的 SHA-256 证书指纹。
+
 ```dart
+import 'dart:io';
+import 'package:crypto/crypto.dart';
+import 'package:dio/io.dart';
+
+const trustedFingerprint = 'YOUR_CERT_SHA256_FINGERPRINT';
+
 adapter.dio.httpClientAdapter = IOHttpClientAdapter(
   createHttpClient: () {
     final client = HttpClient();
     client.badCertificateCallback = (cert, host, port) {
-      // // 获取证书 DER
-      // final der = cert.der;
-      // final sha256 = sha256Convert(der);
-      // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
-      // return sha256 == trustedFingerprint;
-      return true;
+      final fingerprint = sha256.convert(cert.der).toString();
+      return fingerprint == trustedFingerprint;
     };
     return client;
   },
@@ -488,19 +512,16 @@ adapter.dio.httpClientAdapter = IOHttpClientAdapter(
 
 ```dart
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:http/io_client.dart';
 
 // 创建带证书校验的自定义 HTTP 客户端
+// 生产环境绝不能绕过证书校验。
 IOClient createPinnedClient() {
   final HttpClient httpClient = HttpClient();
   httpClient.badCertificateCallback = (X509Certificate cert, String host, int port) {
-    // 在这里添加您的证书校验逻辑
-    // 例如：校验证书指纹
-    // final der = cert.der;
-    // final sha256 = sha256Convert(der);
-    // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
-    // return sha256 == trustedFingerprint;
-    return true; // 仅用于测试，生产环境请正确校验
+    final fingerprint = sha256.convert(cert.der).toString();
+    return fingerprint == 'YOUR_CERT_SHA256_FINGERPRINT';
   };
   return IOClient(httpClient);
 }

@@ -1,3 +1,5 @@
+// ignore_for_file: constant_identifier_names
+
 ///
 /// author: ZhengZaiHong
 /// email:1096877329@qq.com

@@ -15,11 +15,15 @@ class ThrottleInterceptor extends AdapterInterceptor {
   /// 自定义 key 生成器，默认使用请求路径
   final String Function(AdapterRequest request)? keyBuilder;
 
+  /// 最大记录数，超过后按时间窗口/最旧记录自动回收
+  final int maxEntries;
+
   final Map<String, DateTime> _lastRequestTimes = {};
 
   ThrottleInterceptor({
     this.duration = const Duration(seconds: 1),
     this.keyBuilder,
+    this.maxEntries = 1000,
   });
 
   @override
@@ -37,8 +41,36 @@ class ThrottleInterceptor extends AdapterInterceptor {
       return;
     }
 
+    if (_lastRequestTimes.length >= maxEntries) {
+      _prune(now);
+    }
+
     _lastRequestTimes[key] = now;
     handler.next(request);
+  }
+
+  /// 清理过期记录；仍然超限时移除最旧的一条
+  void _prune(DateTime now) {
+    final expiredBefore = now.subtract(duration);
+    _lastRequestTimes.removeWhere(
+      (_, lastTime) => lastTime.isBefore(expiredBefore),
+    );
+
+    if (_lastRequestTimes.length < maxEntries) {
+      return;
+    }
+
+    String? oldestKey;
+    DateTime? oldestTime;
+    _lastRequestTimes.forEach((key, time) {
+      if (oldestTime == null || time.isBefore(oldestTime!)) {
+        oldestTime = time;
+        oldestKey = key;
+      }
+    });
+    if (oldestKey != null) {
+      _lastRequestTimes.remove(oldestKey);
+    }
   }
 
   String _getKey(AdapterRequest request) {

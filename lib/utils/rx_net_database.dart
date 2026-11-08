@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:rxnet_plus/utils/rx_net_platform.dart';
-import 'package:sembast/sembast_io.dart';
-import 'package:sembast_web/sembast_web.dart';
+import 'package:sembast/sembast.dart';
+import 'sembast_factory_web.dart' if (dart.library.io) 'sembast_factory_io.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'log_util.dart';
@@ -387,10 +387,11 @@ class RxNetDataBase {
     try {
       if (kIsWeb) {
         LogUtil.v('RxNetDataBase: Initializing for Web platform (IndexedDB)');
-        final factory = databaseFactoryWeb;
+        final factory = rxNetDatabaseFactory;
         _db = await factory.openDatabase(databaseName);
       } else {
         String dbPath;
+        final folderName = cacheName ?? 'network_cache';
 
         if (databasePath != null) {
           dbPath = p.join(databasePath, databaseName);
@@ -398,31 +399,33 @@ class RxNetDataBase {
           try {
             if (RxNetPlatform.isWindows || RxNetPlatform.isMacOS) {
               final appDir = await getApplicationSupportDirectory();
-              dbPath = p.join(appDir.path, cacheName, databaseName);
+              dbPath = p.join(appDir.path, folderName, databaseName);
             } else if (RxNetPlatform.isLinux) {
               final appDir = await getApplicationSupportDirectory();
-              dbPath = p.join(appDir.path, cacheName, databaseName);
+              dbPath = p.join(appDir.path, folderName, databaseName);
             } else if (RxNetPlatform.isAndroid || RxNetPlatform.isIOS) {
-              final appDir = await getApplicationDocumentsDirectory();
-              dbPath = p.join(appDir.path, cacheName, databaseName);
+              // 使用应用私有 support 目录，避免缓存数据库出现在用户可见的
+              // Documents 目录或被同步/备份。
+              final appDir = await getApplicationSupportDirectory();
+              dbPath = p.join(appDir.path, folderName, databaseName);
             } else if (RxNetPlatform.isHarmonyOS) {
-              final appDir = await getTemporaryDirectory();
-              dbPath = p.join(appDir.path, cacheName, databaseName);
+              final appDir = await getApplicationSupportDirectory();
+              dbPath = p.join(appDir.path, folderName, databaseName);
             } else {
-              final appDir = await getApplicationDocumentsDirectory();
-              dbPath = p.join(appDir.path, cacheName, databaseName);
+              final appDir = await getApplicationSupportDirectory();
+              dbPath = p.join(appDir.path, folderName, databaseName);
             }
           } catch (e) {
             LogUtil.v(
               'RxNetDataBase: Failed to get app directory, using temp: $e',
             );
             final appDir = await getTemporaryDirectory();
-            dbPath = p.join(appDir.path, cacheName, databaseName);
+            dbPath = p.join(appDir.path, folderName, databaseName);
           }
         }
 
         LogUtil.v('RxNetDataBase: Initializing database at: $dbPath');
-        final factory = databaseFactoryIo;
+        final factory = rxNetDatabaseFactory;
         _db = await factory.openDatabase(dbPath);
       }
 
@@ -432,7 +435,7 @@ class RxNetDataBase {
       LogUtil.v(
           'RxNetDataBase: Failed to initialize database: $e\n$stackTrace');
       _db = null;
-      _resetInitState(keepListeners: true);
+      _resetInitState();
       rethrow;
     }
   }
@@ -449,7 +452,7 @@ class RxNetDataBase {
     }
   }
 
-  void _resetInitState({bool keepListeners = false}) {
+  void _resetInitState() {
     isDatabaseReady = false;
     _initFuture = null;
   }

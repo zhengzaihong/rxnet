@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -9,6 +8,8 @@ import 'package:path_provider/path_provider.dart';
 
 import 'bean/base_info.dart';
 import 'bean/new_weather_info.dart';
+import 'pinned_client_web.dart'
+    if (dart.library.io) 'pinned_client_io.dart';
 
 /// RxNet Plus 0.6.0 增强示例
 /// 展示新的适配器架构和最佳实践
@@ -221,20 +222,6 @@ class _EnhancedExampleState extends State<EnhancedExample> {
   void _adapterExample2() async {
     try {
       // 创建新实例并使用 HttpAdapter
-
-      IOClient createPinnedClient() {
-        final HttpClient httpClient = HttpClient();
-        httpClient.badCertificateCallback =
-            (X509Certificate cert, String host, int port) {
-          // // 获取证书 DER
-          // final der = cert.der;
-          // final sha256 = sha256Convert(der);
-          // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
-          // return sha256 == trustedFingerprint;
-          return true;
-        };
-        return IOClient(httpClient);
-      }
 
       final adapter = HttpAdapter(client: createPinnedClient());
 
@@ -1068,7 +1055,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
       }
     }
 
-    Directory? appDocDir = await getDownloadsDirectory();
+    final appDocDir = await getDownloadsDirectory();
     String? appDocPath = "${appDocDir?.absolute.path}/test.jpg";
     RxNet.get()
         .setPath(

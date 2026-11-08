@@ -29,7 +29,8 @@ class NetUtils {
     for (String key in keysToRemove) {
       params.remove(key);
     }
-    //在替换后规范化斜杠，避免将http://转换为http:/
+    //在替换后规范化 path 斜杠，避免将 http:// 转换为 http:/
+    //只处理 path，保留 query / fragment 中的 //。
     int schemeEndIndex = resultUrl.indexOf("://");
     String scheme = "";
     String rest = resultUrl;
@@ -38,16 +39,35 @@ class NetUtils {
       scheme = resultUrl.substring(0, schemeEndIndex + 3);
       rest = resultUrl.substring(schemeEndIndex + 3);
     }
-     //替换掉路径部分的所有多 //or///等等 到 /
-    rest = rest.replaceAll(RegExp(r'/+'), '/');
-    return scheme + rest;
+
+    final fragmentIndex = rest.indexOf('#');
+    final fragment =
+        fragmentIndex == -1 ? '' : rest.substring(fragmentIndex);
+    final withoutFragment =
+        fragmentIndex == -1 ? rest : rest.substring(0, fragmentIndex);
+
+    final queryIndex = withoutFragment.indexOf('?');
+    final query =
+        queryIndex == -1 ? '' : withoutFragment.substring(queryIndex);
+    final path =
+        queryIndex == -1 ? withoutFragment : withoutFragment.substring(0, queryIndex);
+
+    final normalizedPath = path.replaceAll(RegExp(r'/+'), '/');
+    return scheme + normalizedPath + query + fragment;
   }
 
   /// 生成缓存键
   ///
-  /// 使用 SHA-256 哈希生成固定长度的缓存键，避免键过长和碰撞风险。
-  /// 格式：前16字符哈希值，保证唯一性的同时节省存储空间。
-  static String getCacheKeyFromPath(String? path, Map<String, dynamic> params, List<String> ignoreKeys) {
+  /// 默认统一使用 SHA-256 哈希生成固定长度缓存键（取前 32 个十六进制字符，
+/// 128 bit），避免 token / PII 等参数以明文形式写入本地数据库。
+  ///
+  /// [hashKey] 仅用于测试或特殊调试场景；生产环境应保持默认 true。
+  static String getCacheKeyFromPath(
+    String? path,
+    Map<String, dynamic> params,
+    List<String> ignoreKeys, {
+    bool hashKey = true,
+  }) {
     if (TextUtil.isEmpty(path)) {
       throw Exception("请求地址不能为空！");
     }
@@ -73,12 +93,10 @@ class NetUtils {
 
     final rawKey = buffer.toString();
 
-    // 如果键长度小于 64，直接使用原始键（短键不需要哈希）
-    if (rawKey.length <= 64) {
+    if (!hashKey) {
       return rawKey;
     }
 
-    // 长键使用 SHA-256 哈希，取前 32 字符作为缓存键
     final bytes = utf8.encode(rawKey);
     final digest = sha256.convert(bytes);
     return digest.toString().substring(0, 32);

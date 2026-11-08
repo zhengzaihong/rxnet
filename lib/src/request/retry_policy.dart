@@ -67,12 +67,18 @@ class RetryPolicy {
   /// 退避倍数（默认 2.0）
   final double backoffMultiplier;
 
+  /// 是否允许非幂等请求（POST/PATCH 等）自动重试。
+  ///
+  /// 默认为 false，避免重复提交造成业务副作用。
+  final bool retryOnNonIdempotent;
+
   const RetryPolicy({
     this.maxRetries = 3,
     this.strategy = RetryStrategy.fixed,
     this.baseInterval = const Duration(seconds: 1),
     this.maxInterval,
     this.backoffMultiplier = 2.0,
+    this.retryOnNonIdempotent = false,
   });
 
   /// 计算第 [attempt] 次重试的延迟时间（从 0 开始计数）
@@ -105,11 +111,13 @@ class RetryPolicy {
   factory RetryPolicy.fixed({
     int maxRetries = 3,
     Duration interval = const Duration(seconds: 1),
+    bool retryOnNonIdempotent = false,
   }) {
     return RetryPolicy(
       maxRetries: maxRetries,
       strategy: RetryStrategy.fixed,
       baseInterval: interval,
+      retryOnNonIdempotent: retryOnNonIdempotent,
     );
   }
 
@@ -119,6 +127,7 @@ class RetryPolicy {
     Duration baseInterval = const Duration(seconds: 1),
     Duration? maxInterval,
     double backoffMultiplier = 2.0,
+    bool retryOnNonIdempotent = false,
   }) {
     return RetryPolicy(
       maxRetries: maxRetries,
@@ -126,6 +135,7 @@ class RetryPolicy {
       baseInterval: baseInterval,
       maxInterval: maxInterval,
       backoffMultiplier: backoffMultiplier,
+      retryOnNonIdempotent: retryOnNonIdempotent,
     );
   }
 
@@ -135,6 +145,7 @@ class RetryPolicy {
     Duration baseInterval = const Duration(seconds: 1),
     Duration? maxInterval,
     double backoffMultiplier = 2.0,
+    bool retryOnNonIdempotent = false,
   }) {
     return RetryPolicy(
       maxRetries: maxRetries,
@@ -142,6 +153,7 @@ class RetryPolicy {
       baseInterval: baseInterval,
       maxInterval: maxInterval,
       backoffMultiplier: backoffMultiplier,
+      retryOnNonIdempotent: retryOnNonIdempotent,
     );
   }
 

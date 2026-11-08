@@ -56,6 +56,23 @@ dependencies:
 
 ---
 
+## Dependencies
+
+This release ships both built-in adapters, so the following packages are hard
+dependencies and cannot be removed by configuration:
+
+- `dio` — default adapter (`DioAdapter`)
+- `http` — lightweight adapter (`HttpAdapter`)
+- `sembast` / `sembast_web` — persistent cache
+- `path_provider` — cache directory resolution
+- `web` — browser download helper
+
+If bundle size is critical, split the adapters into federated packages or build
+a custom adapter and depend on this package from a fork. `rxnet_lib.dart`
+currently exports both adapters.
+
+---
+
 ## Quick Start
 
 ### Option 1: RxNetConfig (Recommended)
@@ -375,13 +392,13 @@ TokenRefreshInterceptor(
 ### DeduplicateInterceptor
 
 ```dart
-DeduplicateInterceptor(windowDuration: Duration(milliseconds: 500))
+DeduplicateInterceptor(duration: Duration(milliseconds: 500))
 ```
 
 ### ThrottleInterceptor
 
 ```dart
-ThrottleInterceptor(throttleDuration: Duration(seconds: 1))
+ThrottleInterceptor(duration: Duration(seconds: 1))
 ```
 
 ---
@@ -401,11 +418,14 @@ final (weather, user) = await (
 
 ```dart
 final results = await RxNet.zipRequest([
-  ZipRequest<Weather>(request: ..., tag: 'weather'),
-  ZipRequest<User>(request: ..., tag: 'user'),
+  ZipRequest<Weather>(request: fetchWeather, tag: 'weather'),
+  ZipRequest<User>(request: fetchUser, tag: 'user'),
 ]);
 final weather = results.getRequestByTag<Weather>('weather');
 ```
+
+`fetchWeather` / `fetchUser` must be callback-style functions accepting
+`{success, failure, completed}` named parameters.
 
 ---
 
@@ -470,16 +490,23 @@ await RxNet.post()
 
 
 #### Using DioAdapter (dio package method)
+
+> ⚠️ `badCertificateCallback` is invoked after normal certificate validation fails.
+> **Never `return true` in production**; verify a pinned SHA-256 fingerprint instead.
+
 ```dart
+import 'dart:io';
+import 'package:crypto/crypto.dart';
+import 'package:dio/io.dart';
+
+const trustedFingerprint = 'YOUR_CERT_SHA256_FINGERPRINT';
+
 adapter.dio.httpClientAdapter = IOHttpClientAdapter(
   createHttpClient: () {
     final client = HttpClient();
     client.badCertificateCallback = (cert, host, port) {
-      // final der = cert.der;
-      // final sha256 = sha256Convert(der);
-      // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
-      // return sha256 == trustedFingerprint;
-      return true;
+      final fingerprint = sha256.convert(cert.der).toString();
+      return fingerprint == trustedFingerprint;
     };
     return client;
   },
@@ -490,19 +517,16 @@ adapter.dio.httpClientAdapter = IOHttpClientAdapter(
 
 ```dart
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:http/io_client.dart';
 
-// Create a custom HTTP client with certificate verification
+// Create a custom HTTP client with certificate verification.
+// Never bypass verification in production.
 IOClient createPinnedClient() {
   final HttpClient httpClient = HttpClient();
   httpClient.badCertificateCallback = (X509Certificate cert, String host, int port) {
-    // Add your certificate verification logic here
-    // For example: verifying certificate fingerprint
-    // final der = cert.der;
-    // final sha256 = sha256Convert(der);
-    // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
-    // return sha256 == trustedFingerprint;
-    return true; // For testing only, please verify the production environment correctly
+    final fingerprint = sha256.convert(cert.der).toString();
+    return fingerprint == 'YOUR_CERT_SHA256_FINGERPRINT';
   };
   return IOClient(httpClient);
 }

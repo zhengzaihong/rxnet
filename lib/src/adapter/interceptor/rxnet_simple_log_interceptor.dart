@@ -1,5 +1,6 @@
 import '../../../rxnet_lib.dart';
-import '../../type/http_method.dart';
+import '../../../utils/log_redactor.dart';
+
 
 /// author: ZhengZaiHong
 /// email:1096877329@qq.com
@@ -10,9 +11,13 @@ class RxnetSimpleLogInterceptor extends AdapterInterceptor {
   final bool logHeaders;
   final bool logBody;
 
+  /// 是否输出敏感字段原文（默认 false）
+  final bool logSensitiveData;
+
   RxnetSimpleLogInterceptor({
     this.logHeaders = true,
     this.logBody = true,
+    this.logSensitiveData = false,
   });
 
   @override
@@ -24,24 +29,36 @@ class RxnetSimpleLogInterceptor extends AdapterInterceptor {
     LogUtil.v('│ 📤 REQUEST');
     LogUtil.v('├─────────────────────────────────────────────────');
     LogUtil.v('│ Method: ${request.method.value}');
-    LogUtil.v('│ URL: ${request.buildFullUrl()}');
+    LogUtil.v('│ URL: ${LogRedactor.redactUrl(request.buildFullUrl())}');
 
     if (logHeaders && request.headers.isNotEmpty) {
       LogUtil.v('│ Headers:');
       request.headers.forEach((key, value) {
-        LogUtil.v('│   $key: $value');
+        final display = logSensitiveData || !LogRedactor.isSensitiveKey(key)
+            ? value
+            : LogRedactor.mask;
+        LogUtil.v('│   $key: $display');
       });
     }
 
     if (logBody) {
       if (request.queryParams.isNotEmpty) {
-        LogUtil.v('│ Query Params: ${request.queryParams}');
+        LogUtil.v(
+          '│ Query Params: '
+          '${logSensitiveData ? request.queryParams : LogRedactor.toSafeJson(request.queryParams)}',
+        );
       }
       if (request.bodyParams.isNotEmpty) {
-        LogUtil.v('│ Body Params: ${request.bodyParams}');
+        LogUtil.v(
+          '│ Body Params: '
+          '${logSensitiveData ? request.bodyParams : LogRedactor.toSafeJson(request.bodyParams)}',
+        );
       }
       if (request.rawBody != null) {
-        LogUtil.v('│ Raw Body: ${request.rawBody}');
+        LogUtil.v(
+          '│ Raw Body: '
+          '${logSensitiveData ? request.rawBody : LogRedactor.toSafeJson(request.rawBody)}',
+        );
       }
     }
 
@@ -60,17 +77,24 @@ class RxnetSimpleLogInterceptor extends AdapterInterceptor {
     LogUtil.v('│ 📥 RESPONSE');
     LogUtil.v('├─────────────────────────────────────────────────');
     LogUtil.v('│ Status Code: ${response.statusCode}');
-    LogUtil.v('│ URL: ${response.request.buildFullUrl()}');
+    LogUtil.v(
+      '│ URL: ${LogRedactor.redactUrl(response.request.buildFullUrl())}',
+    );
 
     if (logHeaders && response.headers.isNotEmpty) {
       LogUtil.v('│ Headers:');
       response.headers.forEach((key, values) {
-        LogUtil.v('│   $key: ${values.join(', ')}');
+        final display = logSensitiveData || !LogRedactor.isSensitiveKey(key)
+            ? values.join(', ')
+            : LogRedactor.mask;
+        LogUtil.v('│   $key: $display');
       });
     }
 
     if (logBody && response.data != null) {
-      final dataStr = response.data.toString();
+      final dataStr = logSensitiveData
+          ? response.data.toString()
+          : LogRedactor.toSafeJson(response.data);
       if (dataStr.length > 500) {
         LogUtil.v('│ Data: ${dataStr.substring(0, 500)}... (truncated)');
       } else {
@@ -98,7 +122,9 @@ class RxnetSimpleLogInterceptor extends AdapterInterceptor {
       LogUtil.v('│ Status Code: ${error.statusCode}');
     }
     if (error.response != null) {
-      LogUtil.v('│ URL: ${error.response!.request.buildFullUrl()}');
+      LogUtil.v(
+        '│ URL: ${LogRedactor.redactUrl(error.response!.request.buildFullUrl())}',
+      );
     }
     LogUtil.v('└─────────────────────────────────────────────────');
 

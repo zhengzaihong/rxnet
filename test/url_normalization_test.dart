@@ -132,5 +132,45 @@ void main() {
         'http://ylhh.vip/api/v1/music',
       );
     });
+
+    // P1-7 回归：规范化只能作用于 path，不能破坏 query 中的双斜杠。
+    test('should keep double slashes inside query values', () {
+      final request = AdapterRequest(
+        baseUrl: 'https://ylhh.vip',
+        path: '/api//users?redirect=http://a//b',
+        method: HttpMethod.GET,
+      );
+
+      expect(
+        request.buildFullUrl(),
+        'https://ylhh.vip/api/users?redirect=http://a//b',
+      );
+    });
+
+    test('should keep double slashes inside fragment', () {
+      final request = AdapterRequest(
+        baseUrl: 'https://ylhh.vip',
+        path: '/api//users#section//two',
+        method: HttpMethod.GET,
+      );
+
+      expect(
+        request.buildFullUrl(),
+        'https://ylhh.vip/api/users#section//two',
+      );
+    });
+
+    test('should normalize path while preserving query and fragment together', () {
+      final request = AdapterRequest(
+        baseUrl: 'https://ylhh.vip/',
+        path: '//api//v1/users?next=https://a//b#frag//ment',
+        method: HttpMethod.GET,
+      );
+
+      expect(
+        request.buildFullUrl(),
+        'https://ylhh.vip/api/v1/users?next=https://a//b#frag//ment',
+      );
+    });
   });
 }

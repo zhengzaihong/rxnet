@@ -1,4 +1,3 @@
-﻿import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -54,12 +53,23 @@ void main() {
     });
 
     test('static initDatabase works via static instance', () async {
-      final ready = Completer<bool>();
-
       await RxNetDataBase.initDatabase(databasePath: tempDir.path);
 
       expect(RxNetDataBase.isReady, isTrue);
       await RxNetDataBase.waitUntilReady();
+    });
+
+    test('init with explicit null cacheName does not throw', () async {
+      final database = RxNetDataBase();
+
+      await database.init(
+        databasePath: tempDir.path,
+        databaseName: 'null_cache_name.db',
+        cacheName: null,
+      );
+
+      expect(database.isDatabaseReady, isTrue);
+      await database.closeInstance();
     });
   });
 }

@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'http_adapter_web_stub.dart'
+    if (dart.library.io) 'dart:io'
+    hide MultipartFile;
 import 'package:dio/dio.dart';
 // import 'package:dio/dio.dart' as adapter_model hide ResponseType;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../type/response_type.dart' as adapter_model;
 import '../../type/http_method.dart';
 import '../network_adapter.dart' hide ProgressCallback;
+import '../closable_network_adapter.dart';
 import '../models/adapter_request.dart';
 import '../models/adapter_response.dart';
 import '../models/adapter_base_options.dart';
@@ -13,9 +17,11 @@ import '../interceptor/adapter_interceptor.dart' as adapter_interceptor;
 import '../exceptions/adapter_exception.dart';
 import '../cancel_token.dart' as adapter_cancel;
 
-// 条件导入：Web 平台导入 web 辅助文件，其他平台导入 io 辅助文件
-// Conditional import: web helper for Web, io helper for other platforms
-import 'dio_adapter_io.dart' if (dart.library.html) 'dio_adapter_web.dart' show createConfiguredDio;
+// 条件导入：Web/Wasm 使用 web 辅助文件，IO 平台使用 io 辅助文件
+// Conditional import: web helper for Web/Wasm, io helper for IO platforms
+import 'dio_adapter_web.dart'
+    if (dart.library.io) 'dio_adapter_io.dart'
+    show createConfiguredDio;
 
 ///
 /// author: ZhengZaiHong
@@ -227,6 +233,20 @@ class _EarlyResponseException implements Exception {
   _EarlyResponseException(this.response);
 }
 
+/// 错误拦截器处理结果
+class _ErrorHandlingResult {
+  final AdapterException? error;
+  final AdapterResponse? response;
+  final AdapterRequest? retryRequest;
+
+  const _ErrorHandlingResult({
+    this.error,
+    this.response,
+    this.retryRequest,
+  });
+}
+
+
 /// DioAdapter - Dio-based implementation of NetworkAdapter
 /// 
 /// DioAdapter - 基于 Dio 的 NetworkAdapter 实现
@@ -237,10 +257,14 @@ class _EarlyResponseException implements Exception {
 /// 
 /// 这是 RxNet Plus 的默认且功能最完整的适配器。
 /// 它利用强大的 Dio 库提供全面的 HTTP 功能。
-class DioAdapter implements NetworkAdapter {
+class DioAdapter implements NetworkAdapter, ClosableNetworkAdapter {
   final Dio _dio;
   final List<AdapterInterceptor> _interceptors = [];
   final Map<adapter_cancel.CancelToken, CancelToken> _cancelTokenMap = {};
+  final Map<adapter_cancel.CancelToken, int> _cancelTokenRefs = {};
+  final Map<adapter_cancel.CancelToken, void Function(String?)>
+      _cancelCallbacks = {};
+  AdapterBaseOptions? _baseOptions;
   
   /// Creates a DioAdapter.
   /// 
@@ -322,6 +346,7 @@ class DioAdapter implements NetworkAdapter {
 
   @override
   void applyBaseOptions(AdapterBaseOptions options) {
+    _baseOptions = options;
     if (options.connectTimeout != null) {
       _dio.options.connectTimeout = options.connectTimeout;
     }
@@ -342,62 +367,123 @@ class DioAdapter implements NetworkAdapter {
     _dio.options.maxRedirects = options.maxRedirects;
     _dio.options.receiveDataWhenStatusError = options.receiveDataWhenStatusError;
     _dio.options.persistentConnection = options.persistentConnection;
+    // 让 AdapterBaseOptions.validateStatus 真正生效（此前是死配置）。
+    final validateStatus = options.validateStatus;
+    _dio.options.validateStatus = validateStatus == null
+        ? (status) => status != null && status >= 200 && status < 300
+        : (status) => validateStatus(status ?? 0);
   }
 
   @override
-  Future<AdapterResponse> request(AdapterRequest request) async {
+  Future<AdapterResponse> request(AdapterRequest request) {
+    return _executeWithInterceptors(request, _performRequest);
+  }
+
+  /// 统一的拦截器执行/重试包装
+  Future<AdapterResponse> _executeWithInterceptors(
+    AdapterRequest request,
+    Future<AdapterResponse> Function(AdapterRequest request) operation,
+  ) async {
+    AdapterRequest currentRequest;
     try {
-      // 先执行请求拦截器
-      final interceptedRequest = await _executeRequestInterceptors(request);
-      
-      // 转换 AdapterRequest 到 Dio RequestOptions
-      final options = _convertToOptions(interceptedRequest);
-      
-      // 构建请求体
-      final requestBody = _buildRequestBody(interceptedRequest);
-      
-      // 转换 CancelToken
-      final dioCancelToken = _convertCancelToken(interceptedRequest.cancelToken);
-      
-      try {
-        // 构建完整 URL，统一处理 baseUrl/path 斜杠和 RESTful 参数替换。
-        final requestUrl = interceptedRequest.buildFullUrl();
-        final response = await _dio.request(
-          requestUrl,
-          data: requestBody,
-          queryParameters: interceptedRequest.queryParams,
-          options: options,
-          cancelToken: dioCancelToken,
-        );
-        
-        // 转换 Dio Response 到 AdapterResponse
-        var adapterResponse = _convertFromResponse(response, interceptedRequest);
-        
-        // 执行响应拦截器
-        adapterResponse = await _executeResponseInterceptors(adapterResponse);
-        
-        return adapterResponse;
-      } finally {
-        // 请求完成后清理 CancelToken 映射，防止内存泄漏
-        _cancelTokenMap.remove(interceptedRequest.cancelToken);
-      }
+      currentRequest = await _executeRequestInterceptors(request);
     } on _EarlyResponseException catch (e) {
-      // 拦截器提前返回了响应
       return e.response;
-    } on DioException catch (e) {
-      // 执行错误拦截器
-      var exception = _convertException(e);
-      exception = await _executeErrorInterceptors(exception);
-      throw exception;
-    } catch (e) {
-      // 其他错误也通过错误拦截器
-      var exception = AdapterException(
-        message: e.toString(),
-        type: AdapterExceptionType.unknown,
-        originalError: e,
-      );
-      exception = await _executeErrorInterceptors(exception);
-      throw exception;
+    }
+
+    var retryCount = 0;
+
+    while (true) {
+      try {
+        // 执行真实请求，并统一处理响应拦截器
+        final response = await operation(currentRequest);
+        return await _executeResponseInterceptors(response);
+      } on AdapterException catch (e) {
+        final outcome = await _executeErrorInterceptors(e);
+        if (outcome.response != null) {
+          return outcome.response!;
+        }
+        if (outcome.retryRequest != null &&
+            retryCount < kMaxAdapterInterceptorRetries) {
+          retryCount++;
+          currentRequest = outcome.retryRequest!;
+          continue;
+        }
+        throw outcome.error ?? e;
+      } on DioException catch (e) {
+        final exception = _convertException(e, currentRequest);
+        final outcome = await _executeErrorInterceptors(exception);
+        if (outcome.response != null) {
+          return outcome.response!;
+        }
+        if (outcome.retryRequest != null &&
+            retryCount < kMaxAdapterInterceptorRetries) {
+          retryCount++;
+          currentRequest = outcome.retryRequest!;
+          continue;
+        }
+        throw outcome.error ?? exception;
+      } catch (e) {
+        // 其他错误也通过错误拦截器
+        final exception = AdapterException(
+          message: e.toString(),
+          type: AdapterExceptionType.unknown,
+          originalError: e,
+        );
+        final outcome = await _executeErrorInterceptors(exception);
+        if (outcome.response != null) {
+          return outcome.response!;
+        }
+        if (outcome.retryRequest != null &&
+            retryCount < kMaxAdapterInterceptorRetries) {
+          retryCount++;
+          currentRequest = outcome.retryRequest!;
+          continue;
+        }
+        throw outcome.error ?? exception;
+      }
+    }
+  }
+
+  /// 执行底层请求（不包含拦截器）
+  Future<AdapterResponse> _performRequest(AdapterRequest request) async {
+    final effectiveRequest = _baseOptions?.applyToRequest(request) ?? request;
+
+    // 转换 AdapterRequest 到 Dio RequestOptions
+    final options = _convertToOptions(effectiveRequest);
+
+    // 构建请求体
+    final requestBody = await _buildRequestBody(effectiveRequest);
+
+    // 转换 CancelToken
+    final dioCancelToken = _convertCancelToken(effectiveRequest.cancelToken);
+
+    try {
+      // 构建完整 URL，统一处理 baseUrl/path 斜杠和 RESTful 参数替换。
+      final requestUrl = effectiveRequest.buildFullUrl();
+
+      // 使用 compose + fetch 以便支持请求级 connectTimeout
+      // （Dio 的 Options 本身不包含 connectTimeout 字段）
+      final requestOptions = options
+          .compose(
+            _dio.options,
+            requestUrl,
+            data: requestBody,
+            queryParameters: effectiveRequest.queryParams,
+            cancelToken: dioCancelToken,
+          )
+          .copyWith(
+            connectTimeout: effectiveRequest.connectTimeout ??
+                _dio.options.connectTimeout,
+          );
+
+      final response = await _dio.fetch<dynamic>(requestOptions);
+
+      // 转换 Dio Response 到 AdapterResponse
+      return _convertFromResponse(response, effectiveRequest);
+    } finally {
+      // 请求完成后清理 CancelToken 映射，防止内存泄漏
+      _releaseCancelToken(effectiveRequest.cancelToken);
     }
   }
   
@@ -407,7 +493,7 @@ class DioAdapter implements NetworkAdapter {
     
     for (final interceptor in _interceptors) {
       final handler = adapter_interceptor.RequestInterceptorHandler();
-      interceptor.onRequest(currentRequest, handler);
+      await interceptor.onRequest(currentRequest, handler);
       
       if (handler.resolvedResponse != null) {
         // 拦截器直接返回了响应，抛出特殊异常
@@ -431,7 +517,7 @@ class DioAdapter implements NetworkAdapter {
     
     for (final interceptor in _interceptors) {
       final handler = adapter_interceptor.ResponseInterceptorHandler();
-       interceptor.onResponse(currentResponse, handler);
+      await interceptor.onResponse(currentResponse, handler);
 
       if (handler.rejectedError != null) {
         // 拦截器拒绝了响应
@@ -447,24 +533,29 @@ class DioAdapter implements NetworkAdapter {
   }
   
   /// 执行错误拦截器
-  Future<AdapterException> _executeErrorInterceptors(AdapterException error) async {
+  Future<_ErrorHandlingResult> _executeErrorInterceptors(AdapterException error) async {
     var currentError = error;
     
     for (final interceptor in _interceptors) {
       final handler = adapter_interceptor.ErrorInterceptorHandler();
-      interceptor.onError(currentError, handler);
+      await interceptor.onError(currentError, handler);
       
       if (handler.resolvedResponse != null) {
         // 拦截器解决了错误，返回响应
-        throw _EarlyResponseException(handler.resolvedResponse!);
-      } else if (handler.modifiedError != null) {
+        return _ErrorHandlingResult(response: handler.resolvedResponse);
+      }
+      if (handler.retryRequest != null) {
+        // 拦截器要求使用修改后的请求重试
+        return _ErrorHandlingResult(retryRequest: handler.retryRequest);
+      }
+      if (handler.modifiedError != null) {
         // 拦截器修改了错误
         currentError = handler.modifiedError!;
       }
       // 否则继续使用当前错误
     }
     
-    return currentError;
+    return _ErrorHandlingResult(error: currentError);
   }
 
   /// 转换 AdapterRequest 到 Dio Options
@@ -481,7 +572,7 @@ class DioAdapter implements NetworkAdapter {
   }
   
   /// 构建请求体
-  dynamic _buildRequestBody(AdapterRequest request) {
+  Future<dynamic> _buildRequestBody(AdapterRequest request) async {
     // 如果有原始 body，直接使用
     if (request.rawBody != null) {
       return request.rawBody;
@@ -493,23 +584,76 @@ class DioAdapter implements NetworkAdapter {
     }
     
     // 检测是否包含文件
-    final hasFile = request.bodyParams.values.any(
-      (v) => v is MultipartFile || v is FormData
-    );
+    final hasFile = request.bodyParams.values.any(_containsFileLike);
     
     // 如果包含文件或 contentType 是 multipart，使用 FormData
     if (hasFile || request.contentType?.contains('multipart') == true) {
-      return FormData.fromMap(request.bodyParams);
+      final formData = FormData();
+      for (final entry in request.bodyParams.entries) {
+        await _addFormValue(formData, entry.key, entry.value);
+      }
+      return formData;
     }
     
     // 否则直接返回参数 Map（Dio 会根据 contentType 自动处理）
     return request.bodyParams;
   }
+
+  /// 判断是否包含需要转为 multipart 的值
+  bool _containsFileLike(dynamic value) {
+    if (value is MultipartFile || value is File || value is FormData) {
+      return true;
+    }
+    if (value is Iterable) {
+      return value.any(_containsFileLike);
+    }
+    return false;
+  }
+
+  /// 将单个字段写入 FormData，支持 dart:io File / MultipartFile / 列表
+  Future<void> _addFormValue(
+    FormData formData,
+    String key,
+    dynamic value,
+  ) async {
+    if (value is MultipartFile) {
+      formData.files.add(MapEntry(key, value));
+      return;
+    }
+
+    if (!kIsWeb && value is File) {
+      formData.files.add(
+        MapEntry(
+          key,
+          await MultipartFile.fromFile(
+            value.path,
+            filename: _basename(value.path),
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (value is Iterable) {
+      for (final item in value) {
+        await _addFormValue(formData, key, item);
+      }
+      return;
+    }
+
+    formData.fields.add(MapEntry(key, value?.toString() ?? ''));
+  }
+
+  String _basename(String path) {
+    final parts = path.split(RegExp(r'[\\/]'));
+    return parts.isEmpty ? path : parts.last;
+  }
   
   /// 转换 Dio Response 到 AdapterResponse
   AdapterResponse _convertFromResponse(Response dioResponse, AdapterRequest request) {
+    final statusCode = dioResponse.statusCode ?? 0;
     return AdapterResponse(
-      statusCode: dioResponse.statusCode ?? 0,
+      statusCode: statusCode,
       statusMessage: dioResponse.statusMessage,
       data: dioResponse.data,
       headers: dioResponse.headers.map,
@@ -517,11 +661,15 @@ class DioAdapter implements NetworkAdapter {
       isRedirect: dioResponse.isRedirect,
       redirectUrl: dioResponse.realUri.toString(),
       extra: dioResponse.extra,
+      successOverride: _dio.options.validateStatus.call(statusCode),
     );
   }
   
   /// 转换 DioException 到 AdapterException
-  AdapterException _convertException(DioException e) {
+  AdapterException _convertException(
+    DioException e, [
+    AdapterRequest? request,
+  ]) {
     final type = _convertExceptionType(e.type);
     final message = _formatExceptionMessage(e);
     
@@ -532,11 +680,12 @@ class DioAdapter implements NetworkAdapter {
       response: e.response != null 
         ? _convertFromResponse(
             e.response!,
-            AdapterRequest(
-              baseUrl: e.requestOptions.baseUrl,
-              path: e.requestOptions.path,
-              method: _parseHttpMethod(e.requestOptions.method),
-            ),
+            request ??
+                AdapterRequest(
+                  baseUrl: e.requestOptions.baseUrl,
+                  path: e.requestOptions.path,
+                  method: _parseHttpMethod(e.requestOptions.method),
+                ),
           )
         : null,
       originalError: e,
@@ -568,24 +717,54 @@ class DioAdapter implements NetworkAdapter {
   CancelToken? _convertCancelToken(adapter_cancel.CancelToken? token) {
     if (token == null) return null;
     
-    // 如果已经有映射，返回已有的 Dio CancelToken
-    if (_cancelTokenMap.containsKey(token)) {
-      return _cancelTokenMap[token];
+    // 如果已经有映射，返回已有的 Dio CancelToken，并增加引用计数
+    final existing = _cancelTokenMap[token];
+    if (existing != null) {
+      _cancelTokenRefs.update(token, (value) => value + 1);
+      return existing;
     }
     
     // 创建新的 Dio CancelToken
     final dioCancelToken = CancelToken();
     _cancelTokenMap[token] = dioCancelToken;
+    _cancelTokenRefs[token] = 1;
     
-    // 监听适配器 CancelToken 的取消事件
-    token.whenCancel((reason) {
+    // 监听适配器 CancelToken 的取消事件（每个 token 只注册一次）
+    void callback(String? reason) {
       if (!dioCancelToken.isCancelled) {
         dioCancelToken.cancel(reason);
       }
+      // CancelToken.cancel 会在回调结束后自行清空回调列表，
+      // 这里只清理映射，避免在遍历回调时修改列表。
       _cancelTokenMap.remove(token);
-    });
+      _cancelTokenRefs.remove(token);
+      _cancelCallbacks.remove(token);
+    }
+
+    _cancelCallbacks[token] = callback;
+    token.whenCancel(callback);
     
     return dioCancelToken;
+  }
+
+  /// 释放适配器 CancelToken 映射引用
+  void _releaseCancelToken(adapter_cancel.CancelToken? token) {
+    if (token == null) return;
+
+    final refs = _cancelTokenRefs[token];
+    if (refs == null) return;
+
+    if (refs > 1) {
+      _cancelTokenRefs[token] = refs - 1;
+      return;
+    }
+
+    _cancelTokenRefs.remove(token);
+    _cancelTokenMap.remove(token);
+    final callback = _cancelCallbacks.remove(token);
+    if (callback != null) {
+      token.removeCallback(callback);
+    }
   }
   
   /// 转换 HTTP 方法
@@ -654,30 +833,38 @@ class DioAdapter implements NetworkAdapter {
     AdapterRequest request,
     String savePath, {
     ProgressCallback? onProgress,
-  }) async {
+  }) {
+    return _executeWithInterceptors(
+      request,
+      (req) => _performDownload(req, savePath, onProgress),
+    );
+  }
+
+  Future<AdapterResponse> _performDownload(
+    AdapterRequest request,
+    String savePath,
+    ProgressCallback? onProgress,
+  ) async {
+    final effectiveRequest = _baseOptions?.applyToRequest(request) ?? request;
+    final options = _convertToOptions(effectiveRequest);
+    final requestBody = await _buildRequestBody(effectiveRequest);
+    final dioCancelToken = _convertCancelToken(effectiveRequest.cancelToken);
+
     try {
-      final options = _convertToOptions(request);
-      final requestBody = _buildRequestBody(request);
-      final dioCancelToken = _convertCancelToken(request.cancelToken);
-      
-      try {
-        // 下载与普通请求保持一致，统一使用规范化后的完整 URL。
-        final response = await _dio.download(
-          request.buildFullUrl(),
-          savePath,
-          queryParameters: request.queryParams,
-          data: requestBody,
-          options: options,
-          cancelToken: dioCancelToken,
-          onReceiveProgress: onProgress,
-        );
-        
-        return _convertFromResponse(response, request);
-      } finally {
-        _cancelTokenMap.remove(request.cancelToken);
-      }
-    } on DioException catch (e) {
-      throw _convertException(e);
+      // 下载与普通请求保持一致，统一使用规范化后的完整 URL。
+      final response = await _dio.download(
+        effectiveRequest.buildFullUrl(),
+        savePath,
+        queryParameters: effectiveRequest.queryParams,
+        data: requestBody,
+        options: options,
+        cancelToken: dioCancelToken,
+        onReceiveProgress: onProgress,
+      );
+
+      return _convertFromResponse(response, effectiveRequest);
+    } finally {
+      _releaseCancelToken(effectiveRequest.cancelToken);
     }
   }
   
@@ -685,28 +872,41 @@ class DioAdapter implements NetworkAdapter {
   Future<AdapterResponse> upload(
     AdapterRequest request, {
     ProgressCallback? onProgress,
-  }) async {
+  }) {
+    return _executeWithInterceptors(
+      request,
+      (req) => _performUpload(req, onProgress),
+    );
+  }
+
+  Future<AdapterResponse> _performUpload(
+    AdapterRequest request,
+    ProgressCallback? onProgress,
+  ) async {
+    final effectiveRequest = _baseOptions?.applyToRequest(request) ?? request;
+    final options = _convertToOptions(effectiveRequest);
+    final requestBody = await _buildRequestBody(effectiveRequest);
+    final dioCancelToken = _convertCancelToken(effectiveRequest.cancelToken);
+
     try {
-      final options = _convertToOptions(request);
-      final requestBody = _buildRequestBody(request);
-      final dioCancelToken = _convertCancelToken(request.cancelToken);
-      
-      try {
-        final response = await _dio.request(
-          request.buildFullUrl(),
-          data: requestBody,
-          queryParameters: request.queryParams,
-          options: options,
-          cancelToken: dioCancelToken,
-          onSendProgress: onProgress,
-        );
-        
-        return _convertFromResponse(response, request);
-      } finally {
-        _cancelTokenMap.remove(request.cancelToken);
-      }
-    } on DioException catch (e) {
-      throw _convertException(e);
+      final requestOptions = options
+          .compose(
+            _dio.options,
+            effectiveRequest.buildFullUrl(),
+            data: requestBody,
+            queryParameters: effectiveRequest.queryParams,
+            cancelToken: dioCancelToken,
+          )
+          .copyWith(
+            connectTimeout: effectiveRequest.connectTimeout ??
+                _dio.options.connectTimeout,
+            onSendProgress: onProgress,
+          );
+
+      final response = await _dio.fetch<dynamic>(requestOptions);
+      return _convertFromResponse(response, effectiveRequest);
+    } finally {
+      _releaseCancelToken(effectiveRequest.cancelToken);
     }
   }
   
@@ -715,6 +915,21 @@ class DioAdapter implements NetworkAdapter {
     token.cancel();
   }
   
+  @override
+  Future<void> close() async {
+    for (final token in _cancelCallbacks.keys.toList()) {
+      final callback = _cancelCallbacks.remove(token);
+      if (callback != null) {
+        token.removeCallback(callback);
+      }
+    }
+    _cancelTokenMap.clear();
+    _cancelTokenRefs.clear();
+    _interceptors.clear();
+    _baseOptions = null;
+    _dio.close(force: true);
+  }
+
   @override
   void addInterceptor(AdapterInterceptor interceptor) {
     _interceptors.add(interceptor);

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' if (dart.library.html) '../adapter/implementations/http_adapter_web_stub.dart';
+import '../adapter/implementations/http_adapter_web_stub.dart'
+    if (dart.library.io) 'dart:io';
+import 'dart:typed_data';
 import 'package:dio/dio.dart' as dio;
 import 'package:flutter/foundation.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
@@ -170,9 +172,9 @@ class BuildRequest<T> {
 
   // 参数管理 / Parameter Management
   // 优化：分离路径参数和查询参数 / Optimization: Separate path and query parameters
-  Map<String, dynamic> _pathParams = {}; // RESTful 路径参数 / RESTful path parameters
-  Map<String, dynamic> _queryParams = {}; // URL 查询参数 / URL query parameters
-  Map<String, dynamic> _bodyParams = {}; // Body 参数 / Body parameters
+  final Map<String, dynamic> _pathParams = {}; // RESTful 路径参数 / RESTful path parameters
+  final Map<String, dynamic> _queryParams = {}; // URL 查询参数 / URL query parameters
+  final Map<String, dynamic> _bodyParams = {}; // Body 参数 / Body parameters
   dynamic _rawBody; // 原始 body 数据（用于自定义 body）/ Raw body data (for custom body)
 
   // 请求体类型 / Request Body Type
@@ -180,7 +182,7 @@ class BuildRequest<T> {
   RequestBodyType _bodyType = RequestBodyType.auto;
 
   // 请求头 / Request Headers
-  Map<String, dynamic> _headers = {};
+  final Map<String, dynamic> _headers = {};
   bool _enableGlobalHeader = true;
 
   // 请求配置
@@ -191,7 +193,7 @@ class BuildRequest<T> {
   ResponseType _responseType = ResponseType.json;
 
   // 缓存配置
-  List<String> _ignoreCacheKeys = [];
+  final List<String> _ignoreCacheKeys = [];
   int? _cacheInvalidationTime;
   bool _requestIgnoreCacheTime = false;
 
@@ -447,7 +449,7 @@ class BuildRequest<T> {
 
   BuildRequest<T> setResponseCallBack(
       Function(AdapterResponse response) responseCallBack) {
-    this.onResponse = responseCallBack;
+    onResponse = responseCallBack;
     return this;
   }
 
@@ -750,7 +752,7 @@ class BuildRequest<T> {
     } catch (e, s) {
       LogUtil.v('Request error: $e\n$s');
       if (e is RxError) {
-        throw e;
+        rethrow;
       }
       throw NetworkException("Request failed: $e", e);
     }
@@ -758,6 +760,18 @@ class BuildRequest<T> {
 
   /// 保存缓存数据
   Future<void> _saveCacheData(dynamic responseData) async {
+    final path = _path;
+    if (path == null) {
+      return;
+    }
+
+    if (!_isCacheableData(responseData)) {
+      LogUtil.v(
+        'RxNet cache skipped: unsupported data type ${responseData.runtimeType}',
+      );
+      return;
+    }
+
     // 合并全局和本地忽略键
     final allIgnoreKeys = <String>[];
     if (_rxNet.getIgnoreCacheKeys() != null) {
@@ -771,27 +785,45 @@ class BuildRequest<T> {
       ..addAll(_queryParams)
       ..addAll(_bodyParams);
 
-    String cacheKey =
-        NetUtils.getCacheKeyFromPath(_path, allParams, allIgnoreKeys);
+    try {
+      await _rxNet.cacheManager.saveNetworkCache(
+        path: path,
+        params: allParams,
+        responseData: responseData,
+        ignoreKeys: allIgnoreKeys,
+      );
+    } catch (e, stackTrace) {
+      // 缓存写入失败不应影响已经成功的网络请求
+      LogUtil.v('RxNet cache save failed: $e\n$stackTrace');
+    }
+  }
 
-    final map = <String, dynamic>{
-      'timestamp': DateTime.now().millisecondsSinceEpoch,
-      'data': responseData
-    };
-    await _rxNet.getDatabase()?.put(cacheKey, jsonEncode(map));
+  bool _isCacheableData(dynamic data) {
+    if (data == null || data is String || data is num || data is bool) {
+      return true;
+    }
+    // 二进制数据（bytes 响应）不写入 JSON 缓存：既避免存储膨胀，
+    // 也避免读回时被解析成 List<int> 而丢失 Uint8List 类型。
+    if (data is Uint8List || data is ByteData) {
+      return false;
+    }
+    if (data is Map || data is List) {
+      try {
+        jsonEncode(data);
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+    // Stream / 自定义对象等不做缓存
+    return false;
   }
 
   /// 读取缓存
   Future<RxResult<T>> _readCache() async {
-    final database = _rxNet.getDatabase();
-    if (database == null) {
-      throw CacheException("Cache not available");
-    }
-
-    try {
-      await database.ready;
-    } catch (error) {
-      throw CacheException("Cache not available", error);
+    final path = _path;
+    if (path == null) {
+      throw CacheException("Cache is empty");
     }
 
     // 合并全局和本地忽略键
@@ -807,36 +839,25 @@ class BuildRequest<T> {
       ..addAll(_queryParams)
       ..addAll(_bodyParams);
 
-    final cacheKey =
-        NetUtils.getCacheKeyFromPath(_path, allParams, allIgnoreKeys);
-    final cacheData = await database.get(cacheKey);
-
-    if (TextUtil.isEmpty(cacheData)) {
-      throw CacheException("Cache is empty");
-    }
-
-    dynamic data;
     try {
-      data = jsonDecode(cacheData);
+      final data = await _rxNet.cacheManager.readNetworkCache(
+        path: path,
+        params: allParams,
+        ignoreKeys: allIgnoreKeys,
+        // 0 表示忽略过期时间，始终返回已存在的缓存
+        cacheInvalidationTime: _requestIgnoreCacheTime ? 0 : _cacheInvalidationTime,
+      );
+
+      if (data == null) {
+        throw CacheException("Cache is empty");
+      }
+
+      LogUtil.v("缓存数据命中");
+      return await _parseLocalData(data);
+    } on CacheException {
+      rethrow;
     } catch (e) {
-      throw ParsingException("Failed to decode cache data", e);
-    }
-
-    final timestamp = data['timestamp'];
-    final dataValue = data['data'];
-    LogUtil.v("缓存数据:${jsonEncode(data)}");
-
-    final now = DateTime.now().millisecondsSinceEpoch;
-    // LogUtil.v("缓存数据时效:${_cacheInvalidationTime} || now - timestamp ：${now - timestamp }");
-    if (now - timestamp >
-        (_cacheInvalidationTime ?? _rxNet.getCacheInvalidationTime())) {
-      LogUtil.v("缓存数据:超时效");
-      throw CacheException("Cache expired");
-    }
-    if (dataValue != null) {
-      return _parseLocalData(dataValue);
-    } else {
-      throw CacheException("Cache is empty");
+      throw CacheException("Failed to read cache", e);
     }
   }
 
@@ -883,8 +904,25 @@ class BuildRequest<T> {
   }
 
   /// async/await方式
+  ///
+  /// 返回本次请求的最终结果：
+  /// - 缓存优先模式会等待网络请求完成后再返回网络结果；
+  /// - 重试模式只返回最后一次尝试的结果，不会把中间失败结果提前返回；
+  /// - 轮询模式（[setLoop]）返回第一个结果并结束本次轮询。
   Future<RxResult<T>> request() async {
-    return await executeStream().first;
+    final stream = executeStream();
+
+    try {
+      if (_isLoop) {
+        return await stream.first;
+      }
+      return await stream.last;
+    } catch (e) {
+      if (e is RxError) {
+        return RxResult.error(e);
+      }
+      return RxResult.error(NetworkException("Request failed: $e", e));
+    }
   }
 
   /// Stream方式（支持轮询）
@@ -919,20 +957,24 @@ class BuildRequest<T> {
           yield* _networkRequestStream(shouldCache: true);
           break;
         case CacheMode.REQUEST_FAILED_READ_CACHE:
-          bool networkSucceeded = false;
+          RxResult<T>? networkResult;
           await for (final netResult
               in _networkRequestStream(shouldCache: true)) {
-            if (netResult.isSuccess) {
-              networkSucceeded = true;
-            }
-            yield netResult;
+            networkResult = netResult;
           }
-          if (!networkSucceeded) {
+
+          if (networkResult != null && networkResult.isSuccess) {
+            yield networkResult;
+          } else {
             try {
               final cacheResult = await _readCache();
               yield cacheResult;
             } catch (e) {
-              // If cache also fails, the last network error is already emitted.
+              // 缓存也失败时，才把网络错误抛给调用方，避免同一次请求
+              // 同时触发 failure 和 success 回调。
+              if (networkResult != null) {
+                yield networkResult;
+              }
             }
           }
           break;
@@ -970,26 +1012,92 @@ class BuildRequest<T> {
 
   Stream<RxResult<T>> _networkRequestStream(
       {required bool shouldCache}) async* {
-    int attempt = 0;
-    bool success = false;
     final effectiveRetryCount = _retryPolicy?.maxRetries ?? _retryCount;
-    do {
+    var attempt = 0;
+    Object? lastError;
+
+    while (true) {
       attempt++;
       try {
         final result = await _doRequest(cache: shouldCache);
         yield result;
-        success = true;
-        break;
+        return;
       } catch (e) {
-        yield RxResult.error(e);
-        if (attempt <= effectiveRetryCount) {
-          final delay = _retryPolicy != null
-              ? _retryPolicy!.getDelay(attempt - 1)
-              : _retryInterval;
-          await Future.delayed(delay);
+        lastError = e;
+
+        // 只对可重试的错误重试，且默认不重试非幂等请求
+        final canRetry = attempt <= effectiveRetryCount && _isRetryable(e);
+        if (!canRetry) {
+          break;
         }
+
+        final delay = _retryPolicy != null
+            ? _retryPolicy!.getDelay(attempt - 1)
+            : _retryInterval;
+        await Future.delayed(delay);
       }
-    } while (attempt <= effectiveRetryCount && !success);
+    }
+
+    // 重试过程中只向调用方暴露最终结果，避免回调式 API 多次触发 failure
+    yield RxResult.error(lastError);
+  }
+
+  bool _isIdempotentMethod(HttpMethod method) {
+    switch (method) {
+      case HttpMethod.GET:
+      case HttpMethod.PUT:
+      case HttpMethod.DELETE:
+      case HttpMethod.HEAD:
+      case HttpMethod.OPTIONS:
+        return true;
+      case HttpMethod.POST:
+      case HttpMethod.PATCH:
+        return false;
+    }
+  }
+
+  AdapterException? _asAdapterException(Object error) {
+    if (error is AdapterException) {
+      return error;
+    }
+    if (error is RxError && error.cause is AdapterException) {
+      return error.cause as AdapterException;
+    }
+    return null;
+  }
+
+  bool _isRetryable(Object error) {
+    final adapterError = _asAdapterException(error);
+    if (adapterError == null) {
+      return false;
+    }
+
+    if (adapterError.type == AdapterExceptionType.cancel) {
+      return false;
+    }
+
+    final allowNonIdempotent =
+        _retryPolicy?.retryOnNonIdempotent ?? false;
+    if (!allowNonIdempotent && !_isIdempotentMethod(_httpMethod)) {
+      return false;
+    }
+
+    switch (adapterError.type) {
+      case AdapterExceptionType.connectTimeout:
+      case AdapterExceptionType.sendTimeout:
+      case AdapterExceptionType.receiveTimeout:
+      case AdapterExceptionType.connectionError:
+        return true;
+      case AdapterExceptionType.response:
+        final statusCode = adapterError.statusCode;
+        return statusCode == null ||
+            statusCode == 408 ||
+            statusCode == 429 ||
+            statusCode >= 500;
+      case AdapterExceptionType.cancel:
+      case AdapterExceptionType.unknown:
+        return false;
+    }
   }
 
   // ==================== 下载上传方法 ====================

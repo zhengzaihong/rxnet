@@ -3,6 +3,7 @@
 /// email:1096877329@qq.com
 /// date: 2025-01-31
 /// describe: 响应类型枚举
+library;
 
 /// Response type enumeration.
 ///

@@ -20,6 +20,7 @@ export 'package:rxnet_plus/src/error/rx_error.dart';
 
 // Core adapter interface and models
 export 'package:rxnet_plus/src/adapter/network_adapter.dart';
+export 'package:rxnet_plus/src/adapter/closable_network_adapter.dart';
 export 'package:rxnet_plus/src/adapter/models/adapter_request.dart';
 export 'package:rxnet_plus/src/adapter/models/adapter_response.dart';
 export 'package:rxnet_plus/src/adapter/models/adapter_base_options.dart';
@@ -57,8 +58,11 @@ export 'package:dio/dio.dart' hide
     ProgressCallback,
     BaseOptions;  // Use RxNetConfig or DioAdapter options instead
 
-export 'package:dio/io.dart';
-export 'package:http/io_client.dart';
+// dart:io 专用适配器：Web/Wasm 导出空 stub，IO 平台正常导出
+export 'package:dio/io.dart'
+    if (dart.library.js_interop) 'src/adapter/io_exports_stub.dart';
+export 'package:http/io_client.dart'
+    if (dart.library.js_interop) 'src/adapter/io_exports_stub.dart';
 
 // path_provider
 export 'package:rxnet_plus/rxnet_plus.dart';

@@ -20,29 +20,29 @@ abstract class RxError implements Exception {
 /// 网络异常
 /// Thrown when a network-related error occurs.
 class NetworkException extends RxError {
-  NetworkException(String message, [dynamic cause]) : super(message, cause);
+  NetworkException(super.message, [super.cause]);
 }
 
 /// 获取缓存出错时的异常
 /// Thrown when a cache-related error occurs.
 class CacheException extends RxError {
-  CacheException(String message, [dynamic cause]) : super(message, cause);
+  CacheException(super.message, [super.cause]);
 }
 
 /// 数据解析出错时的异常
 /// Thrown when an error occurs during data parsing or transformation.
 class ParsingException extends RxError {
-  ParsingException(String message, [dynamic cause]) : super(message, cause);
+  ParsingException(super.message, [super.cause]);
 }
 
 /// 请求被取消时的异常
 /// Thrown when a request is cancelled.
 class CancellationException extends RxError {
-  CancellationException(String message, [dynamic cause]) : super(message, cause);
+  CancellationException(super.message, [super.cause]);
 }
 
 /// 当在web端使用了移动端api时的异常
 /// Throw when the mobile api is used on the web.
 class WebException extends RxError {
-  WebException(String message, [dynamic cause]) : super(message, cause);
+  WebException(super.message, [super.cause]);
 }

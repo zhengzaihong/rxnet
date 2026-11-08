@@ -11,12 +11,9 @@ void main() async {
   //   createHttpClient: () {
   //     final client = HttpClient();
   //     client.badCertificateCallback = (cert, host, port) {
-  //       // // 获取证书 DER
-  //       // final der = cert.der;
-  //       // final sha256 = sha256Convert(der);
-  //       // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
-  //       // return sha256 == trustedFingerprint;
-  //       return true;
+  //       // 生产环境必须校验固定证书指纹，绝不能直接 return true
+  //       final fingerprint = sha256.convert(cert.der).toString();
+  //       return fingerprint == 'YOUR_CERT_SHA256_FINGERPRINT';
   //     };
   //     return client;
   //   },
@@ -26,12 +23,9 @@ void main() async {
   //   final HttpClient httpClient = HttpClient();
   //   httpClient.badCertificateCallback =
   //       (X509Certificate cert, String host, int port) {
-  //     // // 获取证书 DER
-  //     // final der = cert.der;
-  //     // final sha256 = sha256Convert(der);
-  //     // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
-  //     // return sha256 == trustedFingerprint;
-  //         return true;
+  //     // 生产环境必须校验证书指纹
+  //     final fingerprint = sha256.convert(cert.der).toString();
+  //     return fingerprint == 'YOUR_CERT_SHA256_FINGERPRINT';
   //   };
   //   return IOClient(httpClient);
   // }

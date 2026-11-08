@@ -4,6 +4,7 @@
 /// date:2026-06-02 11:27
 /// describe: 通过[zipRequest]执行的并发请求聚合结果的容器。
 /// Container for aggregated results from concurrent requests executed via [zipRequest].
+library;
 
 /// [ZipResults] provides type-safe access to results from multiple concurrent requests,
 /// maintaining the original submission order and supporting both index-based and tag-based access.

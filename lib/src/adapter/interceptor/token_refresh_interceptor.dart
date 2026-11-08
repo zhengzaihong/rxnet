@@ -9,23 +9,16 @@ import '../exceptions/adapter_exception.dart';
 /// email:1096877329@qq.com
 /// date:2026-08-07 9:44
 /// describe: Token 自动刷新拦截器
-/// 当请求返回 401/403 时，自动调用 [tokenProvider] 刷新 Token 并重试原请求。
+/// 当请求返回 401/403 时，自动调用 [tokenProvider] 刷新 Token，
+/// 并通过 [ErrorInterceptorHandler.retry] 使用新请求真正重试原请求。
 /// 支持并发请求场景下的 Token 刷新去重。
-// TokenRefreshInterceptor(
-//   tokenProvider: () async {
-//     final resp = await RxNet.post().xxxx;
-//     return resp.data['accessToken'];
-//   },
-//   isUnauthorized: (error, request) => error.statusCode == 401,
-//   onRequestUpdated: (request, newToken) {
-//     return request.copyWith(
-//       headers: {...request.headers, 'Authorization': 'Bearer $newToken'},
-//     );
-//   },
-//   onTokenRefreshed: (token) => currentToken = token,
-// );
 ///
+/// 注意：重试由适配器执行，上层请求（如 `RxNet.get().request()`）最终
+/// 拿到的是重试后的响应，而不是 401 错误。
 class TokenRefreshInterceptor extends AdapterInterceptor {
+  /// 重试请求标记，避免重试后再次 401 时无限刷新
+  static const String retryFlagKey = '_rxnetTokenRetried';
+
   /// Token 刷新回调，返回新的 access token
   final Future<String> Function() tokenProvider;
 
@@ -47,8 +40,12 @@ class TokenRefreshInterceptor extends AdapterInterceptor {
   /// Token 刷新失败后的回调（可选）
   final void Function(Object error)? onTokenRefreshFailed;
 
-  /// 缓存最近的请求（按 key），用于 onError 时获取原始请求进行重试
+  /// 缓存最近的请求（按 key），用于错误对象没有携带请求时兜底
   final Map<String, AdapterRequest> _requestCache = {};
+
+  /// 缓存上限，避免长期运行累积
+  final int maxCacheEntries;
+
   Completer<String>? _refreshCompleter;
   DateTime? _lastRefreshTime;
 
@@ -59,12 +56,17 @@ class TokenRefreshInterceptor extends AdapterInterceptor {
     this.onTokenRefreshed,
     this.onTokenRefreshing,
     this.onTokenRefreshFailed,
+    this.maxCacheEntries = 200,
   });
 
   @override
   void onRequest(AdapterRequest request, RequestInterceptorHandler handler) {
     // 缓存请求，key 为 URL + Method，onError 时使用
     final key = _generateKey(request);
+    if (!_requestCache.containsKey(key) &&
+        _requestCache.length >= maxCacheEntries) {
+      _requestCache.remove(_requestCache.keys.first);
+    }
     _requestCache[key] = request;
     handler.next(request);
   }
@@ -78,46 +80,53 @@ class TokenRefreshInterceptor extends AdapterInterceptor {
   }
 
   @override
-  void onError(AdapterException error, ErrorInterceptorHandler handler) {
-    final shouldRefresh = isUnauthorized != null
-        ? isUnauthorized!(error, error.response?.request ?? _emptyRequest)
-        : error.statusCode == 401;
+  Future<void> onError(
+      AdapterException error, ErrorInterceptorHandler handler) async {
+    final originalRequest = _resolveRequest(error);
 
-    if (!shouldRefresh) {
+    // 重试后仍然失败时不再刷新，避免死循环
+    if (originalRequest?.extra[retryFlagKey] == true) {
       handler.next(error);
       return;
     }
 
-    _handleTokenRefresh(error, handler).catchError((e) {
-      onTokenRefreshFailed?.call(e);
-    });
+    final shouldRefresh = isUnauthorized != null
+        ? isUnauthorized!(error, originalRequest ?? _emptyRequest)
+        : error.statusCode == 401;
+
+    if (!shouldRefresh || originalRequest == null) {
+      handler.next(error);
+      return;
+    }
+
+    await _handleTokenRefresh(originalRequest, handler);
   }
 
   Future<void> _handleTokenRefresh(
-      AdapterException error, ErrorInterceptorHandler handler) async {
+    AdapterRequest originalRequest,
+    ErrorInterceptorHandler handler,
+  ) async {
     try {
       final newToken = await _refreshToken();
-      final originalRequest = error.response?.request ?? _emptyRequest;
 
       // 通过 onRequestUpdated 回调让调用方更新请求中的认证信息
       final updatedRequest = onRequestUpdated != null
           ? onRequestUpdated!(originalRequest, newToken)
           : originalRequest;
 
+      // 标记为重试请求，避免再次 401 时重复刷新
+      final retryRequest = updatedRequest.copyWith(
+        extra: {
+          ...updatedRequest.extra,
+          retryFlagKey: true,
+        },
+      );
+
       // 清除缓存
       _requestCache.remove(_generateKey(originalRequest));
 
-      // 解析错误，让上层知道 Token 已刷新
-      handler.resolve(AdapterResponse(
-        statusCode: 200,
-        data: {
-          '_tokenRefreshed': true,
-          '_newToken': newToken,
-          '_retryRequest': updatedRequest,
-        },
-        headers: {},
-        request: originalRequest,
-      ));
+      // 让适配器使用新请求真正重试
+      handler.retry(retryRequest);
     } catch (e) {
       onTokenRefreshFailed?.call(e);
       handler.next(AdapterException(
@@ -126,6 +135,19 @@ class TokenRefreshInterceptor extends AdapterInterceptor {
         originalError: e,
       ));
     }
+  }
+
+  /// 查找触发错误的原始请求
+  AdapterRequest? _resolveRequest(AdapterException error) {
+    final request = error.response?.request;
+    if (request != null) {
+      return request;
+    }
+    // 网络错误等场景可能没有 response，如果只有一个待处理请求则使用它
+    if (_requestCache.length == 1) {
+      return _requestCache.values.first;
+    }
+    return null;
   }
 
   Future<String> _refreshToken() async {

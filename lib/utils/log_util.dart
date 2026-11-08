@@ -1,3 +1,4 @@
+// ignore_for_file: constant_identifier_names, avoid_print
 import 'dart:developer';
 
 import 'package:rxnet_plus/rxnet_lib.dart';
@@ -16,20 +17,21 @@ class LogUtil {
 
   static const String _TAG_DEFAULT = "RxNet：";
 
-  ///是否 debug 默认调试为true 正式环境为false
-  ///Whether to debug The default debugging is true, the official environment is false
-  static bool _debugMode = true;
+  ///是否 debug 默认关闭，避免生产环境输出敏感日志
+  ///Whether to debug The default is off to avoid sensitive logs in production
+  static bool _debugMode = false;
 
   static String tagDefault = _TAG_DEFAULT;
 
   static bool _isSystemPrint = false;
 
-  static void init({bool systemLog = false, bool debug = true}) {
+  static void init({bool systemLog = false, bool debug = false}) {
     _debugMode = debug;
     _isSystemPrint = systemLog;
   }
 
   static void e(Object object, {String? tag}) {
+    if (!_debugMode) return;
     _printLog(tag ?? "", '  e  ', object);
   }
 

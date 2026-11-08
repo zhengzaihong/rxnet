@@ -9,6 +9,11 @@ import 'package:flutter/material.dart';
 /// describe: 抽离日志收集--调试窗口使用
 ///
 class LogManager with ChangeNotifier {
+  LogManager({this.maxLogs = 1000});
+
+  /// 最大保留日志条数，避免调试窗口长期运行导致内存持续增长
+  final int maxLogs;
+
   bool _isCollectLogs = false;
   final ValueNotifier<List<String>> logsNotifier = ValueNotifier([]);
 
@@ -19,10 +24,14 @@ class LogManager with ChangeNotifier {
   }
 
   void addLogs(String log) {
-    if (collectLogs) {
-      logsNotifier.value.add(log);
-      logsNotifier.notifyListeners();
+    if (!collectLogs) return;
+
+    final logs = logsNotifier.value;
+    logs.add(log);
+    if (logs.length > maxLogs) {
+      logs.removeRange(0, logs.length - maxLogs);
     }
+    logsNotifier.notifyListeners();
   }
 
   void clearLogs() {

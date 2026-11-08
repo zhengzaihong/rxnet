@@ -1,6 +1,5 @@
-import 'native_helper.dart'
-    if (dart.library.io) 'native_helper.dart'
-    if (dart.library.html) 'web_helper.dart' as downloader;
+import 'web_helper.dart'
+    if (dart.library.io) 'native_helper.dart' as downloader;
 
 ///
 /// author: ZhengZaiHong

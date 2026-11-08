@@ -95,11 +95,12 @@ class DebugPage extends StatelessWidget {
                   }
                   Clipboard.setData(ClipboardData(text: buffer.toString()))
                       .then((_) {
-                     ScaffoldMessenger.of(context).showSnackBar(
-                       const SnackBar(
-                         content: Text('复制成功'),
-                       ),
-                     );
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('复制成功'),
+                      ),
+                    );
                   });
                 },
                 child: const Text('复制日志信息'),

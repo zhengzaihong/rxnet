@@ -31,7 +31,12 @@ class AdapterResponse<T> {
   
   /// 额外信息
   final Map<String, dynamic> extra;
-  
+
+  /// 适配器根据 validateStatus 得出的成功与否结论。
+  ///
+  /// 为 null 时回退到默认的 2xx 判断。
+  final bool? successOverride;
+
   const AdapterResponse({
     required this.statusCode,
     this.statusMessage,
@@ -41,10 +46,12 @@ class AdapterResponse<T> {
     this.isRedirect = false,
     this.redirectUrl,
     this.extra = const {},
+    this.successOverride,
   });
   
-  /// 是否成功 (2xx)
-  bool get isSuccess => statusCode >= 200 && statusCode < 300;
+  /// 是否成功（默认 2xx；适配器配置了 validateStatus 时以适配器结论为准）
+  bool get isSuccess =>
+      successOverride ?? (statusCode >= 200 && statusCode < 300);
   
   /// 获取响应头值
   /// 
@@ -84,6 +91,7 @@ class AdapterResponse<T> {
     bool? isRedirect,
     String? redirectUrl,
     Map<String, dynamic>? extra,
+    bool? successOverride,
   }) {
     return AdapterResponse<T>(
       statusCode: statusCode ?? this.statusCode,
@@ -94,6 +102,7 @@ class AdapterResponse<T> {
       isRedirect: isRedirect ?? this.isRedirect,
       redirectUrl: redirectUrl ?? this.redirectUrl,
       extra: extra ?? this.extra,
+      successOverride: successOverride ?? this.successOverride,
     );
   }
   

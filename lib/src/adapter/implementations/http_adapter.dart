@@ -7,19 +7,21 @@ import 'package:http/http.dart' as http;
 import 'package:rxnet_plus/src/type/http_method.dart';
 import '../../type/response_type.dart';
 import '../network_adapter.dart';
+import '../closable_network_adapter.dart';
 import '../models/adapter_request.dart';
 import '../models/adapter_response.dart';
 import '../models/adapter_base_options.dart';
 import '../interceptor/adapter_interceptor.dart';
 import '../exceptions/adapter_exception.dart';
 import '../cancel_token.dart' as adapter_cancel;
-// 条件导入：仅在非 Web 平台导入 dart:io
-// Conditional import: Only import dart:io on non-Web platforms
-import 'dart:io' if (dart.library.html) 'http_adapter_web_stub.dart';
+// 条件导入：Web/Wasm 使用 stub，IO 平台使用 dart:io
+// Conditional import: stub for Web/Wasm, dart:io for IO platforms
+import 'http_adapter_web_stub.dart'
+    if (dart.library.io) 'dart:io';
 // 条件导入：IO 平台用 IOClient，Web 平台用普通 http.Client
 // Conditional import: IOClient on IO, plain http.Client on Web
-import 'http_adapter_io.dart'
-    if (dart.library.html) 'http_adapter_web.dart'
+import 'http_adapter_web.dart'
+    if (dart.library.io) 'http_adapter_io.dart'
     show createDefaultHttpClient;
 
 ///
@@ -140,9 +142,10 @@ import 'http_adapter_io.dart'
 /// ```dart
 /// final httpClient = HttpClient();
 /// httpClient.badCertificateCallback = (cert, host, port) {
-///   // 自定义证书验证逻辑
-///   // Custom certificate validation logic
-///   return true;
+///   // 生产环境必须校验证书指纹，绝不能直接 return true
+///   // Never return true in production; verify a pinned fingerprint.
+///   final fingerprint = sha256.convert(cert.der).toString();
+///   return fingerprint == 'YOUR_CERT_SHA256_FINGERPRINT';
 /// };
 ///
 /// final client = IOClient(httpClient);
@@ -263,14 +266,16 @@ import 'http_adapter_io.dart'
 ///
 /// 这是一个使用 Dart 官方 http 包的轻量级适配器。
 /// 适合对包大小敏感的简单场景。
-class HttpAdapter implements NetworkAdapter {
+class HttpAdapter implements NetworkAdapter, ClosableNetworkAdapter {
   final http.Client _client;
   final List<AdapterInterceptor> _interceptors = [];
   final Map<adapter_cancel.CancelToken, List<Completer>> _pendingRequests = {};
+  final Map<adapter_cancel.CancelToken, void Function(String?)>
+      _cancelCallbacks = {};
 
   /// 底层 dart:io HttpClient 引用（仅在 IOClient 场景下非 null）
   /// 用于在 applyBaseOptions 时设置原生参数（超时、重定向等）
-  HttpClient? _nativeHttpClient;
+  final HttpClient? _nativeHttpClient;
 
   /// Creates an HttpAdapter.
   ///
@@ -340,7 +345,9 @@ class HttpAdapter implements NetworkAdapter {
       if (options.connectTimeout != null) {
         nativeClient.connectionTimeout = options.connectTimeout;
       }
-      nativeClient.idleTimeout = options.receiveTimeout ?? const Duration(seconds: 30);
+      nativeClient.idleTimeout =
+          options.receiveTimeout ?? AdapterBaseOptions.defaultReceiveTimeout;
+
     } catch (_) {
       // 平台不支持，静默忽略
     }
@@ -350,144 +357,232 @@ class HttpAdapter implements NetworkAdapter {
   HttpClient? getHttpClient() => _nativeHttpClient;
 
   @override
-  Future<AdapterResponse> request(AdapterRequest request) async {
-    final completer = Completer<void>();
-    adapter_cancel.CancelToken? activeCancelToken;
+  Future<AdapterResponse> request(AdapterRequest request) {
+    return _executeWithInterceptors(
+      request,
+      (currentRequest, completer, cancelToken) => _performRequest(
+        currentRequest,
+        completer: completer,
+        cancelToken: cancelToken,
+      ),
+    );
+  }
 
-    try {
-      var modifiedRequest = request;
-      for (final interceptor in _interceptors) {
-        final handler = RequestInterceptorHandler();
-        interceptor.onRequest(modifiedRequest, handler);
+  /// 统一的拦截器执行/重试包装，供 request/download/upload 复用
+  Future<AdapterResponse> _executeWithInterceptors(
+    AdapterRequest request,
+    Future<AdapterResponse> Function(
+      AdapterRequest request,
+      Completer<void> completer,
+      adapter_cancel.CancelToken? cancelToken,
+    ) operation,
+  ) async {
+    var currentRequest = request;
 
-        if (handler.resolvedResponse != null) {
-          return handler.resolvedResponse!;
-        }
-        if (handler.rejectedError != null) {
-          throw handler.rejectedError!;
-        }
-        if (handler.modifiedRequest != null) {
-          modifiedRequest = handler.modifiedRequest!;
-        }
+    // 请求拦截器（支持同步/异步实现）
+    for (final interceptor in _interceptors) {
+      final handler = RequestInterceptorHandler();
+      await interceptor.onRequest(currentRequest, handler);
+
+      if (handler.resolvedResponse != null) {
+        return handler.resolvedResponse!;
       }
-
-      activeCancelToken = modifiedRequest.cancelToken;
-      if (activeCancelToken != null) {
-        _registerCancelToken(activeCancelToken, completer);
-        if (activeCancelToken.isCancelled) {
-          throw AdapterException(
-            type: AdapterExceptionType.cancel,
-            message: activeCancelToken.cancelReason ?? 'Request cancelled',
-          );
-        }
+      if (handler.rejectedError != null) {
+        throw handler.rejectedError!;
       }
-
-      final baseRequest = await _buildBaseRequest(modifiedRequest);
-
-      // --- 超时策略 ---
-      // connectTimeout 包裹 send() 阶段（建连 + 获取响应头）
-      // receiveTimeout 包裹 Response.fromStream() 阶段（读取响应体）
-      // 两者独立作用，互不干扰
-      var sendFuture = _client.send(baseRequest);
-      final connectTimeout = _baseOptions?.connectTimeout;
-      if (connectTimeout != null && connectTimeout.inMilliseconds > 0) {
-        sendFuture = sendFuture.timeout(
-          connectTimeout,
-          onTimeout: () => throw AdapterException(
-            type: AdapterExceptionType.connectionError,
-            message: 'Connect timeout after ${connectTimeout.inSeconds}s',
-          ),
-        );
+      if (handler.modifiedRequest != null) {
+        currentRequest = handler.modifiedRequest!;
       }
-
-      final streamedResponse = activeCancelToken != null
-          ? await Future.any<http.StreamedResponse>([
-              sendFuture,
-              completer.future.then((_) => throw AdapterException(
-                    type: AdapterExceptionType.cancel,
-                    message:
-                        activeCancelToken!.cancelReason ?? 'Request cancelled',
-                  )),
-            ])
-          : await sendFuture;
-
-      // --- receiveDataWhenStatusError 控制 ---
-      // 当状态码表示错误且 receiveDataWhenStatusError 为 false 时，
-      // 不读取响应体以节省带宽
-      final isErrorResponse =
-          streamedResponse.statusCode >= 400;
-      final shouldReadBody = !isErrorResponse ||
-          (_baseOptions?.receiveDataWhenStatusError ?? true);
-
-      var response = modifiedRequest.responseType == ResponseType.stream
-          ? _convertFromHttpStreamedResponse(streamedResponse, modifiedRequest)
-          : _convertFromHttpResponse(
-              shouldReadBody
-                  ? await _readResponseWithTimeout(streamedResponse)
-                  : http.Response('', streamedResponse.statusCode,
-                      headers: streamedResponse.headers),
-              modifiedRequest,
-            );
-
-      if (!response.isSuccess) {
-        final exception = AdapterException(
-          message:
-              'HTTP ${response.statusCode}: ${response.statusMessage ?? ""}',
-          type: AdapterExceptionType.response,
-          statusCode: response.statusCode,
-          response: response,
-        );
-
-        // 执行错误拦截器
-        var modifiedException = exception;
-        for (final interceptor in _interceptors) {
-          final handler = ErrorInterceptorHandler();
-          interceptor.onError(modifiedException, handler);
-
-          if (handler.resolvedResponse != null) {
-            return handler.resolvedResponse!;
-          }
-          if (handler.modifiedError != null) {
-            modifiedException = handler.modifiedError!;
-          }
-        }
-        throw modifiedException;
-      }
-
-      for (final interceptor in _interceptors) {
-        final handler = ResponseInterceptorHandler();
-        interceptor.onResponse(response, handler);
-
-        if (handler.rejectedError != null) {
-          throw handler.rejectedError!;
-        }
-        if (handler.modifiedResponse != null) {
-          response = handler.modifiedResponse!;
-        }
-      }
-
-      return response;
-    } on AdapterException {
-      rethrow;
-    } catch (e, stackTrace) {
-      var exception = _convertException(e, stackTrace);
-
-      for (final interceptor in _interceptors) {
-        final handler = ErrorInterceptorHandler();
-        interceptor.onError(exception, handler);
-
-        if (handler.resolvedResponse != null) {
-          return handler.resolvedResponse!;
-        }
-        if (handler.modifiedError != null) {
-          exception = handler.modifiedError!;
-        }
-      }
-
-      throw exception;
-    } finally {
-      _unregisterCancelToken(activeCancelToken, completer);
     }
+
+    var retryCount = 0;
+
+    while (true) {
+      final completer = Completer<void>();
+      adapter_cancel.CancelToken? activeCancelToken;
+
+      try {
+        activeCancelToken = currentRequest.cancelToken;
+        if (activeCancelToken != null) {
+          _registerCancelToken(activeCancelToken, completer);
+          if (activeCancelToken.isCancelled) {
+            throw AdapterException(
+              type: AdapterExceptionType.cancel,
+              message: activeCancelToken.cancelReason ?? 'Request cancelled',
+            );
+          }
+        }
+
+        var response = await operation(
+          currentRequest,
+          completer,
+          activeCancelToken,
+        );
+
+        // 响应拦截器（支持同步/异步实现）
+        for (final interceptor in _interceptors) {
+          final handler = ResponseInterceptorHandler();
+          await interceptor.onResponse(response, handler);
+
+          if (handler.rejectedError != null) {
+            throw handler.rejectedError!;
+          }
+          if (handler.modifiedResponse != null) {
+            response = handler.modifiedResponse!;
+          }
+        }
+
+        return response;
+      } on AdapterException catch (e) {
+        final outcome = await _executeErrorInterceptors(e);
+        if (outcome.response != null) {
+          return outcome.response!;
+        }
+        if (outcome.retryRequest != null &&
+            retryCount < kMaxAdapterInterceptorRetries) {
+          retryCount++;
+          currentRequest = outcome.retryRequest!;
+          continue;
+        }
+        throw outcome.error ?? e;
+      } catch (e, stackTrace) {
+        final exception = _convertException(e, stackTrace);
+        final outcome = await _executeErrorInterceptors(exception);
+        if (outcome.response != null) {
+          return outcome.response!;
+        }
+        if (outcome.retryRequest != null &&
+            retryCount < kMaxAdapterInterceptorRetries) {
+          retryCount++;
+          currentRequest = outcome.retryRequest!;
+          continue;
+        }
+        throw outcome.error ?? exception;
+      } finally {
+        _unregisterCancelToken(activeCancelToken, completer);
+      }
+    }
+  }
+
+  /// 执行底层请求（不包含拦截器）
+  Future<AdapterResponse> _performRequest(
+    AdapterRequest request, {
+    required Completer<void> completer,
+    required adapter_cancel.CancelToken? cancelToken,
+  }) async {
+    final effectiveRequest = _baseOptions?.applyToRequest(request) ?? request;
+    final baseRequest = await _buildBaseRequest(effectiveRequest);
+
+    // --- 超时策略 ---
+    // connectTimeout 包裹 send() 阶段（建连 + 获取响应头）
+    // receiveTimeout 包裹 Response.fromStream() 阶段（读取响应体）
+    // sendTimeout 额外约束整个发送阶段
+    var sendFuture = _applySendTimeout(
+      _client.send(baseRequest),
+      effectiveRequest,
+    );
+
+    final streamedResponse = cancelToken != null
+        ? await Future.any<http.StreamedResponse>([
+            sendFuture,
+            completer.future.then((_) => throw AdapterException(
+                  type: AdapterExceptionType.cancel,
+                  message: cancelToken.cancelReason ?? 'Request cancelled',
+                )),
+          ])
+        : await sendFuture;
+
+    // --- receiveDataWhenStatusError 控制 ---
+    // 当状态码表示错误且 receiveDataWhenStatusError 为 false 时，
+    // 不读取响应体以节省带宽
+    final isErrorResponse = streamedResponse.statusCode >= 400;
+    final shouldReadBody = !isErrorResponse ||
+        (_baseOptions?.receiveDataWhenStatusError ?? true);
+
+    var response = effectiveRequest.responseType == ResponseType.stream
+        ? _convertFromHttpStreamedResponse(streamedResponse, effectiveRequest)
+        : _convertFromHttpResponse(
+            shouldReadBody
+                ? await _readResponseWithTimeout(
+                    streamedResponse,
+                    effectiveRequest,
+                  )
+                : http.Response('', streamedResponse.statusCode,
+                    headers: streamedResponse.headers),
+            effectiveRequest,
+          );
+
+    if (!response.isSuccess) {
+      throw AdapterException(
+        message:
+            'HTTP ${response.statusCode}: ${response.statusMessage ?? ""}',
+        type: AdapterExceptionType.response,
+        statusCode: response.statusCode,
+        response: response,
+      );
+    }
+
+    return response;
+  }
+
+  /// 执行错误拦截器
+  Future<_ErrorHandlingResult> _executeErrorInterceptors(
+    AdapterException error,
+  ) async {
+    var currentError = error;
+
+    for (final interceptor in _interceptors) {
+      final handler = ErrorInterceptorHandler();
+      await interceptor.onError(currentError, handler);
+
+      if (handler.resolvedResponse != null) {
+        return _ErrorHandlingResult(response: handler.resolvedResponse);
+      }
+      if (handler.retryRequest != null) {
+        return _ErrorHandlingResult(retryRequest: handler.retryRequest);
+      }
+      if (handler.modifiedError != null) {
+        currentError = handler.modifiedError!;
+      }
+    }
+
+    return _ErrorHandlingResult(error: currentError);
+  }
+
+  /// 应用 connectTimeout / sendTimeout
+  Future<http.StreamedResponse> _applySendTimeout(
+    Future<http.StreamedResponse> future,
+    AdapterRequest request,
+  ) {
+    final connectTimeout = request.connectTimeout ??
+        _baseOptions?.connectTimeout ??
+        AdapterBaseOptions.defaultConnectTimeout;
+
+    var result = future;
+    if (connectTimeout.inMilliseconds > 0) {
+      result = result.timeout(
+        connectTimeout,
+        onTimeout: () => throw AdapterException(
+          type: AdapterExceptionType.connectTimeout,
+          message: 'Connect timeout after ${connectTimeout.inSeconds}s',
+        ),
+      );
+    }
+
+    final sendTimeout = request.sendTimeout ??
+        _baseOptions?.sendTimeout ??
+        AdapterBaseOptions.defaultSendTimeout;
+    if (sendTimeout.inMilliseconds > 0) {
+      result = result.timeout(
+        sendTimeout,
+        onTimeout: () => throw AdapterException(
+          type: AdapterExceptionType.sendTimeout,
+          message: 'Send timeout after ${sendTimeout.inSeconds}s',
+        ),
+      );
+    }
+
+    return result;
   }
 
   String _convertHttpMethod(HttpMethod method) {
@@ -509,6 +604,7 @@ class HttpAdapter implements NetworkAdapter {
 
       final multipartRequest = http.MultipartRequest(method, uri);
       multipartRequest.headers.addAll(headers);
+      _applyRedirectOptions(multipartRequest);
       await _applyMultipartBody(multipartRequest, request);
 
       if (onProgress == null) {
@@ -518,6 +614,7 @@ class HttpAdapter implements NetworkAdapter {
       final streamedRequest = http.StreamedRequest(method, uri);
       streamedRequest.headers.addAll(multipartRequest.headers);
       streamedRequest.contentLength = multipartRequest.contentLength;
+      _applyRedirectOptions(streamedRequest);
       _applyRequestBody(
         streamedRequest,
         multipartRequest.finalize(),
@@ -532,6 +629,7 @@ class HttpAdapter implements NetworkAdapter {
     if (bodyStream != null) {
       final streamedRequest = http.StreamedRequest(method, uri);
       streamedRequest.headers.addAll(headers);
+      _applyRedirectOptions(streamedRequest);
       _applyContentLength(streamedRequest, request, body);
       _applyRequestBody(
         streamedRequest,
@@ -544,6 +642,7 @@ class HttpAdapter implements NetworkAdapter {
 
     final httpRequest = http.Request(method, uri);
     httpRequest.headers.addAll(headers);
+    _applyRedirectOptions(httpRequest);
     _applyRequestBody(
       httpRequest,
       body,
@@ -551,6 +650,12 @@ class HttpAdapter implements NetworkAdapter {
       onProgress: onProgress,
     );
     return httpRequest;
+  }
+
+  /// 应用全局重定向配置（http 包通过 BaseRequest 控制）
+  void _applyRedirectOptions(http.BaseRequest request) {
+    request.followRedirects = _baseOptions?.followRedirects ?? true;
+    request.maxRedirects = _baseOptions?.maxRedirects ?? 5;
   }
 
   Stream<List<int>>? _extractRequestBodyStream(dynamic body) {
@@ -752,14 +857,16 @@ class HttpAdapter implements NetworkAdapter {
   /// 注册取消令牌
   void _registerCancelToken(
       adapter_cancel.CancelToken token, Completer completer) {
-    if (!_pendingRequests.containsKey(token)) {
-      _pendingRequests[token] = [];
-    }
-    _pendingRequests[token]!.add(completer);
+    final pending = _pendingRequests.putIfAbsent(token, () => []);
+    pending.add(completer);
 
-    // 添加取消回调
-    token.whenCancel((reason) {
-      final completers = _pendingRequests[token];
+    // 每个 token 只注册一个回调，避免同一 token 多次请求时回调堆积
+    if (_cancelCallbacks.containsKey(token)) {
+      return;
+    }
+
+    void callback(String? reason) {
+      final completers = _pendingRequests.remove(token);
       if (completers != null) {
         for (final c in completers) {
           if (!c.isCompleted) {
@@ -769,19 +876,30 @@ class HttpAdapter implements NetworkAdapter {
             ));
           }
         }
-        _pendingRequests.remove(token);
       }
-    });
+      // token 取消时会自行清空回调列表，这里只清理映射
+      _cancelCallbacks.remove(token);
+    }
+
+    _cancelCallbacks[token] = callback;
+    token.whenCancel(callback);
   }
 
   /// 注销取消令牌
   void _unregisterCancelToken(
       adapter_cancel.CancelToken? token, Completer completer) {
-    if (token != null && _pendingRequests.containsKey(token)) {
-      _pendingRequests[token]!.remove(completer);
-      if (_pendingRequests[token]!.isEmpty) {
-        _pendingRequests.remove(token);
-      }
+    if (token == null) return;
+
+    final pending = _pendingRequests[token];
+    if (pending == null) return;
+
+    pending.remove(completer);
+    if (pending.isNotEmpty) return;
+
+    _pendingRequests.remove(token);
+    final callback = _cancelCallbacks.remove(token);
+    if (callback != null) {
+      token.removeCallback(callback);
     }
   }
 
@@ -870,14 +988,17 @@ class HttpAdapter implements NetworkAdapter {
   /// 读取响应体，应用 receiveTimeout
   Future<http.Response> _readResponseWithTimeout(
     http.StreamedResponse streamedResponse,
+    AdapterRequest request,
   ) async {
     var responseFuture = http.Response.fromStream(streamedResponse);
-    final receiveTimeout = _baseOptions?.receiveTimeout;
-    if (receiveTimeout != null && receiveTimeout.inMilliseconds > 0) {
+    final receiveTimeout = request.receiveTimeout ??
+        _baseOptions?.receiveTimeout ??
+        AdapterBaseOptions.defaultReceiveTimeout;
+    if (receiveTimeout.inMilliseconds > 0) {
       responseFuture = responseFuture.timeout(
         receiveTimeout,
         onTimeout: () => throw AdapterException(
-          type: AdapterExceptionType.response,
+          type: AdapterExceptionType.receiveTimeout,
           message: 'Receive timeout after ${receiveTimeout.inSeconds}s',
         ),
       );
@@ -921,6 +1042,7 @@ class HttpAdapter implements NetworkAdapter {
       data: data,
       headers: headers,
       request: request,
+      successOverride: _baseOptions?.validateStatus?.call(httpResponse.statusCode),
     );
   }
 
@@ -941,6 +1063,8 @@ class HttpAdapter implements NetworkAdapter {
       request: request,
       isRedirect: streamedResponse.isRedirect,
       redirectUrl: streamedResponse.request?.url.toString(),
+      successOverride: _baseOptions?.validateStatus
+          ?.call(streamedResponse.statusCode),
     );
   }
 
@@ -1034,164 +1158,144 @@ class HttpAdapter implements NetworkAdapter {
     AdapterRequest request,
     String savePath, {
     ProgressCallback? onProgress,
+  }) {
+    return _executeWithInterceptors(
+      request,
+      (currentRequest, completer, cancelToken) => _performDownload(
+        currentRequest,
+        savePath,
+        completer: completer,
+        cancelToken: cancelToken,
+        onProgress: onProgress,
+      ),
+    );
+  }
+
+  Future<AdapterResponse> _performDownload(
+    AdapterRequest request,
+    String savePath, {
+    required Completer<void> completer,
+    required adapter_cancel.CancelToken? cancelToken,
+    ProgressCallback? onProgress,
   }) async {
-    final completer = Completer<void>();
-    try {
-      final baseRequest = await _buildBaseRequest(request);
-      if (request.cancelToken != null) {
-        _registerCancelToken(request.cancelToken!, completer);
-        if (request.cancelToken!.isCancelled) {
-          throw AdapterException.cancel(
-            message: request.cancelToken!.cancelReason,
-          );
-        }
-      }
+    final effectiveRequest = _baseOptions?.applyToRequest(request) ?? request;
+    final baseRequest = await _buildBaseRequest(effectiveRequest);
 
-      var sendFuture = _client.send(baseRequest);
-      final connectTimeout = _baseOptions?.connectTimeout;
-      if (connectTimeout != null && connectTimeout.inMilliseconds > 0) {
-        sendFuture = sendFuture.timeout(
-          connectTimeout,
-          onTimeout: () => throw AdapterException(
-            type: AdapterExceptionType.connectionError,
-            message: 'Connect timeout after ${connectTimeout.inSeconds}s',
-          ),
-        );
-      }
+    var sendFuture = _applySendTimeout(
+      _client.send(baseRequest),
+      effectiveRequest,
+    );
 
-      final streamedResponse = request.cancelToken != null
-          ? await Future.any<http.StreamedResponse>([
-              sendFuture,
-              completer.future.then((_) => throw AdapterException.cancel(
-                    message: request.cancelToken!.cancelReason,
-                  )),
-            ])
-          : await sendFuture;
+    final streamedResponse = cancelToken != null
+        ? await Future.any<http.StreamedResponse>([
+            sendFuture,
+            completer.future.then((_) => throw AdapterException.cancel(
+                  message: cancelToken.cancelReason,
+                )),
+          ])
+        : await sendFuture;
 
-      if (streamedResponse.statusCode >= 400) {
-        throw AdapterException(
-          message: 'HTTP ${streamedResponse.statusCode}',
-          type: AdapterExceptionType.response,
-          statusCode: streamedResponse.statusCode,
-          response: _convertFromHttpStreamedResponse(streamedResponse, request),
-        );
-      }
-
-      if (kIsWeb) {
-        throw AdapterException(
-          message:
-              'File download is not supported on Web platform. Use browser download API instead.',
-          type: AdapterExceptionType.unknown,
-        );
-      }
-
-      final file = File(savePath);
-      if (!file.parent.existsSync()) {
-        file.parent.createSync(recursive: true);
-      }
-      final sink = file.openWrite();
-
-      try {
-        var received = 0;
-        final total = streamedResponse.contentLength ?? -1;
-
-        await for (final chunk in _bindCancelToken(
-          streamedResponse.stream,
-          request.cancelToken,
-        )) {
-          sink.add(chunk);
-          received += chunk.length;
-          onProgress?.call(received, total > 0 ? total : received);
-        }
-      } finally {
-        await sink.flush();
-        await sink.close();
-      }
-
-      final responseHeaders = <String, List<String>>{};
-      streamedResponse.headers.forEach((key, value) {
-        responseHeaders[key] = [value];
-      });
-
-      return AdapterResponse(
+    final response = _convertFromHttpStreamedResponse(
+      streamedResponse,
+      effectiveRequest,
+    );
+    if (!response.isSuccess) {
+      throw AdapterException(
+        message: 'HTTP ${streamedResponse.statusCode}',
+        type: AdapterExceptionType.response,
         statusCode: streamedResponse.statusCode,
-        statusMessage: streamedResponse.reasonPhrase,
-        data: savePath,
-        headers: responseHeaders,
-        request: request,
+        response: response,
       );
-    } catch (e, stackTrace) {
-      if (e is AdapterException) {
-        rethrow;
-      }
-      throw _convertException(e, stackTrace);
-    } finally {
-      _unregisterCancelToken(request.cancelToken, completer);
     }
+
+    if (kIsWeb) {
+      throw AdapterException(
+        message:
+            'File download is not supported on Web platform. Use browser download API instead.',
+        type: AdapterExceptionType.unknown,
+      );
+    }
+
+    final file = File(savePath);
+    if (!file.parent.existsSync()) {
+      file.parent.createSync(recursive: true);
+    }
+    final sink = file.openWrite();
+
+    try {
+      var received = 0;
+      final total = streamedResponse.contentLength ?? -1;
+
+      await for (final chunk in _bindCancelToken(
+        streamedResponse.stream,
+        cancelToken,
+      )) {
+        sink.add(chunk);
+        received += chunk.length;
+        onProgress?.call(received, total > 0 ? total : received);
+      }
+    } finally {
+      await sink.flush();
+      await sink.close();
+    }
+
+    return AdapterResponse(
+      statusCode: streamedResponse.statusCode,
+      statusMessage: streamedResponse.reasonPhrase,
+      data: savePath,
+      headers: response.headers,
+      request: effectiveRequest,
+      successOverride: response.successOverride,
+    );
   }
 
   @override
   Future<AdapterResponse> upload(
     AdapterRequest request, {
     ProgressCallback? onProgress,
-  }) async {
-    final completer = Completer<void>();
-    try {
-      final baseRequest = await _buildBaseRequest(
-        request,
+  }) {
+    return _executeWithInterceptors(
+      request,
+      (currentRequest, completer, cancelToken) => _performUpload(
+        currentRequest,
+        completer: completer,
+        cancelToken: cancelToken,
         onProgress: onProgress,
+      ),
+    );
+  }
+
+  Future<AdapterResponse> _performUpload(
+    AdapterRequest request, {
+    required Completer<void> completer,
+    required adapter_cancel.CancelToken? cancelToken,
+    ProgressCallback? onProgress,
+  }) async {
+    final effectiveRequest = _baseOptions?.applyToRequest(request) ?? request;
+    final baseRequest = await _buildBaseRequest(
+      effectiveRequest,
+      onProgress: onProgress,
+    );
+
+    var sendFuture = _applySendTimeout(
+      _client.send(baseRequest),
+      effectiveRequest,
+    );
+
+    final streamedResponse = cancelToken != null
+        ? await Future.any<http.StreamedResponse>([
+            sendFuture,
+            completer.future.then((_) => throw AdapterException.cancel(
+                  message: cancelToken.cancelReason,
+                )),
+          ])
+        : await sendFuture;
+
+    if (effectiveRequest.responseType == ResponseType.stream) {
+      final response = _convertFromHttpStreamedResponse(
+        streamedResponse,
+        effectiveRequest,
       );
-      if (request.cancelToken != null) {
-        _registerCancelToken(request.cancelToken!, completer);
-        if (request.cancelToken!.isCancelled) {
-          throw AdapterException.cancel(
-            message: request.cancelToken!.cancelReason,
-          );
-        }
-      }
-
-      var sendFuture = _client.send(baseRequest);
-      final connectTimeout = _baseOptions?.connectTimeout;
-      if (connectTimeout != null && connectTimeout.inMilliseconds > 0) {
-        sendFuture = sendFuture.timeout(
-          connectTimeout,
-          onTimeout: () => throw AdapterException(
-            type: AdapterExceptionType.connectionError,
-            message: 'Connect timeout after ${connectTimeout.inSeconds}s',
-          ),
-        );
-      }
-
-      final streamedResponse = request.cancelToken != null
-          ? await Future.any<http.StreamedResponse>([
-              sendFuture,
-              completer.future.then((_) => throw AdapterException.cancel(
-                    message: request.cancelToken!.cancelReason,
-                  )),
-            ])
-          : await sendFuture;
-
-      if (request.responseType == ResponseType.stream) {
-        final response = _convertFromHttpStreamedResponse(
-          streamedResponse,
-          request,
-        );
-        if (!response.isSuccess) {
-          throw AdapterException(
-            message: 'HTTP ${response.statusCode}',
-            type: AdapterExceptionType.response,
-            statusCode: response.statusCode,
-            response: response,
-          );
-        }
-        return response;
-      }
-
-      final response = _convertFromHttpResponse(
-        await _readResponseWithTimeout(streamedResponse),
-        request,
-      );
-
       if (!response.isSuccess) {
         throw AdapterException(
           message: 'HTTP ${response.statusCode}',
@@ -1200,21 +1304,37 @@ class HttpAdapter implements NetworkAdapter {
           response: response,
         );
       }
-
       return response;
-    } catch (e, stackTrace) {
-      if (e is AdapterException) {
-        rethrow;
-      }
-      throw _convertException(e, stackTrace);
-    } finally {
-      _unregisterCancelToken(request.cancelToken, completer);
     }
+
+    final response = _convertFromHttpResponse(
+      await _readResponseWithTimeout(streamedResponse, effectiveRequest),
+      effectiveRequest,
+    );
+
+    if (!response.isSuccess) {
+      throw AdapterException(
+        message: 'HTTP ${response.statusCode}',
+        type: AdapterExceptionType.response,
+        statusCode: response.statusCode,
+        response: response,
+      );
+    }
+
+    return response;
   }
 
   @override
   void cancel(adapter_cancel.CancelToken token) {
     token.cancel();
+  }
+
+  @override
+  Future<void> close() async {
+    _interceptors.clear();
+    _pendingRequests.clear();
+    _cancelCallbacks.clear();
+    _client.close();
   }
 
   @override
@@ -1226,4 +1346,16 @@ class HttpAdapter implements NetworkAdapter {
   void removeInterceptor(AdapterInterceptor interceptor) {
     _interceptors.remove(interceptor);
   }
+}
+/// 错误拦截器处理结果
+class _ErrorHandlingResult {
+  final AdapterException? error;
+  final AdapterResponse? response;
+  final AdapterRequest? retryRequest;
+
+  const _ErrorHandlingResult({
+    this.error,
+    this.response,
+    this.retryRequest,
+  });
 }

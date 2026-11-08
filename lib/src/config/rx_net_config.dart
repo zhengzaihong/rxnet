@@ -121,7 +121,7 @@ class RxNetConfig {
     this.cacheMode = CacheMode.ONLY_REQUEST,
     this.interceptors,
     this.systemLog = false,
-    this.isDebug = true,
+    this.isDebug = false,
     this.baseCheckNet,
     this.ignoreCacheKeys,
     this.baseUrlEnv,
@@ -155,24 +155,41 @@ class RxNetConfig {
     CacheEvictionPolicy? cacheEvictionPolicy,
     double? debugWindowWidth,
     double? debugWindowHeight,
+    bool clearAdapter = false,
+    bool clearAdapterBaseOptions = false,
+    bool clearCachePath = false,
+    bool clearInterceptors = false,
+    bool clearBaseCheckNet = false,
+    bool clearIgnoreCacheKeys = false,
+    bool clearBaseUrlEnv = false,
   }) {
     return RxNetConfig(
       baseUrl: baseUrl ?? this.baseUrl,
-      adapter: adapter ?? this.adapter,
-      adapterBaseOptions: adapterBaseOptions ?? this.adapterBaseOptions,
-      cachePath: cachePath ?? this.cachePath,
+      adapter: clearAdapter ? null : (adapter ?? this.adapter),
+      adapterBaseOptions: clearAdapterBaseOptions
+          ? null
+          : (adapterBaseOptions ?? this.adapterBaseOptions),
+      cachePath: clearCachePath ? null : (cachePath ?? this.cachePath),
       cacheName: cacheName ?? this.cacheName,
       databaseName: databaseName ?? this.databaseName,
       cacheMode: cacheMode ?? this.cacheMode,
-      interceptors: interceptors ?? this.interceptors,
+      interceptors:
+          clearInterceptors ? null : (interceptors ?? this.interceptors),
       systemLog: systemLog ?? this.systemLog,
       isDebug: isDebug ?? this.isDebug,
-      baseCheckNet: baseCheckNet ?? this.baseCheckNet,
-      ignoreCacheKeys: ignoreCacheKeys ?? this.ignoreCacheKeys,
-      baseUrlEnv: baseUrlEnv ?? this.baseUrlEnv,
-      cacheInvalidationTime: cacheInvalidationTime ?? this.cacheInvalidationTime,
+      baseCheckNet: clearBaseCheckNet
+          ? null
+          : (baseCheckNet ?? this.baseCheckNet),
+      ignoreCacheKeys: clearIgnoreCacheKeys
+          ? null
+          : (ignoreCacheKeys ?? this.ignoreCacheKeys),
+      baseUrlEnv:
+          clearBaseUrlEnv ? null : (baseUrlEnv ?? this.baseUrlEnv),
+      cacheInvalidationTime:
+          cacheInvalidationTime ?? this.cacheInvalidationTime,
       cacheMaxSize: cacheMaxSize ?? this.cacheMaxSize,
-      cacheEvictionPolicy: cacheEvictionPolicy ?? this.cacheEvictionPolicy,
+      cacheEvictionPolicy:
+          cacheEvictionPolicy ?? this.cacheEvictionPolicy,
       debugWindowWidth: debugWindowWidth ?? this.debugWindowWidth,
       debugWindowHeight: debugWindowHeight ?? this.debugWindowHeight,
     );
@@ -207,7 +224,7 @@ class RxNetConfigBuilder {
   CacheMode _cacheMode = CacheMode.ONLY_REQUEST;
   final List<AdapterInterceptor> _interceptors = [];
   bool _systemLog = false;
-  bool _isDebug = true;
+  bool _isDebug = false;
   CheckNetWork? _baseCheckNet;
   List<String>? _ignoreCacheKeys;
   Map<String, dynamic>? _baseUrlEnv;

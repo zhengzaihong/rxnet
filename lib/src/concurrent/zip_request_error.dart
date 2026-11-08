@@ -3,8 +3,9 @@
 /// date:2026-06-02 11:28
 /// describe:带有上下文的请求错误包装器
 /// Wrapper for request errors with context
+library;
 
-class ZipRequestError {
+class ZipRequestError implements Exception {
   final int index;
   final String? tag;
   final dynamic error;

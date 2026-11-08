@@ -15,7 +15,7 @@ class DeduplicateInterceptor extends AdapterInterceptor {
   /// 自定义去重 key 生成器
   final String Function(AdapterRequest request)? keyBuilder;
 
-  final Map<String, Completer<void>> _pendingRequests = {};
+  final Set<String> _pendingRequests = {};
   final Map<String, Timer> _timers = {};
 
   DeduplicateInterceptor({
@@ -27,7 +27,7 @@ class DeduplicateInterceptor extends AdapterInterceptor {
   void onRequest(AdapterRequest request, RequestInterceptorHandler handler) {
     final key = _generateKey(request);
 
-    if (_pendingRequests.containsKey(key) && _timers.containsKey(key)) {
+    if (_pendingRequests.contains(key) && _timers.containsKey(key)) {
       handler.reject(AdapterException(
         message: 'Duplicate request blocked: $key',
         type: AdapterExceptionType.cancel,
@@ -36,7 +36,7 @@ class DeduplicateInterceptor extends AdapterInterceptor {
       return;
     }
 
-    _pendingRequests[key] = Completer<void>();
+    _pendingRequests.add(key);
     _timers[key]?.cancel();
     _timers[key] = Timer(duration, () {
       _cleanup(key);
@@ -59,10 +59,18 @@ class DeduplicateInterceptor extends AdapterInterceptor {
     if (keyBuilder != null) {
       return keyBuilder!(request);
     }
-    final params = request.queryParams.entries
-        .map((e) => '${e.key}=${e.value}')
-        .join('&');
+    final params = [
+      _mapSignature(request.queryParams),
+      _mapSignature(request.pathParams),
+      _mapSignature(request.bodyParams),
+    ].join('|');
     return '${request.method.name}|${request.baseUrl}|${request.path}|$params';
+  }
+
+  /// 按 key 排序生成稳定的参数签名
+  String _mapSignature(Map<String, dynamic> map) {
+    final keys = map.keys.map((key) => key.toString()).toList()..sort();
+    return keys.map((key) => '$key=${map[key]}').join('&');
   }
 
   void _cleanup(String key) {

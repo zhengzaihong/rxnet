@@ -848,19 +848,15 @@ await RxNet.init(config: RxNetConfig(
 
 ```dart
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:http/io_client.dart';
 
 IOClient createPinnedClient() {
   final httpClient = HttpClient();
   httpClient.badCertificateCallback = (X509Certificate cert, String host, int port) {
-    // 在此处实现证书验证逻辑
-    // 例如：验证证书指纹
-    // final der = cert.der;
-    // final sha256Hash = sha256Convert(der);
-    // const trustedFingerprint = "YOUR_SHA256_FINGERPRINT";
-    // return sha256Hash == trustedFingerprint;
-
-    return true; // 仅测试用，生产环境请正确验证
+    // 生产环境必须校验固定证书指纹，绝不能直接 return true
+    final fingerprint = sha256.convert(cert.der).toString();
+    return fingerprint == 'YOUR_CERT_SHA256_FINGERPRINT';
   };
   return IOClient(httpClient);
 }

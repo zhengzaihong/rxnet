@@ -2,7 +2,7 @@
 /// 
 /// This library provides utilities for executing multiple callback-based
 /// network requests concurrently with type-safe result aggregation.
-library concurrent;
+library;
 
 export 'zip_request.dart';
 export 'zip_results.dart';

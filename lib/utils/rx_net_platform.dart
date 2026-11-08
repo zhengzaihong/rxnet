@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'platform_web_stub.dart'
+    if (dart.library.io) 'dart:io';
 import 'package:flutter/foundation.dart';
 
 ///
@@ -26,19 +27,19 @@ class RxNetPlatform {
   static bool _isLinux() => _isWeb() ? false : Platform.isLinux;
 
   static bool _isHarmonyOS() {
-    if (_isWeb() ||
-        _isAndroid() ||
-        _isIOS() ||
-        _isMacOS() ||
-        _isWindows() ||
-        _isFuchsia() ||
-        _isLinux()) {
+    if (_isWeb()) {
       return false;
     }
-    return true;
+    final os = Platform.operatingSystem.toLowerCase();
+    return os == 'ohos' || os == 'harmonyos';
   }
 
-  static bool get isAndroid_IOS_HarmonyOS => _isAndroid() || _isIOS() || _isHarmonyOS();
+  static bool get isAndroidIosHarmonyOs =>
+      _isAndroid() || _isIOS() || _isHarmonyOS();
+
+  @Deprecated('Use isAndroidIosHarmonyOs instead.')
+  // ignore: non_constant_identifier_names
+  static bool get isAndroid_IOS_HarmonyOS => isAndroidIosHarmonyOs;
 
   static bool get isWeb => _isWeb();
 

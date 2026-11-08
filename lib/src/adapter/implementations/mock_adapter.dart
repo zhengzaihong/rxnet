@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:rxnet_plus/src/adapter/models/adapter_base_options.dart';
 import '../network_adapter.dart';
+import '../closable_network_adapter.dart';
 import '../models/adapter_request.dart';
 import '../models/adapter_response.dart';
 import '../interceptor/adapter_interceptor.dart';
@@ -10,11 +11,12 @@ import '../cancel_token.dart';
 /// Mock 适配器实现
 /// 
 /// 用于测试的模拟适配器，可以配置模拟响应、错误和延迟
-class MockAdapter implements NetworkAdapter {
+class MockAdapter implements NetworkAdapter, ClosableNetworkAdapter {
   final Map<String, _MockConfig> _mockConfigs = {};
   final List<AdapterRequest> _requestHistory = [];
   final List<AdapterInterceptor> _interceptors = [];
   final Map<CancelToken, List<Completer>> _pendingRequests = {};
+  final Map<CancelToken, void Function(String?)> _cancelCallbacks = {};
   
   @override
   String get name => 'MockAdapter';
@@ -89,11 +91,11 @@ class MockAdapter implements NetworkAdapter {
       }
     }
     
-    // 执行请求拦截器
+    // 执行请求拦截器（支持同步/异步实现）
     var modifiedRequest = request;
     for (final interceptor in _interceptors) {
       final handler = RequestInterceptorHandler();
-       interceptor.onRequest(modifiedRequest, handler);
+      await interceptor.onRequest(modifiedRequest, handler);
       
       if (handler.resolvedResponse != null) {
         _unregisterCancelToken(request.cancelToken, completer);
@@ -107,69 +109,86 @@ class MockAdapter implements NetworkAdapter {
         modifiedRequest = handler.modifiedRequest!;
       }
     }
-    
-    // 获取模拟配置
-    final config = _mockConfigs[modifiedRequest.path];
-    
-    // 应用延迟
-    if (config?.delay != null) {
-      try {
-        await Future.any([
-          Future.delayed(config!.delay!),
-          completer.future,
-        ]);
-        
-        // 检查是否被取消
-        if (completer.isCompleted) {
-          throw await completer.future;
+
+    var currentRequest = modifiedRequest;
+    var retryCount = 0;
+
+    try {
+      while (true) {
+        // 获取模拟配置
+        final config = _mockConfigs[currentRequest.path];
+
+        // 应用延迟
+        if (config?.delay != null) {
+          try {
+            await Future.any([
+              Future.delayed(config!.delay!),
+              completer.future,
+            ]);
+
+            // 检查是否被取消
+            if (completer.isCompleted) {
+              throw await completer.future;
+            }
+          } catch (e) {
+            rethrow;
+          }
         }
-      } catch (e) {
-        _unregisterCancelToken(request.cancelToken, completer);
-        rethrow;
+
+        // 如果配置了错误，抛出错误
+        if (config?.error != null) {
+          var error = config!.error!;
+          AdapterRequest? retryRequest;
+
+          // 执行错误拦截器（支持同步/异步实现）
+          for (final interceptor in _interceptors) {
+            final handler = ErrorInterceptorHandler();
+            await interceptor.onError(error, handler);
+
+            if (handler.resolvedResponse != null) {
+              return handler.resolvedResponse!;
+            }
+            if (handler.retryRequest != null) {
+              retryRequest = handler.retryRequest;
+              break;
+            }
+            if (handler.modifiedError != null) {
+              error = handler.modifiedError!;
+            }
+          }
+
+          if (retryRequest != null &&
+              retryCount < kMaxAdapterInterceptorRetries) {
+            retryCount++;
+            currentRequest = retryRequest;
+            continue;
+          }
+
+          throw error;
+        }
+
+        // 返回模拟响应
+        var response =
+            config?.response ?? _createDefaultResponse(currentRequest);
+
+        // 执行响应拦截器（支持同步/异步实现）
+        for (final interceptor in _interceptors) {
+          final handler = ResponseInterceptorHandler();
+          await interceptor.onResponse(response, handler);
+
+          if (handler.rejectedError != null) {
+            throw handler.rejectedError!;
+          }
+          if (handler.modifiedResponse != null) {
+            response = handler.modifiedResponse!;
+          }
+        }
+
+        return response;
       }
-    }
-    
-    // 如果配置了错误，抛出错误
-    if (config?.error != null) {
-      var error = config!.error!;
-      
-      // 执行错误拦截器
-      for (final interceptor in _interceptors) {
-        final handler = ErrorInterceptorHandler();
-         interceptor.onError(error, handler);
-        
-        if (handler.resolvedResponse != null) {
-          _unregisterCancelToken(request.cancelToken, completer);
-          return handler.resolvedResponse!;
-        }
-        if (handler.modifiedError != null) {
-          error = handler.modifiedError!;
-        }
-      }
-      
+    } finally {
       _unregisterCancelToken(request.cancelToken, completer);
-      throw error;
     }
-    
-    // 返回模拟响应
-    var response = config?.response ?? _createDefaultResponse(modifiedRequest);
-    
-    // 执行响应拦截器
-    for (final interceptor in _interceptors) {
-      final handler = ResponseInterceptorHandler();
-       interceptor.onResponse(response, handler);
-      
-      if (handler.rejectedError != null) {
-        _unregisterCancelToken(request.cancelToken, completer);
-        throw handler.rejectedError!;
-      }
-      if (handler.modifiedResponse != null) {
-        response = handler.modifiedResponse!;
-      }
-    }
-    
-    _unregisterCancelToken(request.cancelToken, completer);
-    return response;
   }
   
   @override
@@ -321,14 +340,15 @@ class MockAdapter implements NetworkAdapter {
   
   /// 注册取消令牌
   void _registerCancelToken(CancelToken token, Completer completer) {
-    if (!_pendingRequests.containsKey(token)) {
-      _pendingRequests[token] = [];
+    final pending = _pendingRequests.putIfAbsent(token, () => []);
+    pending.add(completer);
+
+    if (_cancelCallbacks.containsKey(token)) {
+      return;
     }
-    _pendingRequests[token]!.add(completer);
-    
-    // 添加取消回调
-    token.whenCancel((reason) {
-      final completers = _pendingRequests[token];
+
+    void callback(String? reason) {
+      final completers = _pendingRequests.remove(token);
       if (completers != null) {
         for (final c in completers) {
           if (!c.isCompleted) {
@@ -338,21 +358,40 @@ class MockAdapter implements NetworkAdapter {
             ));
           }
         }
-        _pendingRequests.remove(token);
       }
-    });
+      _cancelCallbacks.remove(token);
+    }
+
+    _cancelCallbacks[token] = callback;
+    token.whenCancel(callback);
   }
   
   /// 注销取消令牌
   void _unregisterCancelToken(CancelToken? token, Completer completer) {
-    if (token != null && _pendingRequests.containsKey(token)) {
-      _pendingRequests[token]!.remove(completer);
-      if (_pendingRequests[token]!.isEmpty) {
-        _pendingRequests.remove(token);
-      }
+    if (token == null) return;
+
+    final pending = _pendingRequests[token];
+    if (pending == null) return;
+
+    pending.remove(completer);
+    if (pending.isNotEmpty) return;
+
+    _pendingRequests.remove(token);
+    final callback = _cancelCallbacks.remove(token);
+    if (callback != null) {
+      token.removeCallback(callback);
     }
   }
   
+  @override
+  Future<void> close() async {
+    _interceptors.clear();
+    _mockConfigs.clear();
+    _requestHistory.clear();
+    _pendingRequests.clear();
+    _cancelCallbacks.clear();
+  }
+
   @override
   void addInterceptor(AdapterInterceptor interceptor) {
     _interceptors.add(interceptor);

@@ -1,7 +1,9 @@
 import 'dart:convert';
-import 'dart:io' if (dart.library.html) '../../adapter/implementations/http_adapter_web_stub.dart';
+import '../../adapter/implementations/http_adapter_web_stub.dart'
+    if (dart.library.io) 'dart:io';
 import 'package:dio/dio.dart' as dio_show show MultipartFile;
 import '../../../rxnet_lib.dart';
+import '../../../utils/log_redactor.dart';
 
 ///
 /// author: ZhengZaiHong
@@ -27,6 +29,7 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
     this.responseHeader = true,
     this.responseBody = true,
     this.error = true,
+    this.logSensitiveData = false,
     this.logPrint = log2Console,
   });
 
@@ -51,6 +54,9 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
   /// 日志打印函数
   final void Function(Object object) logPrint;
 
+  /// 是否输出敏感字段原文（默认 false，Authorization/Cookie/密码等会被脱敏）
+  final bool logSensitiveData;
+
   final Map<String, DateTime> _requestMaps = {};
 
   @override
@@ -61,9 +67,12 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
     logPrint('***************** Request Start *****************');
     
     final uri = request.buildFullUrl();
+    if (_requestMaps.length >= 200) {
+      _requestMaps.remove(_requestMaps.keys.first);
+    }
     _requestMaps[uri] = DateTime.now();
     
-    printKV('Request uri start', uri);
+    printKV('Request uri start', LogRedactor.redactUrl(uri));
     
     if (this.request) {
       printKV('method', request.method.toString());
@@ -71,12 +80,16 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
       printKV('connectTimeout', request.connectTimeout?.inMicroseconds ?? "");
       printKV('receiveTimeout', request.receiveTimeout?.inMicroseconds ?? "");
       printKV('sendTimeout', request.sendTimeout?.inMicroseconds ?? "");
-      printKV('extra', request.extra);
+      printKV('extra',
+          logSensitiveData ? request.extra : LogRedactor.toSafeJson(request.extra));
     }
     
     if (requestHeader) {
       logPrint('Request Headers:');
-      printAll(jsonEncode(request.headers));
+      final headers = logSensitiveData
+          ? request.headers
+          : LogRedactor.redactHeaders(request.headers);
+      printAll(jsonEncode(headers));
     }
     
     if (requestBody) {
@@ -92,9 +105,13 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
     
     if (request.queryParams.isNotEmpty) {
       logPrint("queryParams:");
-      printAll(jsonEncode(request.queryParams));
+      printAll(
+        logSensitiveData
+            ? jsonEncode(request.queryParams)
+            : LogRedactor.toSafeJson(request.queryParams),
+      );
     }
-    printKV('Request uri end', uri);
+    printKV('Request uri end', LogRedactor.redactUrl(uri));
     logPrint('***************** Request End *****************');
     
     // 继续请求
@@ -109,6 +126,7 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
     logPrint("***************** Response Start *****************");
     
     _printResponse(response);
+    _requestMaps.remove(response.request.buildFullUrl());
     
     // 继续响应
     handler.next(response);
@@ -127,6 +145,10 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
       
       if (error.response != null) {
         _printResponse(error.response!);
+        _requestMaps.remove(error.response!.request.buildFullUrl());
+      } else if (_requestMaps.isNotEmpty) {
+        // 没有 response 时按最旧记录清理，避免异常路径导致 Map 持续增长
+        _requestMaps.remove(_requestMaps.keys.first);
       }
       
       if (error.originalError != null) {
@@ -142,7 +164,7 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
 
   void _printResponse(AdapterResponse response) {
     final uri = response.request.buildFullUrl();
-    logPrint('Response url start: $uri');
+    logPrint('Response url start: ${LogRedactor.redactUrl(uri)}');
     if (responseHeader) {
       printKV('statusCode', response.statusCode);
       printKV('statusMessage', response.statusMessage ?? "");
@@ -154,7 +176,10 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
       if (response.headers.isNotEmpty) {
         logPrint("Response Headers:");
         response.headers.forEach((key, values) {
-          printKV(" $key", values.join(","));
+          final value = logSensitiveData || !LogRedactor.isSensitiveKey(key)
+              ? values.join(",")
+              : LogRedactor.mask;
+          printKV(" $key", value);
         });
       }
     }
@@ -162,7 +187,11 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
     if (responseBody) {
       logPrint("Response Data:");
       try {
-        printAll(jsonEncode(response.data));
+        printAll(
+          logSensitiveData
+              ? jsonEncode(response.data)
+              : LogRedactor.toSafeJson(response.data),
+        );
       } catch (e) {
         printAll(response.data.toString());
       }
@@ -174,7 +203,7 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
     Duration duration = responseTime.difference(oldTime);
     
     logPrint('useTime:${duration.inMinutes}分 | ${duration.inSeconds}秒 | ${duration.inMilliseconds}毫秒');
-    logPrint('Response url end: $uri');
+    logPrint('Response url end: ${LogRedactor.redactUrl(uri)}');
     
     logPrint("***************** Response End *****************");
   }
@@ -207,12 +236,18 @@ class RxNetLogAdapterInterceptor implements AdapterInterceptor {
             safeBody[key] = value;
           }
         });
-        printAll(jsonEncode(safeBody));
+        printAll(
+          logSensitiveData
+              ? jsonEncode(safeBody)
+              : LogRedactor.toSafeJson(safeBody),
+        );
       } else if (_isFileType(body)) {
         printAll("[File: ${_getFileDescription(body)}]");
       } else {
-        // 尝试 JSON 编码
-        printAll(jsonEncode(body));
+        // 尝试 JSON 编码；默认对敏感字段脱敏
+        printAll(
+          logSensitiveData ? jsonEncode(body) : LogRedactor.toSafeJson(body),
+        );
       }
     } catch (e) {
       // 如果 JSON 编码失败，使用 toString

@@ -7,6 +7,7 @@ import 'package:rxnet_plus/rxnet_lib.dart';
 import '../logcat/debug_manager.dart';
 import '../logcat/log_manager.dart';
 import '../utils/rx_net_database.dart';
+import 'adapter/closable_network_adapter.dart';
 import 'concurrent/zip_request_impl.dart' as zip_impl;
 
 /// author: ZhengZaiHong
@@ -133,8 +134,22 @@ import 'concurrent/zip_request_impl.dart' as zip_impl;
 ///
 /// ```dart
 /// final results = await RxNet.zipRequest([
-///   ZipRequest<UserInfo>(request: () async => getUser(), tag: 'user'),
-///   ZipRequest<UserSettings>(request: () async => getSettings(), tag: 'settings'),
+///   ZipRequest<UserInfo>(
+///     request: ({success, failure, completed}) => getUser(
+///       success: success,
+///       failure: failure,
+///       completed: completed,
+///     ),
+///     tag: 'user',
+///   ),
+///   ZipRequest<UserSettings>(
+///     request: ({success, failure, completed}) => getSettings(
+///       success: success,
+///       failure: failure,
+///       completed: completed,
+///     ),
+///     tag: 'settings',
+///   ),
 /// ]);
 /// ```
 ///
@@ -149,11 +164,26 @@ class RxNet {
   NetworkAdapter? get adapter => _adapter;
 
   RxNetConfig? _rxNetConfig;
-  String get baseUrl => _rxNetConfig!.baseUrl;
+
+  /// 当前生效的 baseUrl（可能通过 [setEnv] / [setDefaultEnv] 切换）
+  String? _activeBaseUrl;
+
+  String get baseUrl {
+    final config = _rxNetConfig;
+    if (config == null) {
+      throw StateError(
+        'RxNet has not been initialized. Call RxNet.init() first.',
+      );
+    }
+    return _activeBaseUrl ?? config.baseUrl;
+  }
 
   // 数据库实例 - 直接使用 RxNetDataBase
   // Database instance - directly use RxNetDataBase
   RxNetDataBase? _database;
+
+  bool _isInitialized = false;
+  final Set<AdapterInterceptor> _appliedInterceptors = {};
 
   //全局请求头
   //global request header
@@ -196,14 +226,26 @@ class RxNet {
   }
 
   Future<void> initNet({required RxNetConfig config}) async {
+    // 相同配置重复初始化直接复用，避免重复添加拦截器/重建数据库
+    if (_isInitialized && identical(_rxNetConfig, config)) {
+      return;
+    }
+
+    // 重新初始化前释放旧实例资源
+    if (_isInitialized) {
+      await _releaseRuntime();
+    }
+
     LogUtil.init(systemLog: config.systemLog,debug: config.isDebug);
     _rxNetConfig = config;
+    _activeBaseUrl = config.baseUrl;
     debugWindow = ValueNotifier(Size(config.debugWindowWidth, config.debugWindowHeight));
 
     // 如果提供了自定义适配器，使用它；否则使用默认的 DioAdapter
     // If custom adapter provided, use it; otherwise use default DioAdapter
-    if (adapter != null) {
-      _adapter = adapter;
+    final configuredAdapter = config.adapter;
+    if (configuredAdapter != null) {
+      _adapter = configuredAdapter;
     } else {
       _adapter ??= DioAdapter();
     }
@@ -213,23 +255,71 @@ class RxNet {
     // 设置 baseUrl（所有适配器统一处理）
     _adapter?.setBaseUrl(baseUrl);
 
-    // 添加适配器拦截器（适用于所有适配器）
-    if (config.interceptors != null && config.interceptors!.isNotEmpty) {
-      for (var interceptor in config.interceptors!) {
-        _adapter?.addInterceptor(interceptor);
-      }
-    }
+    // 同步适配器拦截器，避免重复 init 时重复添加
+    _syncInterceptors(_adapter!, config.interceptors ?? const []);
     _database = RxNetDataBase();
+    // 先绑定数据库引用，确保 init 期间的缓存操作也能通过 cacheManager 访问
+    cacheManager.setDatabase(_database!);
     await _database!.init(
       databasePath: config.cachePath,
       databaseName: config.databaseName,
       cacheName: config.cacheName,
     );
-    // 立即绑定数据库引用，确保 init 期间的缓存操作也能通过 cacheManager 访问
-    cacheManager.setDatabase(_database!);
     cacheManager.setCacheInvalidationTime(config.cacheInvalidationTime);
     cacheManager.setMaxCacheSize(config.cacheMaxSize);
     cacheManager.setEvictionPolicy(config.cacheEvictionPolicy);
+    _isInitialized = true;
+  }
+
+  /// 同步配置中的拦截器，移除上一次 init 添加的拦截器，避免重复
+  void _syncInterceptors(
+    NetworkAdapter adapter,
+    List<AdapterInterceptor> interceptors,
+  ) {
+    for (final interceptor in _appliedInterceptors) {
+      adapter.removeInterceptor(interceptor);
+    }
+    _appliedInterceptors.clear();
+
+    for (final interceptor in interceptors) {
+      adapter.addInterceptor(interceptor);
+      _appliedInterceptors.add(interceptor);
+    }
+  }
+
+  /// 释放当前实例的运行资源（数据库、拦截器、可选适配器）
+  Future<void> _releaseRuntime({bool closeAdapter = false}) async {
+    if (closeAdapter) {
+      final adapter = _adapter;
+      if (adapter is ClosableNetworkAdapter) {
+        await (adapter as ClosableNetworkAdapter).close();
+      }
+    } else {
+      for (final interceptor in _appliedInterceptors) {
+        _adapter?.removeInterceptor(interceptor);
+      }
+    }
+
+    _appliedInterceptors.clear();
+    await _database?.closeInstance();
+    _database = null;
+    cacheManager.detachDatabase();
+    _isInitialized = false;
+  }
+
+  /// 释放全局单例资源（Dio/http client、数据库、拦截器）
+  static Future<void> dispose() => I.disposeInstance();
+
+  /// 释放当前实例资源，可在重新初始化或应用退出时调用
+  Future<void> disposeInstance() async {
+    await _releaseRuntime(closeAdapter: true);
+    _adapter = null;
+    _rxNetConfig = null;
+    _activeBaseUrl = null;
+    _globalHeader = {};
+    logManager.setCollectLogs(false);
+    logManager.clearLogs();
+    LogUtil.init(debug: false);
   }
 
   NetworkAdapter? getAdapter() => _adapter;
@@ -244,17 +334,16 @@ class RxNet {
   //支持多环境 baseUrl调试， RxNet.I.setEnv("test")方式切换;
   //Support multi-environment baseUrl debugging and switch between RxNet.I.setEnv("test")/RxNet.setDefaultEnv("test") methods;
   static void setDefaultEnv(String env) {
-    final baseUrl = I._rxNetConfig?.baseUrlEnv?[env];
-    if (baseUrl != null) {
-      I._adapter?.setBaseUrl(baseUrl);
-    }
+    I.setEnv(env);
   }
 
   void setEnv(String env) {
-    final baseUrl = _rxNetConfig?.baseUrlEnv?[env];
-    if (baseUrl != null) {
-      _adapter?.setBaseUrl(baseUrl);
+    final baseUrl = _rxNetConfig?.baseUrlEnv?[env]?.toString();
+    if (baseUrl == null || baseUrl.isEmpty) {
+      return;
     }
+    _activeBaseUrl = baseUrl;
+    _adapter?.setBaseUrl(baseUrl);
   }
 
   // ---- 提供的静态实例，用于全局使用，非多实例使用 ----
@@ -339,8 +428,8 @@ class RxNet {
   /// Instance method for executing concurrent requests with multi-instance support.
   /// 
   /// final results = await userService.zipRequestInstance([
-  ///   ZipRequest<UserInfo>(request: getUserAsync, tag: 'user'),
-  ///   ZipRequest<UserSettings>(request: getSettingsAsync, tag: 'settings'),
+  ///   `ZipRequest<UserInfo>`(request: getUserAsync, tag: 'user'),
+  ///   `ZipRequest<UserSettings>`(request: getSettingsAsync, tag: 'settings'),
   /// ]);
   /// Parameters:
   /// - [requests]: List of [ZipRequest] instances to execute

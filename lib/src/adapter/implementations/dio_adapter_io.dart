@@ -4,10 +4,16 @@
 
 import 'package:dio/dio.dart';
 
+import '../models/adapter_base_options.dart';
+
 /// 创建配置好的 Dio 实例（IO 平台）
 /// Create configured Dio instance (IO platforms)
 Dio createConfiguredDio() {
   // IO 平台：Dio 会自动使用 IOHttpClientAdapter
   // IO platforms: Dio will automatically use IOHttpClientAdapter
-  return Dio(BaseOptions());
+  return Dio(BaseOptions(
+    connectTimeout: AdapterBaseOptions.defaultConnectTimeout,
+    receiveTimeout: AdapterBaseOptions.defaultReceiveTimeout,
+    sendTimeout: AdapterBaseOptions.defaultSendTimeout,
+  ));
 }

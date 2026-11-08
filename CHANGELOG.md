@@ -1,3 +1,46 @@
+## Unreleased
+
+### Breaking Changes
+
+- **Secure defaults** - `RxNetConfig.isDebug` now defaults to `false`; debug logging must be enabled explicitly.
+- **`request()` semantics** - Returns the final cache/network/retry result. Cache-first modes now perform the network request; retries are no longer cut off by the first failure. Loop mode still returns the first result.
+- **Retry filtering** - By default, POST/PATCH are not retried. Use `RetryPolicy.retryOnNonIdempotent` to opt in; 4xx (except 408/429), cancellation and parsing errors are never retried.
+- **Cache keys** - Path-based cache keys are always SHA-256 hashed (32 hex chars). Existing caches become misses once.
+- **Interceptor API** - `AdapterInterceptor` methods return `FutureOr<void>`; async interceptors are awaited. Existing `void` implementations remain compatible.
+- **Token refresh** - `TokenRefreshInterceptor` now retries the original request through `ErrorInterceptorHandler.retry` instead of returning a synthetic response.
+- **`AdapterResponse.successOverride`** - Added so `validateStatus` decisions survive the adapter boundary.
+
+### Fixed
+
+- `RxNet.init` now honors `config.adapter`.
+- `setEnv` / `setDefaultEnv` update the actual request base URL.
+- Network cache writes go through `RxNetCache`, enabling metadata and LRU/LFU/FIFO eviction.
+- Default timeouts (connect 15s / receive 30s / send 30s) and request-level timeouts.
+- URL normalization preserves `//` in query/fragment.
+- Download/upload now run interceptors in Dio/Http adapters.
+- DioAdapter supports `dart:io File` request bodies.
+- Cancel-token callbacks are removed when requests finish.
+- `REQUEST_FAILED_READ_CACHE` no longer emits both success and failure callbacks.
+- Binary responses are skipped by the JSON cache.
+
+### Security
+
+- Log redaction covers headers, bodies, PII keys, sensitive URL query parameters and `token=xxx` text.
+- Certificate pinning examples no longer bypass validation.
+- Debug logging is off by default and `LogUtil.e` respects the debug flag.
+
+### Engineering
+
+- Corrected `flutter.plugin.implements` placement and removed placeholder platform config.
+- Updated `flutter_lints` to ^5.0.0 and added a CI workflow with analyze/test/coverage.
+- **Full-platform conditional imports** - Web/Wasm default branches + `dart.library.io` for IO; `rxnet_lib` conditionally exports `IOClient`/`IOHttpClientAdapter`. Verified with actual Web and Windows debug builds. Added a Web compile smoke target to CI.
+- Example SDK lower bound aligned to `>=3.5.0`.
+- Removed generated HarmonyOS build artifacts from the repository index.
+- Fixed stale `DeduplicateInterceptor` / `ThrottleInterceptor` / `ZipRequest` docs.
+- `ZipRequestError` now implements `Exception`; cancellation/timeout use consistent `ZipRequestError` context.
+
+---
+
 ## 0.7.1
 
 ### Fixed

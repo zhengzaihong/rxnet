@@ -139,7 +139,7 @@ List<RequestState> _initializeRequestStates(List<ZipRequest> requests) {
 }
 
 /// Helper function to create a typed RequestState instance.
-/// This preserves type safety by matching the generic type of ZipRequest<T>.
+/// This preserves type safety by matching the generic type of `ZipRequest<T>`.
 RequestState _createTypedRequestState<T>(ZipRequest<T> request, int index) {
   return RequestState<T>(
     request: request,
@@ -157,12 +157,18 @@ void _registerCancellation(
   if (cancelToken == null) return;
   
   cancelToken.whenCancel((reason) {
+    final cancellation = AdapterException(
+      type: AdapterExceptionType.cancel,
+      message: reason ?? 'Request cancelled',
+    );
     for (final state in states) {
       if (!state.isCompleted) {
         state.completer.completeError(
-          AdapterException(
-            type: AdapterExceptionType.cancel,
-            message: reason ?? 'Request cancelled',
+          ZipRequestError(
+            index: state.index,
+            tag: state.request.tag,
+            error: cancellation,
+            stackTrace: StackTrace.current,
           ),
         );
       }
@@ -293,18 +299,24 @@ Future<ZipResults> zipRequest(
   
   // Waiting Phase
   Future<ZipResults> executeFuture() async {
-    if (eagerError) {
-      // Eager error mode: throw on first error
-      final results = await _waitWithEagerError(states);
-      
-      // Result Aggregation Phase
-      return ZipResults(results, tagIndexMap);
-    } else {
-      // Partial success mode: collect all results and errors
-      final (results, errors) = await _waitWithPartialSuccess(states);
-      
-      // Result Aggregation Phase
-      return ZipResults(results, tagIndexMap, errors);
+    try {
+      if (eagerError) {
+        // Eager error mode: throw on first error
+        final results = await _waitWithEagerError(states);
+        
+        // Result Aggregation Phase
+        return ZipResults(results, tagIndexMap);
+      } else {
+        // Partial success mode: collect all results and errors
+        final (results, errors) = await _waitWithPartialSuccess(states);
+        
+        // Result Aggregation Phase
+        return ZipResults(results, tagIndexMap, errors);
+      }
+    } catch (e) {
+      // 快速失败时通知其他仍在执行的请求（需要调用方提供 cancelToken）
+      cancelToken?.cancel('ZipRequest failed: $e');
+      rethrow;
     }
   }
   
@@ -313,20 +325,29 @@ Future<ZipResults> zipRequest(
     return executeFuture().timeout(
       timeout,
       onTimeout: () {
-        // Cancel all pending requests on timeout
+        final message =
+            'ZipRequest timed out after ${timeout.inSeconds} seconds';
+        final timeoutError = TimeoutException(message, timeout);
+
+        // 先完成各请求的 Completer，再取消 token，确保调用方看到超时错误
         for (final state in states) {
           if (!state.isCompleted) {
             state.completer.completeError(
-              TimeoutException(
-                'ZipRequest timed out after ${timeout.inSeconds} seconds',
-                timeout,
+              ZipRequestError(
+                index: state.index,
+                tag: state.request.tag,
+                error: timeoutError,
+                stackTrace: StackTrace.current,
               ),
             );
           }
         }
-        throw TimeoutException(
-          'ZipRequest timed out after ${timeout.inSeconds} seconds',
-          timeout,
+        cancelToken?.cancel(message);
+
+        throw ZipRequestError(
+          index: -1,
+          error: timeoutError,
+          stackTrace: StackTrace.current,
         );
       },
     );

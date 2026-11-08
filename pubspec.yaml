@@ -12,6 +12,7 @@ platforms:
   macos:
 
 
+
 environment:
   sdk: ">=3.5.0 <4.0.0"
   flutter: ">=3.24.0"
@@ -42,16 +43,14 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^2.0.0
+  flutter_lints: ^5.0.0
 
 
 
 flutter:
   plugin:
+    implements: path_provider
     platforms:
-      implements: path_provider
-      some_platform:
-        pluginClass: somePluginClass
       ohos:
         pluginClass: RxNetPathProviderPlugin
         dartPluginClass: RxNetPlus

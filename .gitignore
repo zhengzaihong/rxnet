@@ -49,3 +49,6 @@ example/ohos/entry/build/
 example/ohos/.hvigor/
 example/ohos/oh_modules/
 example/ohos/node_modules/
+# HarmonyOS generated
+ohos/build/
+ohos/oh_modules/

@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import '../models/adapter_request.dart';
 import '../models/adapter_response.dart';
 import '../exceptions/adapter_exception.dart';
+
+/// 单次请求中允许拦截器触发的最大重试次数，避免无限循环
+const int kMaxAdapterInterceptorRetries = 2;
 
 /// author: ZhengZaiHong
 /// email:1096877329@qq.com
@@ -79,6 +84,7 @@ class ErrorInterceptorHandler {
   bool _isCompleted = false;
   AdapterException? _modifiedError;
   AdapterResponse? _resolvedResponse;
+  AdapterRequest? _retryRequest;
 
   /// 继续传递错误（可以修改错误）
   void next(AdapterException error) {
@@ -94,11 +100,23 @@ class ErrorInterceptorHandler {
     _resolvedResponse = response;
   }
 
+  /// 使用修改后的请求重新执行本次请求。
+  ///
+  /// 适配器会跳过请求/响应拦截器，仅重新发送该请求；
+  /// 新的请求仍会再次经过错误拦截器，因此实现方需要自行避免无限重试。
+  void retry(AdapterRequest request) {
+    if (_isCompleted) return;
+    _isCompleted = true;
+    _retryRequest = request;
+  }
+
   bool get isCompleted => _isCompleted;
 
   AdapterException? get modifiedError => _modifiedError;
 
   AdapterResponse? get resolvedResponse => _resolvedResponse;
+
+  AdapterRequest? get retryRequest => _retryRequest;
 }
 
 /// 统一的拦截器接口
@@ -107,11 +125,12 @@ class ErrorInterceptorHandler {
 abstract class AdapterInterceptor {
   /// 请求拦截
   ///
-  /// 在请求发送前调用，可以修改请求或直接返回响应
+  /// 在请求发送前调用，可以修改请求或直接返回响应。
+  /// 支持同步或异步实现，异步实现会被适配器 await。
   ///
   /// [request] 请求配置
   /// [handler] 拦截器处理器
-  void onRequest(
+  FutureOr<void> onRequest(
     AdapterRequest request,
     RequestInterceptorHandler handler,
   ) {
@@ -120,11 +139,12 @@ abstract class AdapterInterceptor {
 
   /// 响应拦截
   ///
-  /// 在收到响应后调用，可以修改响应或抛出错误
+  /// 在收到响应后调用，可以修改响应或抛出错误。
+  /// 支持同步或异步实现，异步实现会被适配器 await。
   ///
   /// [response] 响应对象
   /// [handler] 拦截器处理器
-  void onResponse(
+  FutureOr<void> onResponse(
     AdapterResponse response,
     ResponseInterceptorHandler handler,
   ) {
@@ -133,11 +153,12 @@ abstract class AdapterInterceptor {
 
   /// 错误拦截
   ///
-  /// 在发生错误时调用，可以修改错误或返回响应
+  /// 在发生错误时调用，可以修改错误、返回响应或要求重试。
+  /// 支持同步或异步实现，异步实现会被适配器 await。
   ///
   /// [error] 错误对象
   /// [handler] 拦截器处理器
-  void onError(
+  FutureOr<void> onError(
     AdapterException error,
     ErrorInterceptorHandler handler,
   ) {
