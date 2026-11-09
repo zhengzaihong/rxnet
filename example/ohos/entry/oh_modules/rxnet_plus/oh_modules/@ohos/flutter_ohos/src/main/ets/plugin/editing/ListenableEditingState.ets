@@ -18,7 +18,7 @@ import { FlutterTextUtils } from './TextUtils';
 import { KeyCode } from '@kit.InputKit';
 import KeyEventChannel, { SimulateKeyEvent } from '../../embedding/engine/systemchannels/KeyEventChannel';
 import { PasteboardUtils } from '../../util/PasteboardUtils';
-import { PreviewEditingState,isPreviewTextSupported } from './PreviewEditingState';
+import { PreviewEditingState, isPreviewTextSupported } from './PreviewEditingState';
 
 const TAG = "ListenableEditingState";
 
@@ -78,7 +78,6 @@ export class ListenableEditingState {
   isPreviewStagingActive(): boolean {
     return this.mLeftIdxOfPreviewTextRange !== this.mRightIdxOfPreviewTextRange;
   }
-
 
 
   /**
@@ -355,11 +354,11 @@ export class ListenableEditingState {
   }
 
   /**
-  * IME `setPreviewText`: merge into `mStringCache` span [leftIdx,rightIdx) and map caret.
-  * Merge/caret logic lives in `PreviewEditingState` (initPreviewRangeSplice /
-  * applyLocalFullBodyPreviewMerge / applyImePreviewStringCacheAndRange /
-  * applyImePreviewCaretAfterMerge); trusts the IMF verbatim — no local heuristic corrections.
-  */
+   * IME `setPreviewText`: merge into `mStringCache` span [leftIdx,rightIdx) and map caret.
+   * Merge/caret logic lives in `PreviewEditingState` (initPreviewRangeSplice /
+   * applyLocalFullBodyPreviewMerge / applyImePreviewStringCacheAndRange /
+   * applyImePreviewCaretAfterMerge); trusts the IMF verbatim — no local heuristic corrections.
+   */
   handleInsertPreviewTextEvent(text: string, range: inputMethod.Range): void {
     const notifySnap = this.captureEditingSnapshot();
     const ctx = new PreviewEditingState();
@@ -834,6 +833,7 @@ export class ListenableEditingState {
     this.setSelectionEnd(finalOffset);
     this.notifyListenersIfNeeded(false, true, false);
   }
+
 
   /**
    * text-selection changed with cursor moving at 2D-text

@@ -14,10 +14,18 @@ import {
   NOT_SENSITIVE_CONTENT_SENSITIVITY,
 } from '../../embedding/engine/systemchannels/SensitiveContentChannel';
 const TAG = "SensitiveContentChannel";
+/**
+ * Handles sensitive content requests received through the {@link SensitiveContentChannel} and applies
+ * the requested sensitivity level to the current OpenHarmony window via window privacy mode.
+ */
 export default class SensitiveContentPlugin implements SensitiveContentMethodHandler {
   private readonly sensitiveContentChannel: SensitiveContentChannel;
   private currentContentSensitivity: number = NOT_SENSITIVE_CONTENT_SENSITIVITY;
 
+  /**
+   * Creates a SensitiveContentPlugin and registers itself as the method handler on the given channel.
+   * @param sensitiveContentChannel - Channel used to receive sensitive content requests from Flutter.
+   */
   constructor(
     sensitiveContentChannel: SensitiveContentChannel
   ) {
@@ -25,6 +33,10 @@ export default class SensitiveContentPlugin implements SensitiveContentMethodHan
     this.sensitiveContentChannel.setSensitiveContentMethodHandler(this);
   }
 
+  /**
+   * Sets the content sensitivity level of the current window by toggling window privacy mode.
+   * @param requestedContentSensitivity - Sensitivity level to apply.
+   */
   setContentSensitivity(requestedContentSensitivity: number): void {
     let isPrivacyMode: boolean;
     switch (requestedContentSensitivity) {
@@ -63,14 +75,25 @@ export default class SensitiveContentPlugin implements SensitiveContentMethodHan
     }
   }
 
+  /**
+   * Gets the current content sensitivity level applied to the window.
+   * @returns The current content sensitivity level.
+   */
   getContentSensitivity(): number {
    return this.currentContentSensitivity;
   }
 
+  /**
+   * Checks whether setting and getting content sensitivity is supported on this device.
+   * @returns true if sensitive content APIs are supported, false otherwise.
+   */
   isSupported(): boolean {
     return true;
   }
 
+  /**
+   * Tears down the plugin by clearing its registration on the sensitive content channel.
+   */
   destroy(): void {
     this.sensitiveContentChannel.setSensitiveContentMethodHandler(null);
   }

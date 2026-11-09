@@ -82,7 +82,11 @@ export default class FlutterEnginePreload {
         viewportMetrics.physicalTouchSlop,
         new Array(0),
         new Array(0),
-        new Array(0)
+        new Array(0),
+        viewportMetrics.displayCornerRadiusTopLeft,
+        viewportMetrics.displayCornerRadiusTopRight,
+        viewportMetrics.displayCornerRadiusBottomRight,
+        viewportMetrics.displayCornerRadiusBottomLeft
       );
     }
   }
@@ -134,7 +138,11 @@ export default class FlutterEnginePreload {
       viewportMetrics.physicalTouchSlop,
       new Array(0),
       new Array(0),
-      new Array(0)
+      new Array(0),
+      viewportMetrics.displayCornerRadiusTopLeft,
+      viewportMetrics.displayCornerRadiusTopRight,
+      viewportMetrics.displayCornerRadiusBottomRight,
+      viewportMetrics.displayCornerRadiusBottomLeft
     );
   }
 

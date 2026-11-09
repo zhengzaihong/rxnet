@@ -14,6 +14,7 @@
  * It handles initialization, resource copying, and Dart VM configuration.
  */
 import FlutterShellArgs from '../FlutterShellArgs';
+import FlutterEngineFlags from '../FlutterEngineFlags';
 import FlutterNapi from '../FlutterNapi';
 import Log from '../../../util/Log';
 import FlutterApplicationInfo from './FlutterApplicationInfo';
@@ -54,6 +55,8 @@ const FILE_SEPARATOR = "/";
 const TIMESTAMP_PREFIX = "res_timestamp-";
 
 const ENABLE_IMPELLER_TAG = "enable_impeller";
+
+const ENABLE_OHOS_HCPP_TAG = "enable_ohos_hybrid_composition";
 
 const TRUE_STRING = "true";
 
@@ -105,6 +108,9 @@ export default class FlutterLoader {
   initStartTimestampMillis: number = 0;
   /** Whether Impeller rendering backend is enabled. */
   isEnableImpeller: boolean = false;
+
+  /** Whether OHOS Hybrid Composition (HCPP) platform view mode is enabled. */
+  isEnableHcpp: boolean = false;
 
   /**
    * Constructs a new FlutterLoader instance.
@@ -160,11 +166,14 @@ export default class FlutterLoader {
     if (this.flutterApplicationInfo!.isDebugMode) {
       this.copyResource(context)
     }
-    let buildInfoMap = this.getBuildInfo(this.context!); 
+    let buildInfoMap = this.getBuildInfo(this.context!);
     if (!buildInfoMap.has(ENABLE_IMPELLER_TAG) || buildInfoMap.get(ENABLE_IMPELLER_TAG) == TRUE_STRING) {
         this.isEnableImpeller = true;
     } else {
       this.isEnableImpeller = false;
+    }
+    if (buildInfoMap.get(ENABLE_OHOS_HCPP_TAG) == TRUE_STRING) {
+      this.isEnableHcpp = true;
     }
     this.initResult = new InitResult(
       `${context.filesDir}/`,
@@ -267,12 +276,26 @@ export default class FlutterLoader {
     if (shellArgs == null) {
       shellArgs = new Array<string>();
     }
+
+    // Drop Want-provided flags that are not allowed in release builds, as
+    // on Android (flutter/flutter#182522), before embedding-internal args
+    // are appended.
+    const isRelease =
+      !(this.flutterApplicationInfo!.isDebugMode || this.flutterApplicationInfo!.isProfile);
+    shellArgs = FlutterEngineFlags.filterArgsForRelease(shellArgs, isRelease);
+
     shellArgs.push("--icu-symbol-prefix=_binary_icudtl_dat");
     shellArgs.push(
       "--icu-native-lib-path="
         + this.flutterApplicationInfo!.nativeLibraryDir
         + FILE_SEPARATOR + DEFAULT_LIBRARY
     );
+
+    // Add engine flags declared in the module.json5 metadata, merged in
+    // front of the Want args so the Want takes precedence (last-wins).
+    const metadata = ApplicationInfoLoader.getModuleMetadata();
+    const metadataArgs = FlutterEngineFlags.computeMetadataArgs(metadata, isRelease);
+    shellArgs = FlutterEngineFlags.mergeMetadataArgs(shellArgs, metadataArgs);
 
     let kernelPath: string = "";
     if (this.flutterApplicationInfo!.isDebugMode) {
@@ -321,6 +344,17 @@ export default class FlutterLoader {
         Log.d(TAG, "Enable Impeller in Ohos.");
     } else {
       Log.d(TAG, "Do not find enableImpeller tag or enableImpeller tag set to false, enable Skia in Ohos.");
+    }
+
+    // HCPP is configured solely via buildinfo.json5, matching how Impeller is
+    // handled. Both the command-line path (`flutter run --enable-hcpp`, which
+    // flutter_tools writes into buildinfo.json5 at build time) and manual
+    // configuration (adding { "name": "enable_ohos_hybrid_composition",
+    // "value": "true" } to the buildinfo.json5 string array) are read in
+    // startInitialization via getBuildInfo().
+    if (this.isEnableHcpp == true) {
+      shellArgs.push("--enable-ohos-hybrid-composition");
+      Log.d(TAG, "Enable OHOS Hybrid Composition (HCPP) from buildinfo.json5.");
     }
 
     // Final initialization operation

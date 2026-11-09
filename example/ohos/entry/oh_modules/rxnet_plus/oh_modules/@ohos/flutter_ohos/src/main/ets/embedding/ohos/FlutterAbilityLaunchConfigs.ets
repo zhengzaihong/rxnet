@@ -41,4 +41,9 @@ export default class FlutterAbilityLaunchConfigs {
   static DEFAULT_BACKGROUND_MODE = BackgroundMode.opaque;
   // Preload configuration.
   static PRELOAD_VIEWPORT_METRICS_KEY = "viewport_metrics";
+  static MULTI_WINDOW_ENGINE_CACHE_ID = "io.flutter.multi_window.engine";
+  static EXTRA_FLUTTER_VIEW_ID = "flutter_view_id";
+  static EXTRA_FLUTTER_PREFERRED_WIDTH = "flutter_preferred_width";
+  static EXTRA_FLUTTER_PREFERRED_HEIGHT = "flutter_preferred_height";
+  static EXTRA_FLUTTER_WINDOW_TITLE = "flutter_window_title";
 }

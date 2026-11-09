@@ -26,7 +26,7 @@ struct XComponentStruct {
    * @returns The XComponent tree
    */
   build() {
-    // todo OS解决默认背景色后可以移除冗余重复代码,仅保留差异的backgroundColor属性条件配置
+    // TODO: Once the OS provides a default background color, remove the duplicated code and keep only the conditional backgroundColor property configuration.
     if (this.applicationInfo.isDebugMode) {
       XComponent({
         id: (this.dvModelParams as Record<string, Any>)["xComponentId"],

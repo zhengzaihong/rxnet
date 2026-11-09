@@ -53,23 +53,6 @@ dependencies:
 
 ---
 
-## Dependencies
-
-This release ships both built-in adapters, so the following packages are hard
-dependencies and cannot be removed by configuration:
-
-- `dio` — default adapter (`DioAdapter`)
-- `http` — lightweight adapter (`HttpAdapter`)
-- `sembast` / `sembast_web` — persistent cache
-- `path_provider` — cache directory resolution
-- `web` — browser download helper
-
-If bundle size is critical, split the adapters into federated packages or build
-a custom adapter and depend on this package from a fork. `rxnet_lib.dart`
-currently exports both adapters.
-
----
-
 ## Quick Start
 
 ### Option 1: RxNetConfig (Recommended)

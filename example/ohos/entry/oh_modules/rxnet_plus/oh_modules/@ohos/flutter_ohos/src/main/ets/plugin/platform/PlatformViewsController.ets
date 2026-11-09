@@ -14,8 +14,11 @@ import PlatformViewsChannel, {
   PlatformViewResizeRequest,
   PlatformViewsHandler,
   PlatformViewTouch,
-  PlatformViewBufferSize
+  PlatformViewBufferSize,
+  RequestedDisplayMode
 } from '../../../ets/embedding/engine/systemchannels/PlatformViewsChannel';
+import PlatformViewsControllerHybrid from './PlatformViewsControllerHybrid';
+import FlutterNapi from '../../embedding/engine/FlutterNapi';
 import PlatformView, { Params } from './PlatformView';
 import { DVModelParameters, } from '../../view/DynamicView/dynamicView';
 import { createDVModelFromJson } from '../../view/DynamicView/dynamicViewJson';
@@ -32,6 +35,7 @@ import DartExecutor from '../../embedding/engine/dart/DartExecutor';
 import { FlutterMutatorView } from '../../embedding/engine/mutatorsstack/FlutterMutatorView';
 import Log from '../../util/Log'
 import PlatformViewFactory from './PlatformViewFactory'
+import { decodePlatformViewCreationParams } from './PlatformViewParamsUtil';
 import { ByteBuffer } from '../../util/ByteBuffer';
 import Any from '../common/Any';
 import { ArrayList, Stack } from '@kit.ArkTS';
@@ -95,6 +99,7 @@ const PLATFORM_VIEW_ACTIVE_TOUCHES = 'platformViewActiveTouches';
 const PLATFORM_VIEW_LAST_TOUCH_EVENT = 'platformViewLastTouchEvent';
 const PLATFORM_VIEW_LAST_TOUCH_EVENT_IS_PX = 'platformViewLastTouchEventIsPx';
 const PLATFORM_VIEW_CANCEL_DRAINING = 'platformViewCancelDraining';
+const NON_TEXTURE_FALLBACK = -2;
 
 /**
  * Controller for managing platform views in Flutter applications.
@@ -120,6 +125,8 @@ export default class PlatformViewsController implements PlatformViewsHandler {
   private viewWrappers: Map<number, PlatformViewWrapper>;
   private currentFrameUsedOverlayLayerIds: HashSet<number>;
   private currentFrameUsedPlatformViewIds: HashSet<number>;
+  private hybridController: PlatformViewsControllerHybrid | null = null;
+  private hybridNapi: FlutterNapi | null = null;
 
   /**
    * Constructs a new PlatformViewsController instance.
@@ -140,16 +147,24 @@ export default class PlatformViewsController implements PlatformViewsHandler {
    * @param request - The platform view creation request
    */
   createForPlatformViewLayer(request: PlatformViewCreationRequest): void {
-    Log.i(TAG, "Enter createForPlatformViewLayer");
+    const hcppEnabled = this.hybridNapi?.isHybridCompositionEnabled() ?? false;
     this.ensureValidRequest(request);
 
-    let platformView: PlatformView = this.createPlatformView(request);
+    // Hybrid-only requests (initExpensiveOhosView / HYBRID_ONLY) route to the
+    // HCPP controller when Hybrid Composition is enabled natively.
+    if (this.hybridController != null && hcppEnabled) {
+      this.hybridController.createForPlatformViewLayer(request);
+      return;
+    }
 
-    // OHOS currently relies on the texture composition path for the
-    // multi-PlatformView direction fix below. The platform-view-layer / hybrid
-    // branch remains a stub, so it is intentionally left outside the scope of
-    // this change.
-    this.configureForHybridComposition(platformView, request);
+    // HCPP unavailable: keep the base-version behavior — create the platform
+    // view (plugin factory create() runs, unknown viewType throws up to the
+    // channel's catch → PlatformException) and register it, so lifecycle and
+    // error reporting match the pre-HCPP path. Composition itself is a no-op
+    // (no DISPLAY layer is mounted); the view stays invisible until the app
+    // switches to a supported mode/engine.
+    Log.w(TAG, `createForPlatformViewLayer: HCPP unavailable (hybridController=${this.hybridController != null}, hcppEnabled=${hcppEnabled}) for view id=${request.viewId}; the view is created but not composed.`);
+    this.createPlatformView(request);
   }
 
   private isTerminalTouch(type: TouchType): boolean {
@@ -285,6 +300,11 @@ export default class PlatformViewsController implements PlatformViewsHandler {
    * @param viewId - The ID of the platform view to dispose
    */
   dispose(viewId: number): void {
+    // HCPP views may be disposed via the legacy channel too; forward them.
+    if (this.hybridController?.owns(viewId)) {
+      this.hybridController.dispose(viewId);
+      return;
+    }
     let platformView: PlatformView | null = this.platformViews.get(viewId) || null;
     if (platformView == null) {
       Log.e(TAG, "Disposing unknown platform view with id: " + viewId);
@@ -602,6 +622,11 @@ export default class PlatformViewsController implements PlatformViewsHandler {
    * @param touch - The touch event information
    */
   onTouch(touch: PlatformViewTouch): void {
+    // Touch events for HCPP views arrive on the legacy channel; forward them.
+    if (this.hybridController?.owns(touch.viewId)) {
+      this.hybridController.onTouch(touch);
+      return;
+    }
     let viewWrapper: undefined | PlatformViewWrapper = this.viewWrappers.get(touch.viewId)
     this.focusViewId = touch.viewId;
     if (viewWrapper != undefined) {
@@ -692,6 +717,11 @@ export default class PlatformViewsController implements PlatformViewsHandler {
    * @param direction - The text direction to set
    */
   setDirection(viewId: number, direction: Direction): void {
+    // HCPP views arrive on the legacy channel; forward them.
+    if (this.hybridController?.owns(viewId)) {
+      this.hybridController.setDirection(viewId, direction);
+      return;
+    }
     let nodeController = this.viewIdWithNodeController.get(viewId)
     let platformViewInfo = this.platformViewParentInfo.get(viewId);
     if (nodeController != undefined && platformViewInfo != undefined) {
@@ -720,6 +750,11 @@ export default class PlatformViewsController implements PlatformViewsHandler {
    * @param viewId - The ID of the platform view
    */
   clearFocus(viewId: number): void {
+    // HCPP views arrive on the legacy channel; forward them.
+    if (this.hybridController?.owns(viewId)) {
+      this.hybridController.clearFocus(viewId);
+      return;
+    }
     const platformView = this.platformViews.get(viewId);
     if (platformView == null) {
       Log.e(TAG, "Setting direction to an unknown view with id: " + viewId);
@@ -753,14 +788,34 @@ export default class PlatformViewsController implements PlatformViewsHandler {
    * @throws {Error} if the request is invalid or the view cannot be created
    */
   public createForTextureLayer(request: PlatformViewCreationRequest): number {
-    Log.i(TAG, "Enter createForTextureLayer");
     this.ensureValidRequest(request);
     this.ensureFlutterViewAttached("create platform view");
 
+    // Route to Hybrid Composition (HCPP) when enabled and the framework asked
+    // for texture-with-hybrid-fallback. Returning NON_TEXTURE_FALLBACK makes the
+    // channel reply null, which switches the Dart controller to hybrid mode.
+    if (this.hybridController != null &&
+      request.displayMode == RequestedDisplayMode.TEXTURE_WITH_HYBRID_FALLBACK &&
+      (this.hybridNapi?.isHybridCompositionEnabled() ?? false)) {
+      this.hybridController.createForPlatformViewLayer(request);
+      return NON_TEXTURE_FALLBACK;
+    }
+    Log.i(TAG, "Enter createForTextureLayer");
     let platformView: PlatformView = this.createPlatformView(request);
     let textureId = this.configureForTextureLayerComposition(platformView, request);
     this.viewIdWithTextureId.set(request.viewId, textureId);
     return textureId;
+  }
+
+  /**
+   * Wires the Hybrid Composition (HCPP) sibling controller and the NAPI used to
+   * query whether HCPP is enabled on the native side.
+   * @param controller - The HCPP controller.
+   * @param napi - The FlutterNapi used for the enabled query.
+   */
+  public setHybridController(controller: PlatformViewsControllerHybrid | null, napi: FlutterNapi | null): void {
+    this.hybridController = controller;
+    this.hybridNapi = napi;
   }
 
   /**
@@ -795,8 +850,7 @@ export default class PlatformViewsController implements PlatformViewsHandler {
 
     let createParams: Any = null;
     if (request.params != null) {
-      let byteParas: ByteBuffer = request.params as ByteBuffer;
-      createParams = viewFactory.getCreateArgsCodec().decodeMessage(byteParas.buffer);
+      createParams = decodePlatformViewCreationParams(viewFactory, request.params, request.viewId);
     }
 
     if (this.context == null) {
@@ -814,15 +868,15 @@ export default class PlatformViewsController implements PlatformViewsHandler {
   }
 
   /**
-   * Configures the view for Hybrid Composition mode.
-   * @param platformView - The platform view to configure
-   * @param request - The creation request
-   * @private
+   * Whether any texture-mode (TLHC) platform view is currently alive on this
+   * controller. On an HCPP-enabled engine these views still rely on the
+   * TouchEventProcessor reinjection stream (see FlutterNapi#onTouchEvent's
+   * textureTouchArbiter), so the stream must not be skipped while any exist.
+   * This map only ever holds texture-path views — HCPP views are created via
+   * the sibling hybrid controller and never enter it (see owns() routing).
    */
-  private configureForHybridComposition(platformView: PlatformView, request: PlatformViewCreationRequest): void {
-    // This path is not implemented yet on OHOS. Keep that behavior explicit so
-    // future readers do not assume the texture-path fix also covers hybrid.
-    Log.i(TAG, "Using hybrid composition for platform view: " + request.viewId);
+  public hasTextureViews(): boolean {
+    return this.platformViews.size > 0;
   }
 
   /**
@@ -943,6 +997,7 @@ export default class PlatformViewsController implements PlatformViewsHandler {
     }
 
     this.flutterView = newFlutterView;
+    this.hybridController?.attachToView(newFlutterView);
 
     // A FlutterView surface can be destroyed and later recreated while the
     // engine and PlatformViewsController stay alive. Reattach existing wrapper
@@ -987,6 +1042,7 @@ export default class PlatformViewsController implements PlatformViewsHandler {
       // not widen the normal Flutter/native handoff behavior.
       this.textInputPlugin?.clearPlatformViewClientForTeardown(this.focusViewId);
     }
+    this.hybridController?.detachFromView(detachingFlutterView);
 
     // Mirror Android's FlutterView detach semantics: remove wrapper DVModels
     // from the old FlutterView and notify every PlatformView so plugins do not

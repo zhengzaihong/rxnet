@@ -213,7 +213,13 @@ export struct DynamicView {
       y: this.getParams(this.params, "translateY"),
       z: this.getParams(this.params, "translateZ")
     })
-    .transform(this.getParams(this.params, "matrix"))
+    .rotate(this.getParams(this.params, "rotate") ?? 0)
+    .scale({
+      x: this.getParams(this.params, "scaleX") ?? 1,
+      y: this.getParams(this.params, "scaleY") ?? 1
+    })
+    .transform(this.getParams(this.params, "matrix") ?? undefined)
+    .opacity(this.getParams(this.params, "opacity") ?? 1)
     .direction(this.getParams(this.params, "direction"))
   }
 
@@ -299,9 +305,31 @@ export struct DynamicView {
     NodeContainer(this.getParams(this.params, "nodeController"))
       .common_attrs()
       .position({
-        x: (this.params as Record<string, Any>)['left'] as number,
-        y: (this.params as Record<string, Any>)['top'] as number
+        x: this.getParams(this.params, 'left') as number,
+        y: this.getParams(this.params, 'top') as number
       })
+      // clip 仅对 HCPP wrapper（params.hcpp==true）生效：无 mutator 时 fallback
+      // Rect(width/height) 裁到节点自身边界，防 DISPLAY 越界内容盖住相邻 Flutter 内容。
+      // 纹理模式 wrapper 无此标 → clip(null)，保持基础版本无裁剪行为。
+      .clip(this.getParams(this.params, "hcpp") === true ?
+        (this.getParams(this.params, "pathCommands") ? new Path({
+        width: this.getParams(this.params, "pathWidth"),
+        height: this.getParams(this.params, "pathHeight"),
+        commands: this.getParams(this.params, "pathCommands")
+      }) : new Rect({
+        width: this.getParams(this.params, "rectWidth") ?
+          this.getParams(this.params, "rectWidth") : this.getParams(this.params, "width"),
+        height: this.getParams(this.params, "rectHeight") ?
+          this.getParams(this.params, "rectHeight") : this.getParams(this.params, "height"),
+        radius: this.getParams(this.params, "rectRadius") ?
+          this.getParams(this.params, "rectRadius") : 0
+      })) : null)
+      .hitTestBehavior(this.getParams(this.params, "touchBlock") === true ?
+        HitTestMode.Block : HitTestMode.Default)
+      // [wrapper-touch-block] 截住触摸的注入出口：controller 经 events 通道下发
+      // onTouch（viewId 闭包捕获），无此事件的 wrapper（纹理模式）getEvents 得
+      // undefined，等价未挂——与 common_attrs 的 onClick 同一模式。
+      .onTouch(this.getEvents(this.events, "onTouch"))
   }
 
   @Builder

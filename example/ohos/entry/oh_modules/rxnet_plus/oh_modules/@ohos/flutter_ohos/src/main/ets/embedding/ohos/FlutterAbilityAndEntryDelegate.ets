@@ -114,7 +114,25 @@ class FlutterAbilityAndEntryDelegate implements ExclusiveAppComponent<UIAbility>
     }
   }
 
+  /**
+   * Runs the initial Flutter view by resolving the entrypoint and initial route,
+   * then executes the Dart entrypoint.
+   * The entrypoint is skipped for warm cached engines; split-view config is always sent.
+   */
   private doInitialFlutterViewRun(): void {
+    this.maybeExecuteDartEntrypoint();
+    this.sendSplitViewConfigToFlutter();
+  }
+
+  /** Executes the Dart entrypoint unless Dart is already running on this engine. */
+  private maybeExecuteDartEntrypoint(): void {
+    // Skip only when the isolate is verifiably running; DartExecutor guards
+    // re-entry. Engines created but never run must still start here.
+    if (this.flutterEngine?.dartExecutor?.isExecutingDart()) {
+      Log.d(TAG, "Skipping Dart entrypoint: Dart already running");
+      return;
+    }
+
     let initialRoute = this.host?.getInitialRoute();
     if (initialRoute == null && this.host != null) {
       initialRoute = this.maybeGetInitialRouteFromIntent(this.host.getWant());
@@ -143,6 +161,13 @@ class FlutterAbilityAndEntryDelegate implements ExclusiveAppComponent<UIAbility>
       this.host?.getDartEntrypointFunctionName() ?? ''
     );
     this.flutterEngine?.dartExecutor.executeDartEntrypoint(dartEntrypoint, this.host?.getDartEntrypointArgs());
+  }
+
+  /**
+   * Must run on every initial-view run even when the entrypoint was skipped
+   * (warm engine), or split view silently disables itself (re-sends idempotent).
+   */
+  private sendSplitViewConfigToFlutter(): void {
     this.flutterEngine?.getSplitViewConfigSystemChannel()?.sendConfigToFlutter();
   }
 
@@ -177,6 +202,11 @@ class FlutterAbilityAndEntryDelegate implements ExclusiveAppComponent<UIAbility>
     }
   }
 
+  /**
+   * Extracts framework restoration data from the Want parameters.
+   * @param wantParam - The Want parameters containing restoration data
+   * @returns The restoration data as a Uint8Array
+   */
   private getRestorationData(wantParam: Record<string, Object> | undefined): Uint8Array {
     let result: Uint8Array = new Uint8Array(1).fill(0);
     if (wantParam == null) {
@@ -390,12 +420,12 @@ class FlutterAbilityAndEntryDelegate implements ExclusiveAppComponent<UIAbility>
       case window.WindowStageEventType.SHOWN:
         Log.i(TAG, 'windowStage shown.');
         break;
-      case window.WindowStageEventType.ACTIVE: // 获焦状态
+      case window.WindowStageEventType.ACTIVE: // Focus gained state
         Log.i(TAG, 'windowStage active.');
         this.getFlutterEngine()?.getTextInputChannel()?.textInputMethodHandler?.handleChangeFocus(true);
         this.onWindowFocusChanged(true);
         break;
-      case window.WindowStageEventType.INACTIVE: // 失焦状态
+      case window.WindowStageEventType.INACTIVE: // Focus lost state
         Log.i(TAG, 'windowStage inactive.');
         this.onWindowFocusChanged(false);
         break;
@@ -634,6 +664,10 @@ class FlutterAbilityAndEntryDelegate implements ExclusiveAppComponent<UIAbility>
     }
   }
 
+  /**
+   * Changes the color mode and rebuilds embedding node controllers if the mode differs.
+   * @param colorMode - The new color mode, or undefined
+   */
   changeColorMode(colorMode?: ConfigurationConstant.ColorMode) {
     if (colorMode !== undefined && this.currentColorMode !== colorMode) {
       this.currentColorMode = colorMode;

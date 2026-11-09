@@ -58,11 +58,11 @@ export default class LocalizationPlugin {
       Log.i(TAG, "getStringResource,key: " + key + ",localeString: " + localeString);
       let localContext: common.Context = this.context;
       let stringToReturn: string | null = null;
-      // 获取资源管理器
+      // Get the resource manager
       let resMgr = localContext.resourceManager;
 
       try {
-        // 如果localeString不为空，则更新为指定地区的资源管理器
+        // If localeString is not null, update to the resource manager for the specified locale
         if (localeString) {
           let overrideConfig = resMgr.getOverrideConfiguration();
           overrideConfig.locale = localeString;

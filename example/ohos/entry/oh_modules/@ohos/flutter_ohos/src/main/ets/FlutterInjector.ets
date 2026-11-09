@@ -28,7 +28,7 @@ export default class FlutterInjector {
   }
 
   /**
-   * 初始化
+   * Initializes a new FlutterInjector instance with a FlutterLoader backed by a new FlutterNapi.
    */
   private constructor() {
     this.flutterLoader = new FlutterLoader(new FlutterNapi());

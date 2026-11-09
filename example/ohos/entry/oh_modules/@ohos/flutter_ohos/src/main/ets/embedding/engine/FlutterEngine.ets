@@ -36,6 +36,8 @@ import LocalizationPlugin from '../../plugin/localization/LocalizationPlugin'
 import SettingsChannel from './systemchannels/SettingsChannel';
 import SensitiveContentChannel from './systemchannels/SensitiveContentChannel';
 import PlatformViewsController from '../../plugin/platform/PlatformViewsController';
+import PlatformViewsControllerHybrid from '../../plugin/platform/PlatformViewsControllerHybrid';
+import PlatformViewRegistryImpl from '../../plugin/platform/PlatformViewRegistryImpl';
 import { FlutterRenderer } from './renderer/FlutterRenderer';
 import NativeVsyncChannel from './systemchannels/NativeVsyncChannel';
 import PiPVisibilityBridge from '../ohos/PiPVisibilityBridge';
@@ -75,7 +77,7 @@ export default class FlutterEngine implements EngineLifecycleListener {
   dartExecutor: DartExecutor;
   private flutterLoader: FlutterLoader;
   private assetManager: resourceManager.ResourceManager;
-  //channel定义
+  // Channel definitions
   private lifecycleChannel: LifecycleChannel | null = null;
   private navigationChannel: NavigationChannel | null = null;
   private textInputChannel: TextInputChannel | null = null;
@@ -96,6 +98,7 @@ export default class FlutterEngine implements EngineLifecycleListener {
   private localizationPlugin: LocalizationPlugin | null = null;
   private settingsChannel: SettingsChannel | null = null;
   private platformViewsController: PlatformViewsController;
+  private platformViewsControllerHybrid: PlatformViewsControllerHybrid | null = null;
   private nativeVsyncChannel: NativeVsyncChannel | null = null;
   private readonly pipVisibilityListener = (visible: boolean): void => {
     this.flutterNapi?.setPipVisible(visible);
@@ -133,6 +136,24 @@ export default class FlutterEngine implements EngineLifecycleListener {
     }
     this.platformViewsController = platformViewsController;
     this.platformViewsController.attach(context, this.renderer, this.dartExecutor);
+
+    // Hybrid Composition (HCPP): create the sibling controller that composes
+    // native views as ArkUI system layers (RENDER_TYPE_DISPLAY). It shares the
+    // registry with the texture controller so plugins register factories once,
+    // owns the dedicated flutter/platform_views_2 channel, and receives the
+    // engine composition callbacks via FlutterNapi. Whether it actually
+    // activates is gated by the native HCPP flag (queried in createForTextureLayer).
+    this.platformViewsControllerHybrid =
+      new PlatformViewsControllerHybrid(this.platformViewsController.getRegistry() as PlatformViewRegistryImpl);
+    this.platformViewsControllerHybrid.attach(context, this.dartExecutor);
+    this.flutterNapi.setHybridCompositionHandler(this.platformViewsControllerHybrid);
+    this.platformViewsControllerHybrid.setFlutterNapi(this.flutterNapi);
+    this.platformViewsController.setHybridController(this.platformViewsControllerHybrid, this.flutterNapi);
+    // HCPP 引擎上仍可共存纹理模式 PV（initOhosView / TEXTURE_WITH_VIRTUAL_
+    // FALLBACK）。它们的原生触摸回流依赖 postTouchEvent；该路径在 HCPP 下被
+    // onTouchEvent 跳过。接一个存活性探针：有纹理 PV 时放行，纯 HCPP 时维持
+    // 跳过（防双重注入）。
+    this.flutterNapi.setTextureTouchArbiter((): boolean => this.platformViewsController.hasTextureViews());
   }
 
   /**
@@ -147,7 +168,7 @@ export default class FlutterEngine implements EngineLifecycleListener {
       this.flutterLoader.startInitialization(context)
       this.flutterLoader.ensureInitializationComplete(dartVmArgs);
     }
-    //channel初始化
+    // Channel initialization
     this.lifecycleChannel = new LifecycleChannel(this.dartExecutor);
     this.displayMetricsChannel = new DisplayMetricsChannel(this.dartExecutor, context);
  	  this.navigationChannel = new NavigationChannel(this.dartExecutor, context, this.displayMetricsChannel);
@@ -359,6 +380,10 @@ export default class FlutterEngine implements EngineLifecycleListener {
     return this.systemChannel;
   }
 
+  /**
+   * Gets the split view configuration system channel.
+   * @returns The SplitViewConfigSystemChannel instance, or null if not initialized
+   */
   getSplitViewConfigSystemChannel(): SplitViewConfigSystemChannel | null {
     return this.splitViewConfigSystemChannel;
   }
@@ -379,6 +404,10 @@ export default class FlutterEngine implements EngineLifecycleListener {
     return this.mouseCursorChannel;
   }
 
+  /**
+   * Gets the display metrics channel for managing display-related information.
+   * @returns The DisplayMetricsChannel instance, or null if not initialized
+   */
   getDisplayMetricsChannel(): DisplayMetricsChannel | null {
     return this.displayMetricsChannel;
   }
@@ -407,6 +436,10 @@ export default class FlutterEngine implements EngineLifecycleListener {
     return this.dartExecutor
   }
 
+  /**
+   * Gets the sensitive content channel for managing content sensitivity settings.
+   * @returns The SensitiveContentChannel instance, or null if not initialized
+   */
   getSensitiveContentChannel():SensitiveContentChannel |null {
     return this.sensitiveContentChannel
   }
@@ -448,6 +481,11 @@ export default class FlutterEngine implements EngineLifecycleListener {
    * Notifies all registered lifecycle listeners.
    */
   onPreEngineRestart(): void {
+    // The listener chain only reaches the texture controller; dispose the
+    // HCPP views here too, otherwise DISPLAY nodes from the old isolate
+    // survive the restart and duplicate when the new isolate re-allocates
+    // view ids from 0.
+    this.platformViewsControllerHybrid?.onPreEngineRestart();
     this.engineLifecycleListeners.forEach(listener => listener.onPreEngineRestart())
   }
 
@@ -486,6 +524,8 @@ export default class FlutterEngine implements EngineLifecycleListener {
     this.flutterNapi.removeEngineLifecycleListener(this);
     this.pluginRegistry?.detachFromAbility();
     this.platformViewsController?.onDetachedFromNapi();
+    this.platformViewsControllerHybrid?.onDetachedFromNapi();
+    this.flutterNapi.setHybridCompositionHandler(null);
     this.pluginRegistry?.destroy();
     this.dartExecutor.onDetachedFromNAPI();
     this.flutterNapi.detachFromNativeAndReleaseResources();
@@ -503,6 +543,10 @@ export default class FlutterEngine implements EngineLifecycleListener {
     this.flutterNapi.removeEngineLifecycleListener(this);
     this.pluginRegistry?.detachFromAbility();
     this.platformViewsController?.onDetachedFromNapi();
+    // Same hybrid teardown as destroy(): without it the HCPP DISPLAY nodes
+    // linger after an async engine teardown.
+    this.platformViewsControllerHybrid?.onDetachedFromNapi();
+    this.flutterNapi.setHybridCompositionHandler(null);
     this.pluginRegistry?.destroy();
     this.dartExecutor.onDetachedFromNAPI();
     return this.flutterNapi.detachFromNativeAndReleaseResourcesAsync();
@@ -545,6 +589,15 @@ export default class FlutterEngine implements EngineLifecycleListener {
    */
   getPlatformViewsController(): PlatformViewsController | null {
     return this.platformViewsController;
+  }
+
+  /**
+   * 获取 HCPP PlatformViewsControllerHybrid，供 FlutterPage 的局部 Block
+   * 节点转发触摸到引擎（dispatchTouchToEngine，路 D）。
+   * @returns The PlatformViewsControllerHybrid instance, or null if not initialized
+   */
+  getPlatformViewsControllerHybrid(): PlatformViewsControllerHybrid | null {
+    return this.platformViewsControllerHybrid;
   }
 
   /**

@@ -9,8 +9,10 @@
 		"apiReleaseType": "Release",
 		"targetMinorAPIVersion": 0,
 		"targetPatchAPIVersion": 0,
-		"compileSdkVersion": "6.1.1.125",
+		"compileSdkVersion": "26.0.0.105",
 		"compileSdkType": "HarmonyOS",
+		"minMinorAPIVersion": 0,
+		"minPatchAPIVersion": 0,
 		"appEnvironments": [],
 		"bundleType": "app",
 		"buildMode": "debug"

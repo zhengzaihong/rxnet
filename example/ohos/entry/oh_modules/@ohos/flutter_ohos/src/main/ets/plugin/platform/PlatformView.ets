@@ -35,6 +35,14 @@ const defaultExpectedUpdateInterval: number = 1000;
 /** A handle to an DynamicView to be embedded in the Flutter hierarchy. */
 export default abstract class PlatformView {  
 
+  ohosHcppViewId: number = -1;
+
+  touchDispatcher: ((viewId: number, event: TouchEvent) => void) | null = null;
+
+  axisDispatcher: ((viewId: number, event: AxisEvent) => void) | null = null;
+
+  injectedTimestamps: Map<number, number> = new Map();
+
   /**
    * Gets the type of this platform view.
    * @returns The view type string

@@ -15,16 +15,31 @@ const TAG: string = "SplitViewConfigSystemChannel";
 const CHANNEL_NAME: string = "flutter/split_view_config_system";
 const CONFIG_FILE_NAME: string = "split_config.json";
 
+/**
+ * Channel for sending split-view configuration from OpenHarmony to Flutter.
+ * This channel reads split-view config from a rawfile, injects the app icon,
+ * and forwards the assembled config to Dart via a system message channel.
+ */
 export default class SplitViewConfigSystemChannel {
   private channel: BasicMessageChannel<string>;
   private context: common.Context | null = null;
   private cachedConfigStr: string = '';
 
+  /**
+   * Constructs a new SplitViewConfigSystemChannel instance.
+   * @param dartExecutor - The DartExecutor for sending messages to Dart.
+   * @param context - The ability context used to access resources.
+   */
   constructor(dartExecutor: DartExecutor, context: common.Context) {
     this.channel = new BasicMessageChannel<string>(dartExecutor, CHANNEL_NAME, StringCodec.INSTANCE);
     this.context = context;
   }
 
+  /**
+   * Sends the split-view configuration to Flutter.
+   * Reads the config from cache or rawfile, injects the app icon as base64,
+   * and transmits the assembled JSON to Dart via the message channel.
+   */
   sendConfigToFlutter(): void {
     if (this.context === null) {
       Log.e(TAG, 'Context is null, cannot send config');

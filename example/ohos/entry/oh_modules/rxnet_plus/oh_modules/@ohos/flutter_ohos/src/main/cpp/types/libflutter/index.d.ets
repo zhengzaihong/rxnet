@@ -198,6 +198,10 @@ export const nativeDispatchEmptyPlatformMessage: (nativeShellHolderId: number, c
  * @param displayFeaturesBounds - Array of display feature bounds
  * @param displayFeaturesType - Array of display feature types
  * @param displayFeaturesState - Array of display feature states
+ * @param displayCornerRadiusTopLeft - Optional top-left display corner radius in physical pixels; -1 means unavailable (flutter/flutter#179219)
+ * @param displayCornerRadiusTopRight - Optional top-right display corner radius in physical pixels; -1 means unavailable
+ * @param displayCornerRadiusBottomRight - Optional bottom-right display corner radius in physical pixels; -1 means unavailable
+ * @param displayCornerRadiusBottomLeft - Optional bottom-left display corner radius in physical pixels; -1 means unavailable
  */
 export const nativeSetViewportMetrics: (nativeShellHolderId: number, devicePixelRatio: number, physicalWidth: number
                                         , physicalHeight: number, physicalPaddingTop: number, physicalPaddingRight: number
@@ -205,7 +209,9 @@ export const nativeSetViewportMetrics: (nativeShellHolderId: number, devicePixel
                                         , physicalViewInsetRight: number, physicalViewInsetBottom: number, physicalViewInsetLeft: number
                                         , systemGestureInsetTop: number, systemGestureInsetRight: number, systemGestureInsetBottom: number
                                         , systemGestureInsetLeft: number, physicalTouchSlop: number, displayFeaturesBounds: Array<number>
-                                        , displayFeaturesType: Array<number>, displayFeaturesState: Array<number>) => void;
+                                        , displayFeaturesType: Array<number>, displayFeaturesState: Array<number>
+                                        , displayCornerRadiusTopLeft?: number, displayCornerRadiusTopRight?: number
+                                        , displayCornerRadiusBottomRight?: number, displayCornerRadiusBottomLeft?: number) => void;
 
 /**
  * Gets the system languages and populates the provided array.
@@ -412,6 +418,30 @@ export const nativeEnableFrameCache: (nativeShellHolderId: number, enable: boole
 export const nativeSetPipVisible: (nativeShellHolderId: number, visible: boolean) => void;
 
 /**
+ * Hybrid Composition (HCPP): whether HCPP is enabled on the native engine.
+ * @param nativeShellHolderId - The ID of the native shell holder
+ * @returns True when HCPP is enabled.
+ */
+export const nativeIsHybridCompositionEnabled: (nativeShellHolderId: number) => boolean;
+
+/**
+ * Hybrid Composition (HCPP) route D: injects a DISPLAY system layer's touch
+ * event into the engine as a PointerDataPacket, bypassing the broken main
+ * XComponent hit path so the Dart gesture arena can arbitrate. Coordinates in
+ * each touchData item must be physical pixels in the Flutter-view coordinate
+ * system (converted on the ArkTS side before this call).
+ * @param nativeShellHolderId - The ID of the native shell holder
+ * @param touchData - Array of touch data objects, each with fields:
+ *   change(number), device(number), embedder_id(number),
+ *   physical_x(number), physical_y(number), time_stamp(number),
+ *   pressure(number), size(number), kind(number)
+ */
+export const nativeDispatchTouchToEngine: (
+  nativeShellHolderId: number,
+  touchData: Object[]
+) => void;
+
+/**
  * Looks up callback information for a given handler.
  * @param callback - The FlutterCallbackInformation object to populate
  * @param handler - The handler number
@@ -602,3 +632,37 @@ export const nativeNotifyPageChanged: (pageName: string, pageNameLen: number, wi
  * @return none
  */
 export const nativeLTPODispatchHighFrameRate: (nativeShellHolderId: number) => void;
+
+/**
+ * Notifies native the OS destroyed viewId's host window; same teardown as
+ * Dart-initiated destroy(), no-ops if already torn down.
+ * @param viewId - The engine view id whose OS window host is gone
+ */
+export const nativeHandleOsWindowClosed: (viewId: number) => void;
+
+/**
+ * Structural type of the embedding's result object; native populates it by
+ * invoking set() from the nativeComputeWindowPosition callback path.
+ */
+export interface WindowPositionResult {
+  set(left: number, top: number, width: number, height: number): void;
+}
+
+/**
+ * Computes the LOGICAL-px position for a positioner-anchored sub-window
+ * (tooltip/popup) via the Dart positioner callback; out.set() fires only
+ * when placed.
+ * @param out - Result object populated via set() on success
+ * @returns 0 on placement, non-zero otherwise
+ */
+export const nativeComputeWindowPosition: (out: WindowPositionResult,
+  viewId: number, childW: number, childH: number,
+  parentLeft: number, parentTop: number, parentW: number, parentH: number,
+  workLeft: number, workTop: number, workW: number, workH: number) => number;
+
+/**
+ * Window focus changed (windowEvent/stageEvent ACTIVE↔INACTIVE): native
+ * caches the flag for the Dart `isActivated` query and pings the window's
+ * notify-listeners chain so dependents rebuild.
+ */
+export const nativeNotifyWindowActivated: (viewId: number, activated: boolean) => void;

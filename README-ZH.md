@@ -57,20 +57,6 @@ dependencies:
 
 ---
 
-## 依赖说明
-
-当前版本同时内置两套适配器，以下依赖均为硬依赖，无法通过配置剔除：
-
-- `dio` — 默认适配器（`DioAdapter`）
-- `http` — 轻量适配器（`HttpAdapter`）
-- `sembast` / `sembast_web` — 持久化缓存
-- `path_provider` — 缓存目录解析
-- `web` — 浏览器下载辅助
-
-如果对包体敏感，可将适配器拆分为联邦包，或实现自定义适配器并在 fork 中依赖。
-`rxnet_lib.dart` 目前会同时导出两套适配器。
-
----
 
 ## 快速开始
 

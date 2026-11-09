@@ -179,6 +179,7 @@ const INPUT_TYPE_NAME =
  */
 class TextInputMethodHandlerImpl implements TextInputMethodHandler {
   private static TAG = "TextInputMethodHandlerImpl";
+
   private textConfig: inputMethod.TextConfig;
   /** The input method controller for managing the keyboard. */
   inputMethodController: inputMethod.InputMethodController;

@@ -118,19 +118,19 @@ export default class SendableStandardMessageCodec implements SendableMessageCode
     } else if (typeof value === "boolean") {
       stream.writeInt8(value ? SendableStandardMessageCodec.TRUE : SendableStandardMessageCodec.FALSE)
     } else if (typeof value === "number") {
-      if (Number.isInteger(value)) { //整型
+      if (Number.isInteger(value)) { // Integer type
         if (-0x7fffffff - 1 <= value && value <= 0x7fffffff) { //int32
           stream.writeInt8(SendableStandardMessageCodec.INT32);
           stream.writeInt32(value, true);
-        } else if (Number.MIN_SAFE_INTEGER <= value && value <= Number.MAX_SAFE_INTEGER) { //int64 number整型取值范围
+        } else if (Number.MIN_SAFE_INTEGER <= value && value <= Number.MAX_SAFE_INTEGER) { // Valid range for int64 number
           stream.writeInt8(SendableStandardMessageCodec.INT64);
           stream.writeInt64(value, true);
-        } else { //被判为整型的double型
+        } else { // Double values identified as integers
           stream.writeInt8(SendableStandardMessageCodec.FLOAT64);
           this.writeAlignment(stream, 8);
           stream.writeFloat64(value, true);
         }
-      } else { //浮点型
+      } else { // Floating-point type
         stream.writeInt8(SendableStandardMessageCodec.FLOAT64);
         this.writeAlignment(stream, 8);
         stream.writeFloat64(value, true);

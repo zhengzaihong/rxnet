@@ -44,8 +44,8 @@ export default class FlutterEntry implements Host {
   protected hasInit: boolean = false;
   protected callbackId: number | undefined = undefined;
   /**
-   * 标记是否有一次onPageShow事件在delegate未初始化前执行
-   * 为了保证生命周期事件不丢失，等待delegate初始化完成后再执行一次onShow
+   * Tracks whether an onPageShow event occurred before the delegate was initialized.
+   * Ensures lifecycle events are not lost by re-invoking onShow once the delegate is ready.
    */
   protected pendingOnShow: boolean = false;
 
@@ -85,15 +85,15 @@ export default class FlutterEntry implements Host {
       //Log.d(TAG, "XComponent aboutToAppear predraw");
       Log.i(TAG, 'onAttach end');
       // Sync the system font weight scale on cold start, mirroring onConfigurationUpdated
-      let fontWeightScale: number = this.uiAbility?.context.config.fontWeightScale ?? 0;
-      this.delegate?.getFlutterNapi()?.setFontWeightScale(fontWeightScale);
+      const fontWeightScale = this.uiAbility?.context.config.fontWeightScale;
+      this.delegate?.getFlutterNapi()?.setFontWeightScale(fontWeightScale == undefined ? 0 : fontWeightScale);
       this?.delegate?.platformPlugin?.setUIAbilityContext(this.uiAbility!!.context);
       this.delegate?.onWindowStageCreate()
       this.windowStage?.on('windowStageEvent', this.windowStageEventCallback);
       this.hasInit = true;
       this.delegate?.initWindow();
       if (this.pendingOnShow) {
-        // aboutToAppear晚于onPageShow执行时，再执行一次onShow
+        // If aboutToAppear runs after onPageShow, re-invoke onShow
         this.delegate.onShow();
         this.pendingOnShow = false;
       }
@@ -115,9 +115,9 @@ export default class FlutterEntry implements Host {
           .setPlatformBrightness(config.colorMode != ConfigurationConstant.ColorMode.COLOR_MODE_DARK
             ? PlatformBrightness.LIGHT : PlatformBrightness.DARK)
           .setTextScaleFactor(config.fontSizeScale == undefined ? 1.0 : config.fontSizeScale)
-          .send(); //热启动生命周期内，实时监听系统设置环境改变并实时发送相应信息
+          .send(); // Monitor and send system settings changes in real time during warm start
 
-        //实时获取系统字体加粗系数
+        // Obtain system font weight scale in real time
         this.delegate?.getFlutterNapi()?.setFontWeightScale(config.fontWeightScale == undefined ? 0 :
         config.fontWeightScale);
         Log.i(TAG, 'fontWeightScale: ' + JSON.stringify(config.fontWeightScale));
@@ -208,7 +208,7 @@ export default class FlutterEntry implements Host {
    * Called when the page is shown.
    * Notifies the delegate that the page is visible.
    */
-  onPageShow() { //生命周期
+  onPageShow() { // Lifecycle callback
     Log.d(TAG, "FlutterEntry onPageShow");
     if (this.delegate) {
       this.delegate.onShow();
@@ -221,7 +221,7 @@ export default class FlutterEntry implements Host {
    * Called when the page is hidden.
    * Notifies the delegate that the page is hidden.
    */
-  onPageHide() { //生命周期
+  onPageHide() { // Lifecycle callback
     Log.d(TAG, "FlutterEntry onPageHide");
     this?.delegate?.onHide();
   }

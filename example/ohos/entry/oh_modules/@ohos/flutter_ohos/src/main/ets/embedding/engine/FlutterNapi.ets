@@ -4,7 +4,7 @@
 * found in the LICENSE_KHZG file.
 */
 
-import flutter from 'libflutter.so';
+import flutter, { WindowPositionResult as NativeWindowPositionResult } from 'libflutter.so';
 import common from '@ohos.app.ability.common';
 import Log from '../../util/Log';
 import resourceManager from '@ohos.resourceManager';
@@ -17,7 +17,11 @@ import LocalizationPlugin from '../../plugin/localization/LocalizationPlugin';
 import i18n from '@ohos.i18n';
 import Any from '../../plugin/common/Any';
 import FlutterManager from '../ohos/FlutterManager';
+import { DialogWindowCreationRequest, PopupWindowCreationRequest,
+  RegularWindowCreationRequest, TooltipWindowCreationRequest,
+  WindowConstraints } from '../ohos/windowing/WindowingUtils';
 import deviceInfo from '@ohos.deviceInfo';
+import window from '@ohos.window';
 import TouchEventProcessor from '../ohos/TouchEventProcessor';
 import BuildProfile from '../../../../../BuildProfile';
 import { Action } from '../engine/systemchannels/AccessibilityChannel';
@@ -51,6 +55,38 @@ interface PendingMessage {
 }
 
 /**
+ * Handler for Hybrid Composition (HCPP) callbacks coming from the engine.
+ * Implemented by the HCPP platform views controller (M2). When absent, the
+ * callbacks are logged and the engine degrades gracefully (no overlay / no
+ * native view positioning), without affecting the external texture path.
+ */
+export interface HybridCompositionHandler {
+  onDisplayPlatformViewHybrid(viewId: number, x: number, y: number, width: number,
+    height: number, viewWidth: number, viewHeight: number): void;
+  onDisplayOverlayHybrid(viewId: number, x: number, y: number, width: number,
+    height: number): void;
+  onDisplayMutatorsHybrid(viewId: number, data: number[]): void;
+  hidePlatformViewHybrid(viewId: number): void;
+  showOverlaySurfaceHybrid(): void;
+  hideOverlaySurfaceHybrid(): void;
+  onBeginFrameHybrid(): void;
+  onEndFrameHybrid(): void;
+}
+
+export class WindowPositionResult implements NativeWindowPositionResult {
+  left: number = 0;
+  top: number = 0;
+  width: number = 0;
+  height: number = 0;
+  set(left: number, top: number, width: number, height: number): void {
+    this.left = left;
+    this.top = top;
+    this.width = width;
+    this.height = height;
+  }
+}
+
+/**
  * Provides Flutter NAPI interface for ArkTS.
  * This class serves as the bridge between the ArkTS layer and the native Flutter engine,
  * handling initialization, message passing, viewport management, and lifecycle events.
@@ -78,6 +114,22 @@ export default class FlutterNapi {
   private pendingMessages: PendingMessage[] = [];
   private readyForHandleMessage: boolean = true;
   private firstPreloading: boolean = true;
+  /** Hybrid Composition (HCPP) handler, or null when HCPP is inactive. */
+  private hybridCompositionHandler: HybridCompositionHandler | null = null;
+  /**
+   * Cached result of isHybridCompositionEnabled(). The native value is set once
+   * during PlatformViewOHOS construction and never changes, so we query NAPI
+   * a single time and reuse the cached boolean on subsequent calls (notably the
+   * per-touch-event hot path in onTouchEvent). null = not yet queried.
+   */
+  private hybridCompositionEnabledCached: boolean | null = null;
+  /**
+   * Reports whether any texture-mode (TLHC) platform view is alive, so the
+   * HCPP touch-path skip in onTouchEvent can spare the reinjection stream
+   * those views depend on. Wired by FlutterEngine from PlatformViewsController
+   * (lazily evaluated per call). null = not wired (skip stays in effect).
+   */
+  private textureTouchArbiter: (() => boolean) | null = null;
 
   /**
    * Updates the refresh rate for the Flutter engine.
@@ -254,6 +306,38 @@ export default class FlutterNapi {
   }
 
   /**
+   * The OS itself destroyed a host window (title-bar close, sub-window
+   * teardown): native fires the same teardown Dart destroy() triggers.
+   * Safe to call unconditionally — native no-ops if already torn down.
+   */
+  static nativeHandleOsWindowClosed(viewId: number): void {
+    flutter.nativeHandleOsWindowClosed(viewId);
+  }
+
+  /**
+   * Computes the LOGICAL position for a positioner-anchored sub-window via
+   * the Dart positioner callback. `out` is populated only when the view
+   * has a positioner; nonzero return → the caller keeps default OS
+   * placement. Caller scales to physical px for moveWindowTo.
+   */
+  static nativeComputeWindowPosition(out: WindowPositionResult, viewId: number,
+    childSize: window.Size, parentRect: window.Rect, workArea: window.Rect): number {
+    return flutter.nativeComputeWindowPosition(out, viewId,
+      childSize.width, childSize.height,
+      parentRect.left, parentRect.top, parentRect.width, parentRect.height,
+      workArea.left, workArea.top, workArea.width, workArea.height);
+  }
+
+  /**
+   * Window focus changed (windowEvent/stageEvent ACTIVE↔INACTIVE): native
+   * caches the flag and pings the window's notify-listeners chain so Dart
+   * `isActivated` dependents rebuild and re-query.
+   */
+  static nativeNotifyWindowActivated(viewId: number, activated: boolean): void {
+    flutter.nativeNotifyWindowActivated(viewId, activated);
+  }
+
+  /**
    * Notifies the Flutter engine of a low memory warning.
    */
   notifyLowMemoryWarning(): void {
@@ -390,6 +474,10 @@ export default class FlutterNapi {
    * @param displayFeaturesBounds - Array of display feature bounds
    * @param displayFeaturesType - Array of display feature types
    * @param displayFeaturesState - Array of display feature states
+   * @param displayCornerRadiusTopLeft - Top-left display corner radius in physical pixels; defaults to -1 (unavailable) when omitted
+   * @param displayCornerRadiusTopRight - Top-right display corner radius in physical pixels; defaults to -1 (unavailable) when omitted
+   * @param displayCornerRadiusBottomRight - Bottom-right display corner radius in physical pixels; defaults to -1 (unavailable) when omitted
+   * @param displayCornerRadiusBottomLeft - Bottom-left display corner radius in physical pixels; defaults to -1 (unavailable) when omitted
    */
   setViewportMetrics(devicePixelRatio: number, physicalWidth: number
     , physicalHeight: number, physicalPaddingTop: number, physicalPaddingRight: number
@@ -397,7 +485,9 @@ export default class FlutterNapi {
     , physicalViewInsetRight: number, physicalViewInsetBottom: number, physicalViewInsetLeft: number
     , systemGestureInsetTop: number, systemGestureInsetRight: number, systemGestureInsetBottom: number
     , systemGestureInsetLeft: number, physicalTouchSlop: number, displayFeaturesBounds: Array<number>
-    , displayFeaturesType: Array<number>, displayFeaturesState: Array<number>): void {
+    , displayFeaturesType: Array<number>, displayFeaturesState: Array<number>
+    , displayCornerRadiusTopLeft: number = -1, displayCornerRadiusTopRight: number = -1
+    , displayCornerRadiusBottomRight: number = -1, displayCornerRadiusBottomLeft: number = -1): void {
     if (this.isAttached()) {
       if (!this.nativeShellHolderId) {
         Log.e(TAG, "setViewportMetrics this.nativeShellHolderId = " + this.nativeShellHolderId)
@@ -421,7 +511,11 @@ export default class FlutterNapi {
         physicalTouchSlop,
         displayFeaturesBounds,
         displayFeaturesType,
-        displayFeaturesState);
+        displayFeaturesState,
+        displayCornerRadiusTopLeft,
+        displayCornerRadiusTopRight,
+        displayCornerRadiusBottomRight,
+        displayCornerRadiusBottomLeft);
     }
   }
 
@@ -603,6 +697,157 @@ export default class FlutterNapi {
     });
   }
 
+  // Native entries (InvokeJsMethod), one per archetype — the same names as
+  // the C++ facade. req carries the creation fields (preferred size / constraints / title /
+  // parentViewId, LOGICAL px), field-for-field with the C++ structs in
+  // ohos_window_types.h.
+
+  createRegularWindow(viewId: number, req: RegularWindowCreationRequest): void {
+    FlutterManager.getInstance().createRegularWindow(viewId, req);
+  }
+
+  /** Dialog: modal (parentViewId set) → SubWindow; modeless (sentinel) →
+   * UIAbility spawn. */
+  createDialogWindow(viewId: number, req: DialogWindowCreationRequest): void {
+    FlutterManager.getInstance().createDialogWindow(viewId, req);
+  }
+
+  /** Tooltip: anchored, parent-bound SubWindow. */
+  createTooltipWindow(viewId: number, req: TooltipWindowCreationRequest): void {
+    FlutterManager.getInstance().createTooltipWindow(viewId, req);
+  }
+
+  /** Popup: anchored, parent-bound SubWindow. */
+  createPopupWindow(viewId: number, req: PopupWindowCreationRequest): void {
+    FlutterManager.getInstance().createPopupWindow(viewId, req);
+  }
+
+  /**
+   * Native entry (InvokeJsMethod "bindEntryAbilityToView"): reuse the
+   * EntryAbility's pre-created main window as the surface host for the
+   * FIRST Dart-requested Regular window — the first RegularWindow IS the
+   * main window, keeping `main.dart` identical across platforms.
+   * Subsequent Regular windows use createRegularWindow.
+   */
+  bindEntryAbilityToView(viewId: number, req: RegularWindowCreationRequest): void {
+    FlutterManager.getInstance().bindEntryAbilityToView(viewId, req);
+  }
+
+  /** Native entry (InvokeJsMethod "updateTooltipPosition"): Dart pushed a
+   * fresh anchorRect/positioner (controller.updatePosition) — re-run the
+   * positioner and move the tooltip sub-window. */
+  updateTooltipPosition(viewId: number): void {
+    FlutterManager.getInstance().updateTooltipPosition(viewId);
+  }
+
+  updatePopupPosition(viewId: number): void {
+    FlutterManager.getInstance().updatePopupPosition(viewId);
+  }
+
+  /** Native entry (InvokeJsMethod "didUpdateViewSize"): the raster thread
+   * reported a sized-to-content view's new content size (PHYSICAL px;
+   * win32 HostWindowTooltip::DidUpdateViewSize parity). */
+  didUpdateViewSize(viewId: number, width: number, height: number): void {
+    FlutterManager.getInstance().didUpdateViewSize(viewId, width, height);
+  }
+
+  /** Native entry (InvokeJsMethod "destroyWindowHost"): tear down the OS
+   * window host when Dart closes it (controller.destroy()). */
+  destroyWindowHost(viewId: number): void {
+    Log.d(TAG, `destroyWindowHost viewId=${viewId}`);
+    const host = FlutterManager.getInstance().getHostWindowByView(viewId);
+    if (!host) {
+      Log.w(TAG, `destroyWindowHost: no host for ${viewId} (already closed?)`);
+      return;
+    }
+    host.destroy();
+  }
+
+  exitApplication(): void {
+    Log.d(TAG, `exitApplication`);
+    FlutterManager.getInstance().exitApplication();
+  }
+
+  setWindowSize(viewId: number, width: number, height: number): void {
+    Log.d(TAG, `setWindowSize viewId=${viewId} size=${width}x${height}`);
+    const host = FlutterManager.getInstance().getHostWindowByView(viewId);
+    if (!host) {
+      Log.e(TAG, `setWindowSize: no window for viewId=${viewId}`);
+      return;
+    }
+    host.setWindowSize(width, height);
+  }
+
+  setWindowTitle(viewId: number, title: string): void {
+    Log.d(TAG, `setWindowTitle viewId=${viewId} title="${title}"`);
+    const host = FlutterManager.getInstance().getHostWindowByView(viewId);
+    if (!host) {
+      Log.e(TAG, `setWindowTitle: no window for viewId=${viewId}`);
+      return;
+    }
+    host.setWindowTitle(title);
+  }
+
+  setWindowMaximized(viewId: number, maximized: boolean): void {
+    Log.d(TAG, `setWindowMaximized viewId=${viewId} maximized=${maximized}`);
+    const host = FlutterManager.getInstance().getHostWindowByView(viewId);
+    if (!host) {
+      Log.e(TAG, `setWindowMaximized: no window for viewId=${viewId}`);
+      return;
+    }
+    host.setWindowMaximized(maximized);
+  }
+
+  setWindowMinimized(viewId: number, minimized: boolean): void {
+    Log.d(TAG, `setWindowMinimized viewId=${viewId} minimized=${minimized}`);
+    const host = FlutterManager.getInstance().getHostWindowByView(viewId);
+    if (!host) {
+      Log.e(TAG, `setWindowMinimized: no window for viewId=${viewId}`);
+      return;
+    }
+    host.setWindowMinimized(minimized);
+  }
+
+  setWindowFullscreen(viewId: number, fullscreen: boolean): void {
+    Log.d(TAG, `setWindowFullscreen viewId=${viewId} fullscreen=${fullscreen}`);
+    const host = FlutterManager.getInstance().getHostWindowByView(viewId);
+    if (!host) {
+      Log.e(TAG, `setWindowFullscreen: no window for viewId=${viewId}`);
+      return;
+    }
+    host.setWindowFullscreen(fullscreen);
+  }
+
+  // LOGICAL-px runtime constraint update (max 0 == unbounded).
+  setWindowConstraints(viewId: number, constraints: WindowConstraints): void {
+    // Wrap the raw napi object (creation bridges do the same).
+    const c = new WindowConstraints(constraints);
+    Log.d(TAG, `setWindowConstraints viewId=${viewId} ${c.toString()}`);
+    const host = FlutterManager.getInstance().getHostWindowByView(viewId);
+    if (!host) {
+      Log.e(TAG, `setWindowConstraints: no window for viewId=${viewId}`);
+      return;
+    }
+    const limits: window.WindowLimits = {
+      minWidth: c.viewMinWidth,
+      minHeight: c.viewMinHeight,
+      maxWidth: c.viewMaxWidth,
+      maxHeight: c.viewMaxHeight
+    };
+    host.setWindowLimits(limits);
+  }
+
+  // Brings the window to front.
+  activateWindow(viewId: number): void {
+    Log.d(TAG, `activateWindow viewId=${viewId}`);
+    const host = FlutterManager.getInstance().getHostWindowByView(viewId);
+    if (!host) {
+      Log.e(TAG, `activateWindow: no window for viewId=${viewId}`);
+      return;
+    }
+    host.activate();
+  }
+
   /**
    * Called by native when the engine is about to restart.
    * Notifies all registered lifecycle listeners.
@@ -610,6 +855,109 @@ export default class FlutterNapi {
   onPreEngineRestart(): void {
     Log.d(TAG, "called onPreEngineRestart")
     this.engineLifecycleListeners.forEach(listener => listener.onPreEngineRestart());
+  }
+
+  /**
+   * Registers the HCPP handler that receives engine composition callbacks.
+   * @param handler - The handler, or null to unregister.
+   */
+  setHybridCompositionHandler(handler: HybridCompositionHandler | null): void {
+    this.hybridCompositionHandler = handler;
+    Log.i(TAG, "setHybridCompositionHandler " + (handler != null ? "registered" : "cleared"));
+  }
+
+  /**
+   * Whether Hybrid Composition (HCPP) is enabled on the native engine.
+   * The native value is immutable after PlatformViewOHOS construction, so the
+   * first call queries NAPI and caches the result; subsequent calls (including
+   * the per-touch-event hot path) return the cached boolean without crossing
+   * the JS→C++ boundary.
+   */
+  isHybridCompositionEnabled(): boolean {
+    if (this.hybridCompositionEnabledCached != null) {
+      return this.hybridCompositionEnabledCached;
+    }
+    if (this.nativeShellHolderId == null) {
+      return false;
+    }
+    const enabled: boolean =
+      flutter.nativeIsHybridCompositionEnabled(this.nativeShellHolderId);
+    this.hybridCompositionEnabledCached = enabled;
+    return enabled;
+  }
+
+  /**
+   * HCPP route D: injects a DISPLAY system layer's touch event into the engine.
+   * Each touchData item fields mirror native HandleTouchEvent's PointerData
+   * layout; coordinates must already be physical pixels in the Flutter-view
+   * coordinate system.
+   */
+  dispatchTouchToEngine(touchData: Object[]): void {
+    if (this.nativeShellHolderId == null) {
+      Log.e(TAG, "dispatchTouchToEngine: nativeShellHolderId is null");
+      return;
+    }
+    flutter.nativeDispatchTouchToEngine(this.nativeShellHolderId, touchData);
+  }
+
+  onDisplayPlatformViewHybrid(viewId: number, x: number, y: number, width: number,
+    height: number, viewWidth: number, viewHeight: number): void {
+    if (this.hybridCompositionHandler != null) {
+      this.hybridCompositionHandler.onDisplayPlatformViewHybrid(
+        viewId, x, y, width, height, viewWidth, viewHeight);
+    } else {
+      Log.d(TAG, "onDisplayPlatformViewHybrid (no handler) viewId=" + viewId);
+    }
+  }
+
+  /** native 下发 SliceViews 算出的 overlay rect → 转发 ControllerHybrid 存 AppStorage。 */
+  onDisplayOverlayHybrid(viewId: number, x: number, y: number, width: number,
+    height: number): void {
+    if (this.hybridCompositionHandler != null) {
+      this.hybridCompositionHandler.onDisplayOverlayHybrid(
+        viewId, x, y, width, height);
+    } else {
+      Log.d(TAG, "onDisplayOverlayHybrid (no handler) viewId=" + viewId);
+    }
+  }
+
+  /** native 下发折叠后的 mutator finals → 转发 ControllerHybrid。 */
+  onDisplayMutatorsHybrid(viewId: number, data: number[]): void {
+    if (this.hybridCompositionHandler != null) {
+      this.hybridCompositionHandler.onDisplayMutatorsHybrid(viewId, data);
+    } else {
+      Log.d(TAG, "onDisplayMutatorsHybrid (no handler) viewId=" + viewId);
+    }
+  }
+
+  hidePlatformViewHybrid(viewId: number): void {
+    if (this.hybridCompositionHandler != null) {
+      this.hybridCompositionHandler.hidePlatformViewHybrid(viewId);
+    }
+  }
+
+  showOverlaySurfaceHybrid(): void {
+    if (this.hybridCompositionHandler != null) {
+      this.hybridCompositionHandler.showOverlaySurfaceHybrid();
+    }
+  }
+
+  hideOverlaySurfaceHybrid(): void {
+    if (this.hybridCompositionHandler != null) {
+      this.hybridCompositionHandler.hideOverlaySurfaceHybrid();
+    }
+  }
+
+  onBeginFrameHybrid(): void {
+    if (this.hybridCompositionHandler != null) {
+      this.hybridCompositionHandler.onBeginFrameHybrid();
+    }
+  }
+
+  onEndFrameHybrid(): void {
+    if (this.hybridCompositionHandler != null) {
+      this.hybridCompositionHandler.onEndFrameHybrid();
+    }
   }
 
   /**
@@ -1082,8 +1430,21 @@ export default class FlutterNapi {
    */
   onTouchEvent(strings: Array<string>): void {
     if (this.isAttached()) {
+      const hasTextureViews = this.textureTouchArbiter != null
+        ? this.textureTouchArbiter() : false;
+      if (this.isHybridCompositionEnabled() && !hasTextureViews) {
+        return;
+      }
       TouchEventProcessor.getInstance().postTouchEvent(strings);
     }
+  }
+
+  /**
+   * Wires the texture-PV liveness probe consulted by onTouchEvent's HCPP skip
+   * (see textureTouchArbiter). Pass null to restore the unconditional skip.
+   */
+  setTextureTouchArbiter(arbiter: (() => boolean) | null): void {
+    this.textureTouchArbiter = arbiter;
   }
 
   /**

@@ -456,7 +456,7 @@ export interface PlatformViewsHandler {
 }
 
 /** Platform view display modes that can be requested at creation time. */
-enum RequestedDisplayMode {
+export enum RequestedDisplayMode {
   /** Use Texture Layer if possible, falling back to Virtual Display if not. */
   TEXTURE_WITH_VIRTUAL_FALLBACK,
   /** Use Texture Layer if possible, falling back to Hybrid Composition if not. */

@@ -46,7 +46,7 @@ export default class EventChannel {
     this.messenger = messenger
     this.name = name
     this.codec = codec ? codec : StandardMethodCodec.INSTANCE
-    // TODO:(0xZOne): 实现后台处理
+    // TODO:(0xZOne): Implement background processing
     // this.taskQueue = taskQueue ?? null
     this.taskQueue = null
   }

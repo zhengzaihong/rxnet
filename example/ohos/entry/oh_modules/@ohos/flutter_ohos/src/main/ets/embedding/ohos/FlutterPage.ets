@@ -8,6 +8,7 @@ import Log from '../../util/Log';
 import { FlutterView } from '../../view/FlutterView';
 import FlutterManager from './FlutterManager';
 import { DVModel, DVModelChildren, DynamicView } from '../../view/DynamicView/dynamicView';
+import { OverlayRect } from '../../plugin/platform/PlatformViewsControllerHybrid';
 import Any from '../../plugin/common/Any';
 import deviceInfo from '@ohos.deviceInfo';
 import flutter from 'libflutter.so';
@@ -28,6 +29,8 @@ struct FlutterSurface {
   @Prop xComponentRenderFit: RenderFit = RenderFit.RESIZE_FILL;
   @Prop firstFrameDisplayed: boolean = false;
   @Prop xComponentColor: Color = Color.Black
+  /** When true, keep the main XComponent background transparent (HCPP hole-punch). */
+  @Prop forceTransparentBackground: boolean = false;
   @Prop defaultFocusOnTouch: boolean = false;
 
   private surfaceLifecycleToken: number = 0;
@@ -75,8 +78,9 @@ struct FlutterSurface {
         this.flutterView = null;
       })
       .renderFit(this.xComponentRenderFit)
-      .backgroundColor(this.firstFrameDisplayed && this.xComponentRenderFit == RenderFit.RESIZE_FILL ?
-      this.xComponentColor : Color.Transparent)
+      .backgroundColor(this.forceTransparentBackground ? Color.Transparent :
+        (this.firstFrameDisplayed && this.xComponentRenderFit == RenderFit.RESIZE_FILL ?
+          this.xComponentColor : Color.Transparent))
       .expandSafeArea(this.safeAreaTypes, this.safeAreaEdges)
       .onAreaChange((oldValue: Area, newValue: Area) => {
         // Only handle when Y position changes (window decoration state changed)
@@ -84,6 +88,107 @@ struct FlutterSurface {
           FlutterManager.getInstance().handleWindowDecorSafeArea(this.viewId, this.getUIContext().getHostContext());
         }
       })
+  }
+}
+
+
+/**
+ * Hosts the transparent overlay XComponent used by Hybrid Composition (HCPP) to
+ * composite Flutter content drawn ABOVE platform views (the "overlay slice").
+ *
+ * Key difference vs {@link FlutterSurface}: this XComponent is NEVER attached to
+ * the engine as the main Flutter surface. Its id carries the `__overlay` suffix
+ * so the native {@code XComponentBase::OnSurfaceCreated} routes its window to
+ * {@code SetHybridCompositionOverlayWindow} instead of {@code SurfaceCreated}.
+ * Transparent + HitTestMode.None so touches fall through to DISPLAY nodes below.
+ */
+@Component
+struct FlutterOverlayXComponent {
+  @Prop viewId: string = "";
+
+  build() {
+    XComponent({ id: `${this.viewId}__overlay`, type: XComponentType.SURFACE, libraryname: 'flutter' })
+      .backgroundColor(Color.Transparent)
+      .hitTestBehavior(HitTestMode.None)
+      .visibility(Visibility.Visible)
+  }
+}
+
+/**
+ * 局部 Block 节点列表，每个节点几何跟随一个 SliceViews overlay rect
+ * （platform view 上方所有 Flutter 控件的 Union 包围盒，如刷新按钮/视频播放控件）。
+ * rect 列表来自 AppStorage（ControllerHybrid.onEndFrameHybrid 每 frame flush 覆盖）。
+ */
+@Component
+export struct FlutterOverlayBlock {
+  flutterView: FlutterView | null = null;
+  @Prop viewId: string = "";
+  // ForEach 模式：动态渲染每个 rect 一个局部 Block，支持多 PV。
+  // key 含坐标：OverlayRect 是普通 interface（非 @Observed），ForEach 用稳定 key（viewId）复用
+  // 节点时不重新执行 itemBuilder，导致 rect 变化时节点几何不更新，
+  // key 含坐标则 rect 变即重建 →几何跟随刷新。
+  // Map<viewKey, rects>：多引擎时各 controller 只写自己的 slice，本页按
+  // viewId 取自己的部分，避免固定 key 的跨引擎 last-writer-wins。
+  @StorageLink('hcpp_overlay_rects_map') overlayRectsMap: Map<string, OverlayRect[]> = new Map();
+
+  private getOverlayRects(): OverlayRect[] {
+    const rects = this.overlayRectsMap.get(this.viewId);
+    return rects != undefined ? rects : [];
+  }
+
+  build() {
+    Stack() {
+      ForEach(this.getOverlayRects(), (r: OverlayRect) => {
+        if (r.visible) {
+          Stack() {
+          }
+          .width(r.width)
+          .height(r.height)
+          .position({ x: r.x, y: r.y })
+          .backgroundColor(Color.Transparent)
+          .hitTestBehavior(HitTestMode.Block)
+          .onTouch((event: TouchEvent) => {
+            if (r == undefined || !r.visible) {
+              return;
+            }
+            const flutterView = this.flutterView != null
+              ? this.flutterView
+              : FlutterManager.getInstance().getFlutterView(this.viewId);
+            if (flutterView == null) {
+              return;
+            }
+            flutterView.dispatchTouchToEngineHybrid(r.viewId, event);
+          })
+          .onHover((isHover: boolean, event: HoverEvent) => {
+            if (r == undefined || !r.visible) {
+              return;
+            }
+            const flutterView = this.flutterView != null
+              ? this.flutterView
+              : FlutterManager.getInstance().getFlutterView(this.viewId);
+            if (flutterView == null) {
+              return;
+            }
+            flutterView.dispatchHoverToEngineHybrid(r.viewId, isHover, event);
+          })
+          .onAxisEvent((event: AxisEvent) => {
+            if (r == undefined || !r.visible) {
+              return;
+            }
+            const flutterView = this.flutterView != null
+              ? this.flutterView
+              : FlutterManager.getInstance().getFlutterView(this.viewId);
+            if (flutterView == null) {
+              return;
+            }
+            flutterView.dispatchAxisToEngineHybrid(r.viewId, event);
+          })
+        }
+      }, (r: OverlayRect) => `${r.id}_${r.x}_${r.y}_${r.width}_${r.height}`)
+    }
+    .width('100%')
+    .height('100%')
+    .hitTestBehavior(HitTestMode.None)
   }
 }
 
@@ -134,13 +239,15 @@ export struct FlutterPage {
   
   @BuilderParam splashScreenView: () => void = this.doNothingBuilder;
 
-  /**
-   * Default page builder that displays Flutter content with XComponent.
-   */
+  /** True when the engine runs in HCPP mode; drives Stack z-order. */
+  @State hybridCompositionEnabled: boolean = false;
+
+  // hcppOnly: true=仅 HCPP wrapper / false=仅纹理 wrapper / undefined=全部(非 HCPP 态原语义)。
   @Builder
-  defaultPage() {
-    Stack() {
-      ForEach(this.rootDvModel!!, (child: ESObject) => {
+  buildPlatformViewLayer(hcppOnly?: boolean) {
+    ForEach(this.rootDvModel!!, (child: ESObject) => {
+      if (hcppOnly === undefined ||
+        ((child.params as Record<string, ESObject>)['hcpp'] === true) === hcppOnly) {
         DynamicView({
           model: child as DVModel,
           params: child.params,
@@ -148,20 +255,68 @@ export struct FlutterPage {
           children: child.children,
           customBuilder: child.builder
         })
-      }, (child: ESObject) => `${child.id_}`)
+      }
+    }, (child: ESObject) => `${child.id_}`)
+  }
 
-      Text("").id("unfocus-xcomponent-node").focusable(true)
+  @Builder
+  buildFlutterSurfaceLayer() {
+    FlutterSurface({
+      safeAreaEdges: this.safeAreaEdges,
+      safeAreaTypes: this.safeAreaTypes,
+      viewId: this.viewId,
+      xComponentType: this.xComponentType,
+      xComponentRenderFit: this.xComponentRenderFit,
+      firstFrameDisplayed: this.firstFrameDisplayed,
+      xComponentColor: this.xComponentColor,
+      forceTransparentBackground: this.hybridCompositionEnabled,
+      defaultFocusOnTouch: this.defaultFocusOnTouch
+    })
+  }
 
-      FlutterSurface({
-        safeAreaEdges: this.safeAreaEdges,
-        safeAreaTypes: this.safeAreaTypes,
-        viewId: this.viewId,
-        xComponentType: this.xComponentType,
-        xComponentRenderFit: this.xComponentRenderFit,
-        firstFrameDisplayed: this.firstFrameDisplayed,
-        xComponentColor: this.xComponentColor,
-        defaultFocusOnTouch: this.defaultFocusOnTouch
-      })
+  // HCPP overlay layer: transparent XComponent composited ABOVE platform views.
+  // The engine renders Flutter content that sits on top of a native view into
+  // this surface (the "overlay slice"). Only rendered in HCPP mode.
+  @Builder
+  buildOverlayLayer() {
+    FlutterOverlayXComponent({ viewId: this.viewId })
+  }
+
+  // 局部 Block 节点（最顶层，overlay 之上），几何跟随 overlay rect。
+  // 仅 rect.visible 时内部渲染，否则透明 None 不影响下层。
+  @Builder
+  buildOverlayBlock() {
+    FlutterOverlayBlock({ flutterView: this.flutterView, viewId: this.viewId })
+  }
+
+  private refreshHybridCompositionState(): void {
+    const enabled = this.flutterView?.isHybridCompositionEnabled() ?? false;
+    if (enabled != this.hybridCompositionEnabled) {
+      this.hybridCompositionEnabled = enabled;
+    }
+  }
+
+  /**
+   * Default page builder that displays Flutter content with XComponent.
+   */
+  @Builder
+  defaultPage() {
+    Stack() {
+      // HCPP z-order: background slice (bottom) < DISPLAY nodes < overlay slice (top).
+      // 仅 HCPP(DISPLAY)节点进 surface 之上的合成层序。
+      if (this.hybridCompositionEnabled) {
+        this.buildPlatformViewLayer(false)
+        this.buildFlutterSurfaceLayer()
+        Text("").id("unfocus-xcomponent-node").focusable(true)
+        this.buildPlatformViewLayer(true)
+        this.buildOverlayLayer()
+        this.buildOverlayBlock()
+      } else {
+        this.buildPlatformViewLayer()
+        Text("").id("unfocus-xcomponent-node").focusable(true)
+        this.buildFlutterSurfaceLayer()
+      }
+
       if (this.showSplashScreen) {
         this.splashScreenView();
       }
@@ -206,28 +361,20 @@ export struct FlutterPage {
   @Builder
   mouseWheelPage() {
     Stack() {
-      ForEach(this.rootDvModel!!, (child: Any) => {
-        DynamicView({
-          model: child as DVModel,
-          params: child.params,
-          events: child.events,
-          children: child.children,
-          customBuilder: child.builder
-        })
-      }, (child: ESObject) => `${child.id_}`)
-
-      Text("").id("unfocus-xcomponent-node").focusable(true)
-
-      FlutterSurface({
-        safeAreaEdges: this.safeAreaEdges,
-        safeAreaTypes: this.safeAreaTypes,
-        viewId: this.viewId,
-        xComponentType: this.xComponentType,
-        xComponentRenderFit: this.xComponentRenderFit,
-        firstFrameDisplayed: this.firstFrameDisplayed,
-        xComponentColor: this.xComponentColor,
-        defaultFocusOnTouch: this.defaultFocusOnTouch
-      })
+      // HCPP z-order 与 defaultPage 完全一致：
+      // texture PVs < background slice (bottom) < unfocus Text < DISPLAY nodes < overlay slice < overlay Block。
+      if (this.hybridCompositionEnabled) {
+        this.buildPlatformViewLayer(false)
+        this.buildFlutterSurfaceLayer()
+        Text("").id("unfocus-xcomponent-node").focusable(true)
+        this.buildPlatformViewLayer(true)
+        this.buildOverlayLayer()
+        this.buildOverlayBlock()
+      } else {
+        this.buildPlatformViewLayer()
+        Text("").id("unfocus-xcomponent-node").focusable(true)
+        this.buildFlutterSurfaceLayer()
+      }
 
       if (this.showSplashScreen) {
         this.splashScreenView();
@@ -340,7 +487,7 @@ export struct FlutterPage {
     this.flutterView?.addFirstFrameListener(this)
     this.flutterView?.addFirstPreloadFrameListener(this)
 
-    // api18开始支持getDistance()接口
+    // API 18+ supports getDistance() for touch slop detection.
     if (deviceInfo.sdkApiVersion >= 18) {
       this.flutterView?.setTouchSlopCallbackValue(() => {
         return this.panOption.getDistance()
@@ -360,6 +507,7 @@ export struct FlutterPage {
       this.shouldPauseWhenInvisible,
       this.flutterView
     );
+    this.refreshHybridCompositionState();
   }
 
   /**
@@ -378,6 +526,7 @@ export struct FlutterPage {
   onFirstFrame() {
     this.showSplashScreen = false;
     this.firstFrameDisplayed = true;
+    this.refreshHybridCompositionState();
   }
 
   /**

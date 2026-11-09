@@ -456,7 +456,7 @@ class SerialTaskQueueWithTaskPool implements SerialTaskQueue {
         await task();
       } finally {
         this.isRunning = false;
-        this.runNext(); // 执行下一个任务
+        this.runNext(); // Execute the next task
       }
     }
   }

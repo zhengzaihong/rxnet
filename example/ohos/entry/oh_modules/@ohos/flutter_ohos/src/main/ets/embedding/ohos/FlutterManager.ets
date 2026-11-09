@@ -14,14 +14,29 @@ import List from '@ohos.util.List';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { common } from '@kit.AbilityKit';
 import PiPVisibilityBridge from './PiPVisibilityBridge';
+import FlutterNapi from '../engine/FlutterNapi';
+import { WindowHostContext } from './windowing/WindowHostContext';
+import { FlutterWindowHost } from './windowing/FlutterWindowHost';
+import { DialogWindowCreationRequest, IMPLICIT_VIEW_ID, NO_PARENT_VIEW_ID,
+  numericViewId, PopupWindowCreationRequest, RegularWindowCreationRequest,
+  TooltipWindowCreationRequest,
+  WindowArchetype } from './windowing/WindowingUtils';
+import { DialogWindowHost } from './windowing/DialogWindowHost';
+import { TooltipWindowHost } from './windowing/TooltipWindowHost';
+import { PopupWindowHost } from './windowing/PopupWindowHost';
+import { RegularWindowHost, AbilityHostMode } from './windowing/RegularWindowHost';
+import { FlutterAbility } from './FlutterAbility';
 
 const TAG = "FlutterManager"
 
 /**
  * Singleton manager for Flutter views and UI abilities.
  * This class manages the lifecycle of FlutterView instances and their association with UI abilities.
+ *
+ * Multi-window: per-window host behavior lives in the window/ host classes;
+ * this manager keeps the shared bookkeeping and implements WindowHostContext.
  */
-export default class FlutterManager {
+export default class FlutterManager implements WindowHostContext {
   private static instance: FlutterManager;
 
   /**
@@ -35,12 +50,16 @@ export default class FlutterManager {
     return FlutterManager.instance;
   }
 
+  private windowHosts = new Map<number, FlutterWindowHost>();
+  private viewAbilities = new Map<number, UIAbility>();
   private flutterViewList = new Map<String, FlutterView>();
   private flutterViewIndex = 1;
   private uiAbilityList = new Array<UIAbility>();
   private windowStageList = new Map<UIAbility, window.WindowStage>();
   private mFullScreenListener: FullScreenListener = new DefaultFullScreenListener();
   private windowStageEventCallbacks = new Map<UIAbility, (event: window.WindowStageEventType) => void>();
+  private regularWindowAbilityName: string = 'RegularWindowAbility';
+  private subWindowPageName: string = 'pages/FlutterWindowPage';
 
   private dragEnterCbId: number = 1;
   private dragMoveCbId: number = 1;
@@ -309,6 +328,229 @@ export default class FlutterManager {
     return flutterView;
   }
 
+  registerViewAbility(viewId: number, ability: UIAbility): void {
+    const holder = ability as FlutterAbility;
+    if (viewId === IMPLICIT_VIEW_ID && this.viewAbilities.has(IMPLICIT_VIEW_ID)) {
+      Log.w(TAG, `registerViewAbility: main ability already recorded; ignoring`);
+      return;
+    }
+    this.viewAbilities.set(viewId, ability);
+    holder.hostedViewId = viewId;
+    const fv = this.getFlutterView(String(viewId));
+    this.windowHosts.get(viewId)?.setWindow(this.getWindowStage(ability)?.getMainWindowSync());
+    this.windowHosts.get(viewId)?.setAbility(ability);
+    if (fv !== null) {
+      this.windowHosts.get(viewId)?.setFlutterView(fv);
+    }
+
+  }
+
+  // ---- Per-archetype window creation (same names as the C++ facade / win32;
+  // the typed request IS the archetype — no discriminator int) ---------------
+
+  createRegularWindow(viewId: number, req: RegularWindowCreationRequest): void {
+    const request = new RegularWindowCreationRequest(req);
+    Log.d(TAG, `createRegularWindow viewId=${viewId}`);
+    const host = new RegularWindowHost(this, viewId, AbilityHostMode.SPAWNED,
+      request, WindowArchetype.REGULAR);
+    this.windowHosts.set(viewId, host);
+    host.attach();
+  }
+
+  createDialogWindow(viewId: number, req: DialogWindowCreationRequest): void {
+    const request = new DialogWindowCreationRequest(req);
+    Log.d(TAG, `createDialogWindow viewId=${viewId}`);
+    let host: FlutterWindowHost;
+    if (request.parentViewId !== NO_PARENT_VIEW_ID) {
+      host = new DialogWindowHost(this, viewId, request); // modal Dialog path
+    } else {
+      host = new RegularWindowHost(this, viewId, AbilityHostMode.SPAWNED,
+        request, WindowArchetype.DIALOG);
+    }
+    this.windowHosts.set(viewId, host);
+    host.attach();
+  }
+
+  /** Tooltip: anchored, parent-bound SubWindow. */
+  createTooltipWindow(viewId: number, req: TooltipWindowCreationRequest): void {
+    const request = new TooltipWindowCreationRequest(req);
+    Log.d(TAG, `createTooltipWindow viewId=${viewId}`);
+    const host = new TooltipWindowHost(this, viewId, request);
+    this.windowHosts.set(viewId, host);
+    host.attach();
+  }
+
+  createPopupWindow(viewId: number, req: PopupWindowCreationRequest): void {
+    const request = new PopupWindowCreationRequest(req);
+    Log.d(TAG, `createPopupWindow viewId=${viewId}`);
+    const host = new PopupWindowHost(this, viewId, request);
+    this.windowHosts.set(viewId, host);
+    host.attach();
+  }
+
+  updateTooltipPosition(viewId: number): void {
+    const host = this.windowHosts.get(viewId);
+    if (host instanceof TooltipWindowHost) {
+      host.updatePosition();
+    } else {
+      Log.w(TAG, `updateTooltipPosition: viewId=${viewId} is not a tooltip host`);
+    }
+  }
+
+  updatePopupPosition(viewId: number): void {
+    const host = this.windowHosts.get(viewId);
+    if (host instanceof PopupWindowHost) {
+      host.updatePosition();
+    } else {
+      Log.w(TAG, `updatePopupPosition: viewId=${viewId} is not a popup host`);
+    }
+  }
+
+  /** Raster content-size report (napi didUpdateViewSize, PHYSICAL px;
+   * win32 HostWindowTooltip::DidUpdateViewSize parity): re-place the
+   * sized-to-content tooltip/popup. Unknown or other views no-op. */
+  didUpdateViewSize(viewId: number, width: number, height: number): void {
+    const host = this.windowHosts.get(viewId);
+    if (host instanceof TooltipWindowHost || host instanceof PopupWindowHost) {
+      host.didUpdateViewSize(width, height);
+    }
+  }
+
+  /**
+   * ADOPT path, view 0 only (C++ CreateWindow routes it here): adopt the
+   * EntryAbility's main window as the FIRST Dart Regular window's surface.
+   *
+   * @param viewId - The engine numeric view id (always 0 here)
+   * @param req    - Creation fields (preferred size / title) from native
+   */
+  bindEntryAbilityToView(viewId: number, req: RegularWindowCreationRequest): void {
+    const request = new RegularWindowCreationRequest(req);
+    const ability = this.getAbilityByView(viewId);
+    if (this.getHostWindowByView(viewId) !== undefined) {
+      Log.d(TAG, `bindEntryAbilityToView: view ${viewId} already adopted`);
+      return;
+    }
+    Log.d(TAG, `bindEntryAbilityToView viewId=${viewId} ${request.toString()}`);
+    const host = new RegularWindowHost(this, viewId, AbilityHostMode.ADOPTED,
+      request, WindowArchetype.REGULAR, ability);
+    this.windowHosts.set(viewId, host);
+    host.attach();
+  }
+
+  /**
+   * The host of a view. Registry keys are the numeric view ids (0 = the
+   * implicit main view) — the same ids Dart/C++/napi speak, so no translation.
+   */
+  getHostWindowByView(viewId: number): FlutterWindowHost | undefined {
+    return this.windowHosts.get(viewId);
+  }
+
+  getAbilityByView(viewId: number): UIAbility | undefined {
+    return this.viewAbilities.get(viewId);
+  }
+
+  // ---- WindowHostContext: service surface for the window/ host classes ----
+  registerFlutterView(viewId: string, flutterView: FlutterView): void {
+    this.putFlutterView(viewId, flutterView);
+    this.windowHosts.get(numericViewId(viewId))?.setFlutterView(flutterView);
+  }
+
+  removeHost(viewId: number): void {
+    this.windowHosts.delete(viewId);
+  }
+
+  /** Drops the view's ability record (WindowHostContext; idempotent): without
+   * it every SPAWNED-window close would leave a destroyed UIAbility pinned. */
+  deleteViewAbility(viewId: number): void {
+    this.viewAbilities.delete(viewId);
+  }
+
+  /**
+   * ArkUI page loaded into every SubWindow host — APP code, not in the HAR. An app
+   * MUST set its own page first: unresolvable → loadContent fails → window reported closed.
+   */
+  subWindowPage(): string {
+    return this.subWindowPageName;
+  }
+
+  setSubWindowPageName(name: string): void {
+    if (name && name.length > 0) {
+      this.subWindowPageName = name;
+    }
+  }
+
+  /** UIAbility class SPAWNED Regular hosts launch (WindowHostContext): the
+    * app's RegularWindowAbility, declared launchType "specified". */
+  spawnedAbilityName(): string {
+    return this.regularWindowAbilityName;
+  }
+
+  setSpawnedAbilityName(name: string): void {
+    if (name && name.length > 0) {
+      this.regularWindowAbilityName = name;
+    }
+  }
+
+  /**
+   * Focus push for sub-window hosts (WindowHostContext): windowEvent
+   * WINDOW_ACTIVE↔WINDOW_INACTIVE translated into the view's activation flag
+   * and handed to native. Native no-ops for untracked views — safe at any lifecycle point.
+   */
+  notifyWindowActivated(viewId: number, activated: boolean): void {
+    try {
+      FlutterNapi.nativeNotifyWindowActivated(viewId, activated);
+    } catch (e) {
+      Log.w(TAG, `notifyWindowActivated(${viewId}, ${activated}) napi failed: ${JSON.stringify(e)}`);
+    }
+  }
+
+  /**
+   * Close child windows BEFORE the parent frees the shared engine (survivors
+   * dangle); closeForCascade's synchronous detach is the guarantee; idempotent.
+   * @param parentAbility - The host that owns and is about to destroy the engine.
+   */
+  cascadeCloseChildren(parentAbility: UIAbility): void {
+    // Only the view-0 (shared-engine main window) ability cascades; a
+    // closing own-engine ability must not wipe unrelated windows.
+    if (parentAbility !== this.getAbilityByView(IMPLICIT_VIEW_ID)) {
+      Log.w(TAG, 'cascadeCloseChildren: caller is not the main-window ability — ignoring');
+      return;
+    }
+    // Snapshot: closeForCascade drops each host from windowHosts as it runs.
+    const children: FlutterWindowHost[] = [];
+    this.windowHosts.forEach((host: FlutterWindowHost) => {
+      children.push(host);
+    });
+    for (const host of children) {
+      try {
+        host.closeForCascade(parentAbility);
+      } catch (e) {
+        Log.w(TAG, `cascadeCloseChildren: viewId=${String(host.viewId)} failed: ${JSON.stringify(e)}`);
+      }
+    }
+  }
+
+  /**
+   * Main-window close = quit: terminateSelf() runs the full shutdown
+   * (cascadeCloseChildren → engine.destroy). NOT exit(0) — it bypasses the Ability lifecycle.
+   */
+  exitApplication(): void {
+    const mainAbility = this.getAbilityByView(IMPLICIT_VIEW_ID);
+    if (!mainAbility) {
+      Log.e(TAG, `exitApplication: no main (EntryAbility) host found — cannot terminate`);
+      return;
+    }
+    try {
+      (mainAbility.context as common.UIAbilityContext)
+        .terminateSelf()
+        .catch((e: Error) => {
+          Log.e(TAG, `exitApplication: terminateSelf failed: ${JSON.stringify(e)}`);
+        });
+    } catch (e) {
+      Log.e(TAG, `exitApplication: terminateSelf threw: ${JSON.stringify(e)}`);
+    }
+  }
+
   /**
    * Gets the next FlutterView ID that will be used.
    * @param idOffset - Optional offset to add to the index
@@ -446,7 +688,6 @@ export default class FlutterManager {
         Log.e(TAG, "getWindowId: mainWindow is null");
         return 0;
       }
-      // get windowID for notifyPageChanged.
       const windowId = mainWindow.getWindowProperties()?.id ?? 0;
       return windowId;
     } catch (error) {
@@ -611,7 +852,7 @@ export interface FullScreenListener {
   setUseFullScreen(useFullScreen: boolean, context?: Context | null | undefined): void;
 
   /**
-   * Sets whether to use full screen mode specifically for free free-window.
+   * Sets whether to use full screen mode specifically for free multi-window.
    * @param useFullScreen - Whether to use full screen
    * @param context - Optional context
    */

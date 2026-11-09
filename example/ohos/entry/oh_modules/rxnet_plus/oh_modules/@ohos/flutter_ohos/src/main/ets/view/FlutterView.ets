@@ -32,6 +32,8 @@ import { AUTOFILL_SUPPORT_API } from '../plugin/editing/OhosAutoFillHelper';
 const TAG = "FlutterViewTag";
 const EVENT_BACK_PRESS = 'EVENT_BACK_PRESS';
 const DPI_SCALE_RESET: number = -1;
+/** display.getRoundedCorner() is available since API 23 (flutter/flutter#179219). */
+const ROUNDED_CORNER_SUPPORT_API: number = 23;
 
 /**
  * Metrics describing the viewport dimensions and insets.
@@ -72,6 +74,18 @@ export class ViewportMetrics {
   physicalTouchSlop: number = -1;
   /** List of display features such as folds, hinges, or cutouts. */
   displayFeatures: ArrayList<DisplayFeature> = new ArrayList();
+  /**
+   * Display corner radius of the top-left corner in physical pixels,
+   * or -1 if the platform does not provide display corner radii.
+   * Mirrors flutter/flutter#179219 (Android RoundedCorner support).
+   */
+  displayCornerRadiusTopLeft: number = -1;
+  /** Display corner radius of the top-right corner in physical pixels, or -1 if unavailable. */
+  displayCornerRadiusTopRight: number = -1;
+  /** Display corner radius of the bottom-right corner in physical pixels, or -1 if unavailable. */
+  displayCornerRadiusBottomRight: number = -1;
+  /** Display corner radius of the bottom-left corner in physical pixels, or -1 if unavailable. */
+  displayCornerRadiusBottomLeft: number = -1;
 
   /**
    * Creates a deep copy of this ViewportMetrics instance.
@@ -96,6 +110,10 @@ export class ViewportMetrics {
     copy.systemGestureInsetLeft = this.systemGestureInsetLeft;
     copy.physicalTouchSlop = this.physicalTouchSlop;
     copy.displayFeatures = this.displayFeatures;
+    copy.displayCornerRadiusTopLeft = this.displayCornerRadiusTopLeft;
+    copy.displayCornerRadiusTopRight = this.displayCornerRadiusTopRight;
+    copy.displayCornerRadiusBottomRight = this.displayCornerRadiusBottomRight;
+    copy.displayCornerRadiusBottomLeft = this.displayCornerRadiusBottomLeft;
     return copy;
   }
 
@@ -121,7 +139,11 @@ export class ViewportMetrics {
       this.systemGestureInsetBottom === other.systemGestureInsetBottom &&
       this.systemGestureInsetLeft === other.systemGestureInsetLeft &&
       this.physicalTouchSlop === other.physicalTouchSlop &&
-      this.displayFeatures === other.displayFeatures;
+      this.displayFeatures === other.displayFeatures &&
+      this.displayCornerRadiusTopLeft === other.displayCornerRadiusTopLeft &&
+      this.displayCornerRadiusTopRight === other.displayCornerRadiusTopRight &&
+      this.displayCornerRadiusBottomRight === other.displayCornerRadiusBottomRight &&
+      this.displayCornerRadiusBottomLeft === other.displayCornerRadiusBottomLeft;
   }
 }
 
@@ -358,7 +380,7 @@ export class FlutterView {
   private keyboardAvoidArea: window.AvoidArea;
   private needSetViewport: boolean = false;
   private windowPosition: window.Rect | null = null;
-  // 默认值5，参考：https://developer.huawei.com/consumer/cn/doc/harmonyos-references/ts-basic-gestures-pangesture
+  // Default value 5, see: https://developer.huawei.com/consumer/cn/doc/harmonyos-references/ts-basic-gestures-pangesture
   private callbackValue: callbackNumber = () => 5;
   // Stay consistent with Android
  	private defaultPhysicalTouchSlop: number = 8;
@@ -396,6 +418,10 @@ export class FlutterView {
     this.mFirstFrameListeners = new ArrayList<FirstFrameListener>();
     this.mFirstPreloadFrameListeners = new ArrayList<FirstPreloadFrameListener>();
     this.registerDefaultCallbacks();
+  }
+
+  getContext(): Context {
+    return this.context;
   }
 
   onBackPressCallback = () => {
@@ -577,8 +603,8 @@ export class FlutterView {
           this.flutterEngine?.getFlutterNapi()?.updateDensity(this.displayInfo.densityPixels);
           this.flutterEngine?.getTextInputChannel()?.setDevicePixelRatio(this.getEffectiveDensity());
 
-        let devicePixelRatio: number = this.getEffectiveDensity();
-        Log.i(TAG, `windowSizeChangeCallback devicePixelRatio: ${devicePixelRatio}, viewportMetrics.devicePixelRatio: ${this.viewportMetrics.devicePixelRatio}`);
+          let devicePixelRatio: number = this.getEffectiveDensity();
+          Log.i(TAG, `windowSizeChangeCallback devicePixelRatio: ${devicePixelRatio}, viewportMetrics.devicePixelRatio: ${this.viewportMetrics.devicePixelRatio}`);
 
         if (devicePixelRatio !== this.viewportMetrics.devicePixelRatio) {
           this.viewportMetrics.devicePixelRatio = devicePixelRatio;
@@ -694,7 +720,7 @@ export class FlutterView {
     }
 
     try {
-      //监听系统无障碍服务状态改变
+      // Listen to system accessibility service state changes
       accessibility.on('accessibilityStateChange', this.accessibilityStateChangeCallback);
     } catch (e) {
       Log.e(TAG, "accessibility on error: " + JSON.stringify(e));
@@ -813,6 +839,13 @@ export class FlutterView {
   }
 
   /**
+   * Returns the FlutterEngine attached to this view, or null.
+   */
+  getFlutterEngine(): FlutterEngine | null {
+    return this.flutterEngine;
+  }
+
+  /**
    * Sets the active state of the view.
    * @param value - True to activate, false to deactivate
    */
@@ -869,6 +902,11 @@ export class FlutterView {
     }
   }
 
+  /**
+   * Called when the page visibility changes.
+   * Updates the visibility state and notifies the Flutter engine accordingly.
+   * @param isVisible - True if the page is now visible, false otherwise
+   */
   public onPageVisibilityChanged(isVisible: boolean): void {
     if (this.pageVisible === isVisible) {
       return;
@@ -877,6 +915,11 @@ export class FlutterView {
     this.updateHostVisibility();
   }
 
+  /**
+   * Called when the visible area changes.
+   * Updates the area visibility state and notifies the Flutter engine accordingly.
+   * @param isVisible - True if the area is now visible, false otherwise
+   */
   public onVisibleAreaChanged(isVisible: boolean): void {
     if (this.areaVisible === isVisible) {
       return;
@@ -962,6 +1005,49 @@ export class FlutterView {
     FlutterManager.getInstance().deleteFlutterView(this.id, this);
 
     this.nodeController.disposeFrameNode();
+  }
+
+  /**
+   * 封装对 controllerHybrid.dispatchTouchToEngine 的调用，不暴露 flutterEngine。
+   * @param viewId - overlay rect 所属 platform view id（webview 的 viewId）
+   * @param event - ArkUI TouchEvent，坐标用 windowX×dpr（dispatchTouchToEngine 内部转）
+   */
+  dispatchTouchToEngineHybrid(viewId: number, event: TouchEvent): void {
+    const controller = this.flutterEngine?.getPlatformViewsControllerHybrid();
+    if (controller == null) {
+      Log.w(TAG, `dispatchTouchToEngineHybrid no controllerHybrid (viewId=${viewId})`);
+      return;
+    }
+    controller.dispatchTouchToEngine(viewId, event);
+  }
+
+  /**
+   * 封装对 controllerHybrid.dispatchHoverToEngine 的调用（hover 返投）。
+   * @param viewId - overlay rect 所属 platform view id
+   * @param isHover - ArkUI onHover 的 isHover（true=进入/移动，false=离开）
+   * @param event - ArkUI HoverEvent，坐标用 windowX×dpr（dispatchHoverToEngine 内部转）
+   */
+  dispatchHoverToEngineHybrid(viewId: number, isHover: boolean, event: HoverEvent): void {
+    const controller = this.flutterEngine?.getPlatformViewsControllerHybrid();
+    if (controller == null) {
+      Log.w(TAG, `dispatchHoverToEngineHybrid no controllerHybrid (viewId=${viewId})`);
+      return;
+    }
+    controller.dispatchHoverToEngine(viewId, isHover, event);
+  }
+
+  /**
+   * 封装对 controllerHybrid.dispatchAxisToEngine 的调用（滚轮返投）。
+   * @param viewId - overlay rect 所属 platform view id
+   * @param event - ArkUI AxisEvent，滚轮增量在 UPDATE action 时有值（dispatchAxisToEngine 内部处理）
+   */
+  dispatchAxisToEngineHybrid(viewId: number, event: AxisEvent): void {
+    const controller = this.flutterEngine?.getPlatformViewsControllerHybrid();
+    if (controller == null) {
+      Log.w(TAG, `dispatchAxisToEngineHybrid no controllerHybrid (viewId=${viewId})`);
+      return;
+    }
+    controller.dispatchAxisToEngine(viewId, event);
   }
 
   /**
@@ -1224,9 +1310,9 @@ export class FlutterView {
       this.viewportMetrics.physicalHeight = vp2px(newArea.height as number);
     }
     let fullScreen = false
-    // 根据是否全屏显示，设置标题栏高度
+    // Set title bar height based on whether fullscreen is active
     if (this.checkFullScreen &&
-      (setFullScreen || FlutterManager.getInstance().getFullScreenListener().useFullScreen())) { // 全屏显示
+      (setFullScreen || FlutterManager.getInstance().getFullScreenListener().useFullScreen())) { // Fullscreen display
       fullScreen = true
       if (this.paddingTop != undefined) {
         this.viewportMetrics.physicalViewPaddingTop = this.paddingTop;
@@ -1240,7 +1326,7 @@ export class FlutterView {
         this.viewportMetrics.physicalViewPaddingBottom =
           this.systemAvoidArea?.bottomRect.height ?? this.viewportMetrics.physicalViewPaddingBottom;
       }
-    } else { // 非全屏显示
+    } else { // Non-fullscreen display
       this.viewportMetrics.physicalViewPaddingTop = this.paddingTop ?? 0;
       this.viewportMetrics.physicalViewPaddingBottom = this.paddingBottom ?? 0;
     }
@@ -1313,6 +1399,22 @@ export class FlutterView {
     return this.flutterEngine != null
   }
 
+  public isHybridCompositionEnabled(): boolean {
+    if (this.isAttachedToFlutterEngine() && this.flutterEngine!.getFlutterNapi().isAttached()) {
+      return this.flutterEngine!.getFlutterNapi().isHybridCompositionEnabled();
+    }
+    // Pre-attach fallback: the loader flag alone is NOT sufficient — the
+    // native gate (PlatformViewOHOS ctor) also requires a non-software
+    // rendering API, and software rendering is only reachable with Impeller
+    // off (ohos_main.cpp FML_CHECKs enable_impeller==false for software).
+    // Requiring isEnableImpeller mirrors that gate: GL+HCPP falls through
+    // unchanged, software+HCPP now answers false so the page never mounts
+    // the overlay XComponent against a non-HCPP engine (which native
+    // IsHcppOverlay() would then hijack as a second main surface).
+    const loader = this.flutterEngine?.getFlutterLoader();
+    return loader?.isEnableHcpp === true && loader.isEnableImpeller === true;
+  }
+
   /**
    * Checks if this view is attached to an engine with the specified shell holder ID.
    * @param id - The shell holder ID to check
@@ -1328,8 +1430,63 @@ export class FlutterView {
     return false;
   }
 
+  /**
+   * Updates the display corner radii of the viewport metrics.
+   *
+   * Mirrors flutter/flutter#179219 (Android RoundedCorner support): on API levels that
+   * provide the data, corners not reported by the system (flat screens, virtual displays)
+   * resolve to 0; below API 23 the -1 sentinels are kept so the framework decodes
+   * MediaQuery.displayCornerRadii as null.
+   */
+  private updateDisplayCornerRadii(): void {
+    const displayInfo: display.Display = display.getDefaultDisplaySync();
+    if (deviceInfo.sdkApiVersion < ROUNDED_CORNER_SUPPORT_API ||
+        typeof (displayInfo as ESObject)?.getRoundedCorner !== 'function') {
+      return;
+    }
+    const cornerTypeTopLeft = 0;
+    const cornerTypeTopRight = 1;
+    const cornerTypeBottomRight = 2;
+    const cornerTypeBottomLeft = 3;
+    let corners: Array<ESObject>;
+    try {
+      corners = (displayInfo as ESObject)?.getRoundedCorner() as Array<ESObject>;
+    } catch (e) {
+      // Capability not supported on this display (BusinessError 801):
+      // keep the -1 sentinels so the framework treats the radii as unavailable.
+      Log.e(TAG, "updateDisplayCornerRadii error: " + JSON.stringify(e));
+      return;
+    }
+    this.viewportMetrics.displayCornerRadiusTopLeft = 0;
+    this.viewportMetrics.displayCornerRadiusTopRight = 0;
+    this.viewportMetrics.displayCornerRadiusBottomRight = 0;
+    this.viewportMetrics.displayCornerRadiusBottomLeft = 0;
+    for (let i = 0; i < corners.length; i++) {
+      const corner: ESObject = corners[i];
+      const cornerType = corner?.type as number;
+      const radius = corner?.radius as number;
+      switch (cornerType) {
+        case cornerTypeTopLeft:
+          this.viewportMetrics.displayCornerRadiusTopLeft = radius;
+          break;
+        case cornerTypeTopRight:
+          this.viewportMetrics.displayCornerRadiusTopRight = radius;
+          break;
+        case cornerTypeBottomRight:
+          this.viewportMetrics.displayCornerRadiusBottomRight = radius;
+          break;
+        case cornerTypeBottomLeft:
+          this.viewportMetrics.displayCornerRadiusBottomLeft = radius;
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
   private updateViewportMetrics(): boolean {
     if (this.isAttachedToFlutterEngine()) {
+      this.updateDisplayCornerRadii();
       const displayFeatures = this.viewportMetrics.displayFeatures;
       let displayFeatureBound: number[] = new Array(displayFeatures.length * 4);
       let displayFeatureType: number[] = new Array(displayFeatures.length);
@@ -1363,7 +1520,11 @@ export class FlutterView {
         this.viewportMetrics.physicalTouchSlop,
         displayFeatureBound,
         displayFeatureType,
-        displayFeatureStatus)
+        displayFeatureStatus,
+        this.viewportMetrics.displayCornerRadiusTopLeft,
+        this.viewportMetrics.displayCornerRadiusTopRight,
+        this.viewportMetrics.displayCornerRadiusBottomRight,
+        this.viewportMetrics.displayCornerRadiusBottomLeft)
       return true
     }
     return false
@@ -1412,7 +1573,7 @@ export class FlutterView {
    * @param event - The pan gesture event
    */
   onMouseWheel(eventType: string, event: PanGestureEvent) {
-    if (deviceInfo.sdkApiVersion < 15) { // API15 及以后通过轴事件处理滚动
+    if (deviceInfo.sdkApiVersion < 15) { // API15 and later handle scrolling via axis events
       this.flutterEngine?.getFlutterNapi()?.xComponentDisPatchMouseWheel(this.id, eventType, event);
     }
   }

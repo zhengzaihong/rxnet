@@ -27,6 +27,7 @@ import errorManager from '@ohos.app.ability.errorManager';
 import { OhosAutoFillHelper } from '../../plugin/editing/OhosAutoFillHelper';
 import appRecovery from '@ohos.app.ability.appRecovery';
 import FlutterManager from './FlutterManager';
+import FlutterNapi from '../engine/FlutterNapi';
 import { FlutterView } from '../../view/FlutterView';
 import ApplicationInfoLoader from '../engine/loader/ApplicationInfoLoader';
 import { accessibility } from '@kit.AccessibilityKit';
@@ -46,6 +47,8 @@ export class FlutterAbility extends UIAbility implements Host {
   private flutterView: FlutterView | null = null;
   private mainWindow?: window.Window | null;
   private errorManagerId: number = 0;
+  // Non-implicit view id this ability hosts; 0 = implicit main host.
+  public hostedViewId: number = 0;
 
   /**
    * Gets the FlutterView instance.
@@ -96,8 +99,8 @@ export class FlutterAbility extends UIAbility implements Host {
     this?.delegate?.onAttach(this.context);
     Log.i(TAG, 'onAttach end');
     // Sync the system font weight scale on cold start, mirroring onConfigurationUpdate
-    let fontWeightScale: number = this.context.config.fontWeightScale ?? 0;
-    this.delegate?.getFlutterNapi()?.setFontWeightScale(fontWeightScale);
+    this.delegate?.getFlutterNapi()?.setFontWeightScale(this.context.config.fontWeightScale == undefined ? 0 :
+    this.context.config.fontWeightScale);
     this?.delegate?.platformPlugin?.setUIAbilityContext(this.context);
     this?.delegate?.onRestoreInstanceState(want);
 
@@ -128,6 +131,22 @@ export class FlutterAbility extends UIAbility implements Host {
    * Cleans up resources and removes the ability from FlutterManager.
    */
   onDestroy() {
+    if (this.hostedViewId > 0) {
+      try {
+        FlutterNapi.nativeHandleOsWindowClosed(this.hostedViewId);
+      } catch (e) {
+        Log.w(TAG, `nativeHandleOsWindowClosed failed for view ${this.hostedViewId}: ${JSON.stringify(e)}`);
+      }
+      const host = FlutterManager.getInstance().getHostWindowByView(this.hostedViewId);
+      if (host) {
+        host.handleOsClosed();
+      } else {
+        // No host: still drop the registry entries so nothing dangles.
+        FlutterManager.getInstance().removeHost(this.hostedViewId);
+        FlutterManager.getInstance().deleteViewAbility(this.hostedViewId);
+      }
+    }
+
     FlutterManager.getInstance().popUIAbility(this);
 
     errorManager.off('error', this.errorManagerId);
@@ -135,6 +154,10 @@ export class FlutterAbility extends UIAbility implements Host {
     if (this.flutterView != null) {
       this.flutterView.onDestroy()
       this.flutterView = null;
+    }
+
+    if (this.shouldDestroyEngineWithHost()) {
+      FlutterManager.getInstance().cascadeCloseChildren(this);
     }
 
     if (this.stillAttachedForEvent("onDestroy")) {
@@ -154,8 +177,28 @@ export class FlutterAbility extends UIAbility implements Host {
     return this?.delegate?.onSaveState(reason, wantParam) ?? AbilityConstant.OnSaveResult.ALL_REJECT;
   }
 
+  /**
+   * Callback invoked when the window stage event changes.
+   */
   protected windowStageEventCallback = (data: window.WindowStageEventType) => {
-    this.delegate?.onWindowStageChanged(data)
+    this.delegate?.onWindowStageChanged(data);
+    // Focus push for ability-hosted windows: the EntryAbility's main window
+    // is implicit view 0 (hostedViewId stays 0); spawned Regular hosts carry
+    // their numeric id on hostedViewId. Native caches the flag for the Dart
+    // `isActivated` query and fires notify_listeners on change.
+    let activated: boolean | null = null;
+    if (data === window.WindowStageEventType.ACTIVE) {
+      activated = true;
+    } else if (data === window.WindowStageEventType.INACTIVE) {
+      activated = false;
+    }
+    if (activated !== null) {
+      try {
+        FlutterNapi.nativeNotifyWindowActivated(this.hostedViewId, activated);
+      } catch (e) {
+        Log.w(TAG, `nativeNotifyWindowActivated failed for view ${this.hostedViewId}: ${JSON.stringify(e)}`);
+      }
+    }
   }
 
   /**
@@ -164,6 +207,8 @@ export class FlutterAbility extends UIAbility implements Host {
    */
   onWindowStageCreate(windowStage: window.WindowStage) {
     FlutterManager.getInstance().pushWindowStage(this, windowStage);
+    const rawViewId = this.launchWant.parameters?.[FlutterAbilityLaunchConfigs.EXTRA_FLUTTER_VIEW_ID];
+    FlutterManager.getInstance().registerViewAbility(rawViewId != null ? Number(rawViewId) : 0, this);
     this.delegate?.initWindow();
     this.mainWindow = windowStage.getMainWindowSync();
     try {
@@ -178,6 +223,7 @@ export class FlutterAbility extends UIAbility implements Host {
           return;
         }
         this.flutterView?.onWindowCreated();
+        this.applyWindowTitle();
 
         Log.i(TAG, 'Succeeded in loading the content. Data: %{public}s', JSON.stringify(data) ?? '');
       });
@@ -397,6 +443,29 @@ export class FlutterAbility extends UIAbility implements Host {
     return ""
   }
 
+  // Window title from the launch want (SPAWNED Regular windows: put there by
+  // RegularWindowHost.attachSpawned). The EntryAbility main window's title is
+  // NOT set for now — setWindowTitle on it never took effect on device.
+  protected applyWindowTitle(win?: window.Window): void {
+    const title =
+      this.launchWant.parameters![FlutterAbilityLaunchConfigs.EXTRA_FLUTTER_WINDOW_TITLE] as string | undefined;
+    this.pushWindowTitle(title ?? '', win);
+  }
+
+  // Single push point: empty titles and missing windows are no-ops, rejections are logged.
+  private pushWindowTitle(title: string, win?: window.Window): void {
+    if (title === '') {
+      return;
+    }
+    const w = win ?? this.mainWindow;
+    if (!w) {
+      return;
+    }
+    w.setWindowTitle(title).catch((e: Object) => {
+      Log.w(TAG, `setWindowTitle "${title}" failed: ${JSON.stringify(e)}`);
+    });
+  }
+
   /**
    * Gets the Want object.
    * @returns The launch Want instance
@@ -528,9 +597,9 @@ export class FlutterAbility extends UIAbility implements Host {
       .setPlatformBrightness(config.colorMode != ConfigurationConstant.ColorMode.COLOR_MODE_DARK
         ? PlatformBrightness.LIGHT : PlatformBrightness.DARK)
       .setTextScaleFactor(config.fontSizeScale == undefined ? 1.0 : config.fontSizeScale)
-      .send(); //热启动生命周期内，实时监听系统设置环境改变并实时发送相应信息
+      .send(); // Monitors system settings changes during warm start lifecycle and sends updated settings in real time
 
-    //实时获取系统字体加粗系数
+    // Gets the system font weight scale in real time
     this.delegate?.getFlutterNapi()?.setFontWeightScale(config.fontWeightScale == undefined ? 0 :
     config.fontWeightScale);
     Log.i(TAG, 'fontWeightScale: ' + JSON.stringify(config.fontWeightScale));
