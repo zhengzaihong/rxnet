@@ -1,6 +1,7 @@
 /// HttpAdapter helper for Web platform
 ///
 /// HttpAdapter Web 平台辅助文件
+library;
 
 import 'package:http/http.dart' as http;
 

@@ -31,6 +31,8 @@
 /// - [AdapterRequest.cancelToken] for using cancel tokens in requests
 /// - [NetworkAdapter.cancel] for adapter-level cancellation
 
+library;
+
 class CancelToken {
   bool _isCancelled = false;
   String? _cancelReason;

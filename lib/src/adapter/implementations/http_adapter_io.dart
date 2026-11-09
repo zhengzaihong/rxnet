@@ -1,6 +1,7 @@
 /// HttpAdapter helper for non-Web platforms (IO platforms)
 ///
 /// HttpAdapter 非 Web 平台辅助文件
+library;
 
 import 'dart:io';
 

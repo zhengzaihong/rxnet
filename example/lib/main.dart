@@ -11,6 +11,10 @@ void main() async {
     config: RxNetConfig(
       isDebug: kDebugMode,
       baseUrl: 'https://jsonplaceholder.typicode.com',
+      baseUrlEnv: const {
+        'jsonplaceholder': 'https://jsonplaceholder.typicode.com',
+        'weather': 'http://t.weather.sojson.com',
+      },
       cacheMode: CacheMode.CACHE_EMPTY_OR_EXPIRED_THEN_REQUEST,
       cacheMaxSize: 200,
       cacheEvictionPolicy: CacheEvictionPolicy.lru,

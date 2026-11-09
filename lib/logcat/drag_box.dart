@@ -15,8 +15,8 @@ class DragBox extends StatefulWidget {
   const DragBox({
     required this.child,
     this.startOffset = Offset.zero,
-    Key? key,
-  }):super(key: key);
+    super.key,
+  });
   @override
   State<DragBox> createState() => _DragBoxState();
 }

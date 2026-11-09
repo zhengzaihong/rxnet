@@ -21,7 +21,7 @@ import 'pinned_client_web.dart'
 /// - 统一的拦截器系统
 /// - 100% 向后兼容
 class EnhancedExample extends StatefulWidget {
-  const EnhancedExample({Key? key}) : super(key: key);
+  const EnhancedExample({super.key});
 
   @override
   State<EnhancedExample> createState() => _EnhancedExampleState();
@@ -31,6 +31,7 @@ class _EnhancedExampleState extends State<EnhancedExample> {
   String result = "";
   SourcesType sourcesType = SourcesType.net;
   var count = 1;
+  String _baseEnv = 'jsonplaceholder';
 
   CancelToken pageRequestToken = CancelToken();
 
@@ -38,6 +39,8 @@ class _EnhancedExampleState extends State<EnhancedExample> {
   void dispose() {
     pageRequestToken.cancel();
     _subscription?.cancel();
+    // 离开 Legacy 示例时恢复新 Playground 使用的默认地址
+    RxNet.setDefaultEnv('jsonplaceholder');
     super.dispose();
   }
 
@@ -64,6 +67,9 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _buildBaseUrlSwitcher(),
+            const SizedBox(height: 16),
+
             // ==================== 适配器架构示例 ====================
             _buildSectionTitle("🎯 适配器架构示例（0.6.0 新特性）"),
             _buildSection("1. 默认适配器（DioAdapter）", _adapterExample1),
@@ -116,6 +122,60 @@ class _EnhancedExampleState extends State<EnhancedExample> {
         ),
       ),
     );
+  }
+
+  Widget _buildBaseUrlSwitcher() {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '🌐 Base URL 环境切换（RxNet.setDefaultEnv）',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '当前：${RxNet.I.baseUrl}',
+              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('JSONPlaceholder'),
+                  selected: _baseEnv == 'jsonplaceholder',
+                  onSelected: (_) => _switchBaseEnv('jsonplaceholder'),
+                ),
+                ChoiceChip(
+                  label: const Text('天气 API'),
+                  selected: _baseEnv == 'weather',
+                  onSelected: (_) => _switchBaseEnv('weather'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '天气相关示例请先切换到「天气 API」；退出本页会自动恢复 JSONPlaceholder。\n'
+              '注意：天气 API 为 http://，HTTPS 的 Web 页面可能因混合内容被浏览器拦截，建议在 IO 平台验证。',
+              style: TextStyle(fontSize: 12, color: Colors.black54),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _switchBaseEnv(String env) {
+    RxNet.setDefaultEnv(env);
+    setState(() {
+      _baseEnv = env;
+      result = '已切换 Base URL：${RxNet.I.baseUrl}';
+    });
   }
 
   Widget _buildSectionTitle(String title) {

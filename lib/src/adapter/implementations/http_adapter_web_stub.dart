@@ -2,6 +2,7 @@
 ///
 /// This file provides stub definitions for dart:io types that are not
 /// available on the Web platform. It's used via conditional imports.
+library;
 
 // Stub class for File (not used on Web)
 class File {

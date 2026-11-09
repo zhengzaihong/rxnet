@@ -461,7 +461,8 @@ class _PlaygroundPageState extends State<PlaygroundPage> {
                 SizedBox(
                   width: 170,
                   child: DropdownButtonFormField<_BodyFormat>(
-                    value: _bodyFormat,
+                    key: ValueKey('body-${_bodyFormat.name}'),
+                    initialValue: _bodyFormat,
                     decoration: const InputDecoration(
                       labelText: 'Body 格式',
                       isDense: true,
@@ -512,7 +513,8 @@ class _PlaygroundPageState extends State<PlaygroundPage> {
               SizedBox(
                 width: 210,
                 child: DropdownButtonFormField<CacheMode>(
-                  value: _cacheMode,
+                  key: ValueKey('cache-${_cacheMode.name}'),
+                  initialValue: _cacheMode,
                   isExpanded: true,
                   decoration:
                       const InputDecoration(labelText: '缓存模式'),
@@ -536,7 +538,8 @@ class _PlaygroundPageState extends State<PlaygroundPage> {
               SizedBox(
                 width: 150,
                 child: DropdownButtonFormField<int>(
-                  value: _retryCount,
+                  key: ValueKey('retry-$_retryCount'),
+                  initialValue: _retryCount,
                   decoration: const InputDecoration(labelText: '重试次数'),
                   items: [0, 1, 2, 3]
                       .map(
@@ -555,7 +558,8 @@ class _PlaygroundPageState extends State<PlaygroundPage> {
               SizedBox(
                 width: 150,
                 child: DropdownButtonFormField<Duration>(
-                  value: _timeout,
+                  key: ValueKey('timeout-${_timeout.inSeconds}'),
+                  initialValue: _timeout,
                   decoration: const InputDecoration(labelText: '超时'),
                   items: const [
                     Duration(seconds: 5),

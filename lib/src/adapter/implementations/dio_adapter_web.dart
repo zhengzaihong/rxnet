@@ -1,6 +1,7 @@
 /// DioAdapter helper for Web platform
 /// 
 /// DioAdapter Web 平台辅助文件
+library;
 
 import 'package:dio/dio.dart';
 

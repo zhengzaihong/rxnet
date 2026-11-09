@@ -18,11 +18,11 @@ jobs:
     name: Analyze, test and build Web
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.47.8'
           cache: true
 
       - name: Install dependencies
@@ -40,7 +40,7 @@ jobs:
 
       - name: Upload coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: coverage/lcov.info
@@ -51,7 +51,7 @@ jobs:
         run: flutter build web --no-pub --base-href /rxnet/
 
       - name: Upload Web demo
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rxnet-web-demo
           path: example/build/web
@@ -73,19 +73,19 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Download Web demo
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: rxnet-web-demo
           path: site
 
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
   windows-build:
     name: Build Windows example
@@ -93,11 +93,11 @@ jobs:
     runs-on: windows-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.47.8'
           cache: true
 
       - name: Enable Windows desktop
@@ -112,10 +112,21 @@ jobs:
 
       - name: Build Windows example
         working-directory: example
-        run: flutter build windows --release --no-pub
+        shell: pwsh
+        run: |
+          flutter build windows --release --no-pub *>&1 | Tee-Object -FilePath windows-build.log
+          exit $LASTEXITCODE
+
+      - name: Upload Windows build log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-build-log
+          path: example/windows-build.log
+          if-no-files-found: ignore
 
       - name: Upload Windows demo
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rxnet-windows-demo
           path: example/build/windows/x64/runner/Release
@@ -130,13 +141,13 @@ jobs:
     env:
       PUB_DEV_TOKEN: ${{ secrets.PUB_DEV_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.47.8'
           cache: true
 
       - name: Resolve version and published state
@@ -171,7 +182,7 @@ jobs:
 
       - name: Download Web demo
         if: steps.version.outputs.skip == 'false'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: rxnet-web-demo
           path: artifacts/web
