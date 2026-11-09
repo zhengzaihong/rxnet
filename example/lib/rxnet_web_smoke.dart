@@ -2,6 +2,8 @@
 ///
 /// 用于验证 `rxnet_lib`、DioAdapter、HttpAdapter、缓存与平台判断
 /// 在 Web 条件导入分支下可以正常编译。
+library;
+
 import 'package:flutter/widgets.dart';
 import 'package:rxnet_plus/rxnet_lib.dart';
 import 'package:rxnet_plus/utils/rx_net_database.dart';

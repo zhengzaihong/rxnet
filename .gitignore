@@ -52,3 +52,6 @@ example/ohos/node_modules/
 # HarmonyOS generated
 ohos/build/
 ohos/oh_modules/
+
+# OHOS generated Flutter assets
+example/ohos/entry/src/main/resources/rawfile/flutter_assets/

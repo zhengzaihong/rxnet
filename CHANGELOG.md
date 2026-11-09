@@ -1,4 +1,4 @@
-## Unreleased
+## 0.7.2
 
 ### Breaking Changes
 
@@ -35,9 +35,14 @@
 - Updated `flutter_lints` to ^5.0.0 and added a CI workflow with analyze/test/coverage.
 - **Full-platform conditional imports** - Web/Wasm default branches + `dart.library.io` for IO; `rxnet_lib` conditionally exports `IOClient`/`IOHttpClientAdapter`. Verified with actual Web and Windows debug builds. Added a Web compile smoke target to CI.
 - Example SDK lower bound aligned to `>=3.5.0`.
+- **Example rebuilt** - Added a responsive Material 3 Playground (all HTTP methods, query/body/header editors, cache/retry/timeout/cancel, generated code), Methods, Recipes, Logs and About pages; legacy demos remain accessible.
 - Removed generated HarmonyOS build artifacts from the repository index.
 - Fixed stale `DeduplicateInterceptor` / `ThrottleInterceptor` / `ZipRequest` docs.
 - `ZipRequestError` now implements `Exception`; cancellation/timeout use consistent `ZipRequestError` context.
+
+### Migration
+
+See [MIGRATION_GUIDE_0.7.2.md](MIGRATION_GUIDE_0.7.2.md) or [迁移指南_0.7.2.md](迁移指南_0.7.2.md).
 
 ---
 

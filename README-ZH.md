@@ -11,37 +11,31 @@ RxNet：极简易用、强大、原生风格的 Flutter 网络通信框架
 RxNet 是专为 Flutter 构建的跨平台网络请求工具，贴合原生开发习惯，几乎零学习成本即可上手，支持丰富的功能组合，助你构建高性能、可维护的应用程序。
 
 ---
-[使用说明文档](docs/USAGE_GUIDE.md)
+[使用说明文档](doc/USAGE_GUIDE.md)
+
+**在线 Web 示例：** [zhengzaihong.github.io/rxnet](https://zhengzaihong.github.io/rxnet/)
 
 
-## 最新版本：0.7.1
+## 最新版本：0.7.2
 
-请使用 **rxnet_plus ^0.7.1**（或更高版本）。
+请使用 **rxnet_plus ^0.7.2**（或更高版本）。
 
 ```yaml
 dependencies:
-  rxnet_plus: ^0.7.1
+  rxnet_plus: ^0.7.2
 ```
 
+**0.7.2 新特性：**
 
+- **全平台条件导入** - IO（`dart:io`）与 Web 分支均可打包；`IOClient` / `IOHttpClientAdapter` 仅在 IO 平台导出。
+- **安全默认值** - 日志默认关闭；Header、Body、PII 字段与 URL query token 默认脱敏。
+- **生命周期修复** - 新增 `RxNet.dispose()`、幂等初始化、取消回调清理与日志/拦截器缓存上限。
+- **行为修复** - `init` 正确使用 `config.adapter`；`setEnv` 影响真实请求；请求缓存接入淘汰策略；重试与 `request()` 返回最终结果。
+- **现代示例** - Material 3 响应式 Playground，覆盖全部方法、缓存、重试、超时、取消、并发、Multipart 与日志。
 
-** 新特性：**
+> ⚠️ 0.7.2 虽是补丁版本，但包含行为变更。升级前请阅读
+> [迁移指南_0.7.2.md](迁移指南_0.7.2.md)。
 
-- **RxNetConfig** - 清晰的配置类，支持 Builder 模式，替代冗长的参数列表
-- **缓存淘汰策略** - 支持 LRU / LFU / FIFO，可配置 `cacheMaxSize`
-- **RetryPolicy** - 支持指数退避、抖动等高级重试策略
-- **AdapterBaseOptions** - 适配器无关的全局请求默认配置（超时、请求头等）
-- **TokenRefreshInterceptor** - 401/403 自动刷新 Token，支持并发去重
-- **DeduplicateInterceptor** - 可配置时间窗口内的请求去重
-- **ThrottleInterceptor** - 请求限流，可配置窗口时间
-- **RxResult.success()** - 保证非空的工厂方法 + `requiredValue` getter
-
-
-### 历史亮点
-
-- **0.7.1**: 修复 Web 编译错误— Web 请优先使用，勿停留在 0.7.0
-- **0.6.x**: 可插拔适配器架构（DioAdapter、HttpAdapter、MockAdapter）
-- **0.5.0**: RESTful 自动检测、参数分离、断点上传/下载
 
 ---
 
@@ -58,7 +52,8 @@ dependencies:
 - [并发请求](#并发请求)
 - [上传与下载](#上传与下载)
 - [证书校验](#证书校验)
-- [迁移指南](#从-06x-迁移到-070)
+- [迁移指南：0.7.1 → 0.7.2](#迁移指南071--072)
+
 
 ---
 
@@ -289,10 +284,10 @@ await RxNet.init(config: RxNetConfig(
 
 ```dart
 final mainApi = RxNet.create();
-await mainApi.initNet(config:RxNetConfig(baseUrl: "https://api.main.com", adapter: DioAdapter()));
+await mainApi.initNet(config: RxNetConfig(baseUrl: "https://api.main.com", adapter: DioAdapter()));
 
 final analyticsApi = RxNet.create();
-await analyticsApi.initNet(config:RxNetConfig(baseUrl: "https://analytics.example.com", adapter: HttpAdapter()));
+await analyticsApi.initNet(config: RxNetConfig(baseUrl: "https://analytics.example.com", adapter: HttpAdapter()));
 ```
 
 ---
@@ -530,19 +525,39 @@ IOClient createPinnedClient() {
 final httpAdapter = HttpAdapter(client: createPinnedClient());
 
 // 使用配置好的适配器初始化 RxNet
-await RxNet.init(config:RxNetConfig
-  baseUrl: "https://your-api.com",
-  adapter: httpAdapter,
-));
+await RxNet.init(
+  config: RxNetConfig(
+    baseUrl: 'https://your-api.com',
+    adapter: httpAdapter,
+  ),
+);
 ```
 
-## 从 0.6.x 迁移到 0.7.0
+## 迁移指南：0.7.1 → 0.7.2
 
-**务必配置RxNetConfig**
+0.7.2 包含行为变更，升级前请阅读完整
+[迁移指南](迁移指南_0.7.2.md)。
+
+- `isDebug` 默认关闭，仅在 debug 包显式开启。
+- `request()` 返回缓存/网络/重试的最终结果；缓存优先 UI 请使用
+  `executeStream()`。
+- POST/PATCH 默认不自动重试；仅在接口可安全重复时开启
+  `RetryPolicy.retryOnNonIdempotent`。
+- 路径缓存键改为哈希；旧路径缓存会一次性失效。
+- 拦截器支持异步并会被 await；`TokenRefreshInterceptor` 通过
+  `ErrorInterceptorHandler.retry` 真正重试。
+- `IOClient` / `IOHttpClientAdapter` 仅在 IO 平台导出。
 
 ```dart
-await RxNet.init(config: RxNetConfig(baseUrl: "...", cacheMode: CacheMode.ONLY_REQUEST));
+await RxNet.init(
+  config: RxNetConfig(
+    baseUrl: 'https://api.example.com',
+    isDebug: kDebugMode,
+  ),
+);
 ```
+
+
 ---
 
 ## 调试窗口

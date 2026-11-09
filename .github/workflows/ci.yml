@@ -1,12 +1,21 @@
-name: CI
+name: CI & Release
 
 on:
   push:
-    branches: [main, master]
+    branches: [master]
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: rxnet-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
 
 jobs:
-  analyze-and-test:
+  verify:
+    name: Analyze, test and build Web
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,18 +28,188 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Install example dependencies
+        working-directory: example
+        run: flutter pub get
+
       - name: Analyze
         run: flutter analyze --no-pub
 
       - name: Test
         run: flutter test --no-pub --coverage
 
-      - name: Build example Web
-        working-directory: example
-        run: flutter build web --no-pub --target=lib/rxnet_web_smoke.dart
-
       - name: Upload coverage
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage
           path: coverage/lcov.info
+          if-no-files-found: ignore
+
+      - name: Build Web example
+        working-directory: example
+        run: flutter build web --no-pub --base-href /rxnet/
+
+      - name: Upload Web demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: rxnet-web-demo
+          path: example/build/web
+
+  deploy-pages:
+    name: Deploy Web demo to GitHub Pages
+    if: |
+      github.ref == 'refs/heads/master' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: verify
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download Web demo
+        uses: actions/download-artifact@v4
+        with:
+          name: rxnet-web-demo
+          path: site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  windows-build:
+    name: Build Windows example
+    if: github.event_name != 'pull_request'
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Install example dependencies
+        working-directory: example
+        run: flutter pub get
+
+      - name: Build Windows example
+        working-directory: example
+        run: flutter build windows --release --no-pub
+
+      - name: Upload Windows demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: rxnet-windows-demo
+          path: example/build/windows/x64/runner/Release
+
+  publish:
+    name: Publish to pub.dev and GitHub Release
+    if: |
+      github.ref == 'refs/heads/master' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      PUB_DEV_TOKEN: ${{ secrets.PUB_DEV_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve version and published state
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(awk '/^version:/{print $2; exit}' pubspec.yaml | tr -d '\r')
+          if [ -z "$VERSION" ]; then
+            echo "Unable to read version from pubspec.yaml"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          if ! grep -q "^## ${VERSION}$" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md is missing a '## ${VERSION}' section."
+            exit 1
+          fi
+
+          PUBLISHED=""
+          if curl -fsSL https://pub.dev/api/packages/rxnet_plus -o /tmp/rxnet_pub.json; then
+            PUBLISHED=$(jq -r --arg v "$VERSION" '[.versions[].version] | index($v) // empty' /tmp/rxnet_pub.json)
+          fi
+
+          if [ -n "$PUBLISHED" ]; then
+            echo "rxnet_plus $VERSION is already on pub.dev; skipping publish."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "rxnet_plus $VERSION will be published."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download Web demo
+        if: steps.version.outputs.skip == 'false'
+        uses: actions/download-artifact@v4
+        with:
+          name: rxnet-web-demo
+          path: artifacts/web
+
+      - name: Package release artifact
+        if: steps.version.outputs.skip == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd artifacts
+          zip -r rxnet-web-demo.zip web
+
+      - name: Publish dry run
+        if: steps.version.outputs.skip == 'false' && env.PUB_DEV_TOKEN != ''
+        run: flutter pub publish --dry-run
+
+      - name: Publish to pub.dev
+        if: steps.version.outputs.skip == 'false' && env.PUB_DEV_TOKEN != ''
+        run: |
+          set -euo pipefail
+          dart pub token add https://pub.dev --env-var PUB_DEV_TOKEN
+          flutter pub publish --force
+
+      - name: Create GitHub Release
+        if: steps.version.outputs.skip == 'false' && env.PUB_DEV_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "v${{ steps.version.outputs.version }}" \
+            artifacts/rxnet-web-demo.zip \
+            --title "RxNet ${{ steps.version.outputs.version }}" \
+            --target "${{ github.sha }}" \
+            --generate-notes
+
+      - name: Missing pub token notice
+        if: steps.version.outputs.skip == 'false' && env.PUB_DEV_TOKEN == ''
+        run: |
+          echo "::warning::PUB_DEV_TOKEN is not configured. Skipping pub.dev publish and GitHub Release."
+          echo "Add a repository secret named PUB_DEV_TOKEN with a pub.dev publishing token."

@@ -1,18 +1,15 @@
-.DS_Store
-.dart_tool/
-.idea/
-.packages
-.pub/
-images/
-build/
-ios/.generated/
-ios/Flutter/Generated.xcconfig
-ios/Runner/GeneratedPluginRegistrant.*
-pubspec.lock
-.vscode/launch.json
+# Build outputs and generated dependencies
+**/build/
+**/.dart_tool/
+**/oh_modules/
+**/node_modules/
+**/*.iml
 coverage/
-example/ohos/entry/build/
-example/ohos/.hvigor/
-example/ohos/oh_modules/
-example/ohos/node_modules/
+.example/
 
+# CI / editor metadata
+.github/
+.vscode/
+.idea/
+# OHOS generated Flutter assets
+example/ohos/entry/src/main/resources/rawfile/flutter_assets/

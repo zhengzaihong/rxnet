@@ -7,7 +7,7 @@ import 'package:rxnet_plus/rxnet_lib.dart';
 import '../logcat/debug_manager.dart';
 import '../logcat/log_manager.dart';
 import '../utils/rx_net_database.dart';
-import 'adapter/closable_network_adapter.dart';
+
 import 'concurrent/zip_request_impl.dart' as zip_impl;
 
 /// author: ZhengZaiHong

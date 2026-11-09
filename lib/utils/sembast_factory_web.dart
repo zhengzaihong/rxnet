@@ -1,4 +1,4 @@
-import 'package:sembast/sembast.dart';
+
 import 'package:sembast_web/sembast_web.dart';
 
 /// Web/Wasm 平台 sembast 工厂（IndexedDB）

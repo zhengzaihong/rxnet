@@ -11,33 +11,29 @@ RxNet: Extremely Easy-to-Use, Powerful, Native-Style Flutter Network Communicati
 RxNet is a cross-platform network request tool specially built for Flutter. It conforms to native development habits, can be started with almost zero learning cost, and supports rich function combinations to help you build high-performance, maintainable applications.
 
 ---
-[instructions for use document](docs/USAGE_GUIDE.md)
+[instructions for use document](doc/USAGE_GUIDE.md)
 
-## Latest: 0.7.1
+**Live Web demo:** [zhengzaihong.github.io/rxnet](https://zhengzaihong.github.io/rxnet/)
+
+## Latest: 0.7.2
 
 ```yaml
 dependencies:
-  rxnet_plus: ^0.7.1
+  rxnet_plus: ^0.7.2
 ```
 
-**New in :**
+**New in 0.7.2:**
 
-- **RxNetConfig** - Clean configuration class with Builder pattern, replacing long parameter lists
-- **Cache Eviction** - LRU / LFU / FIFO policies with configurable `cacheMaxSize`
-- **RetryPolicy** - Exponential backoff, jitter strategies beyond fixed interval
-- **AdapterBaseOptions** - Adapter-agnostic global request defaults (timeout, headers, etc.)
-- **TokenRefreshInterceptor** - Automatic token refresh on 401/403 with concurrent deduplication
-- **DeduplicateInterceptor** - Prevents duplicate requests within configurable time window
-- **ThrottleInterceptor** - Request rate limiting with configurable window
-- **RxResult.success()** - Guaranteed non-null value factory + `requiredValue` getter
+- **Full-platform imports** - IO (`dart:io`) and Web conditional branches are both buildable; `IOClient` / `IOHttpClientAdapter` are exported only on IO.
+- **Secure defaults** - debug logging is off by default; headers, body, PII keys and URL query tokens are redacted.
+- **Correct lifecycle** - `RxNet.dispose()`, idempotent init, request cancellation cleanup and bounded log/interceptor caches.
+- **Behavior fixes** - `init` honors `config.adapter`, `setEnv` affects real requests, cache eviction works for request caches, and retries/`request()` return the final result.
+- **Modern example** - Responsive Material 3 Playground covering all HTTP methods, caching, retry, timeout, cancellation, concurrency, multipart and logs.
 
-**100% backward compatible** - All existing code works without changes. New features are opt-in.
+> ⚠️ 0.7.2 contains behavior changes despite the patch version. See
+> [MIGRATION_GUIDE_0.7.2.md](MIGRATION_GUIDE_0.7.2.md) before upgrading.
 
-### Previous Highlights
 
-- **0.7.1**: Web compile fix (stub import path) — prefer this over 0.7.0 for Web
-- **0.6.x**: Pluggable Adapter Architecture (DioAdapter, HttpAdapter, MockAdapter)
-- **0.5.0**: RESTful auto-detection, parameter separation, breakpoint upload/download
 
 ## Table of Contents
 
@@ -52,7 +48,8 @@ dependencies:
 - [Concurrent Requests](#concurrent-requests)
 - [Upload & Download](#upload--download)
 - [Certificate Validation](#certificate-validation)
-- [Migration from 0.6.x to 0.7.0](#migration-from-06x-to-070)
+- [Migration from 0.7.1 to 0.7.2](#migration-from-071-to-072)
+
 
 ---
 
@@ -293,10 +290,10 @@ Request-level parameters always override global defaults
 
 ```dart
 final mainApi = RxNet.create();
-await mainApi.initNet(config:RxNetConfig(baseUrl: "https://api.main.com", adapter: DioAdapter()));
+await mainApi.initNet(config: RxNetConfig(baseUrl: "https://api.main.com", adapter: DioAdapter()));
 
 final analyticsApi = RxNet.create();
-await analyticsApi.initNet(config:RxNetConfig(baseUrl: "https://analytics.example.com", adapter: HttpAdapter()));
+await analyticsApi.initNet(config: RxNetConfig(baseUrl: "https://analytics.example.com", adapter: HttpAdapter()));
 ```
 
 ---
@@ -535,19 +532,38 @@ IOClient createPinnedClient() {
 final httpAdapter = HttpAdapter(client: createPinnedClient());
 
 // Initialize RxNet using a configured adapter
-await RxNet.init(config:RxNetConfig
-  baseUrl: "https://your-api.com",
-  adapter: httpAdapter,
-));
+await RxNet.init(
+  config: RxNetConfig(
+    baseUrl: 'https://your-api.com',
+    adapter: httpAdapter,
+  ),
+);
 ```
 
-## Migration from 0.6.x to 0.7.0
+## Migration from 0.7.1 to 0.7.2
 
-**Be sure to configure RxNetConfig**
+0.7.2 contains behavior changes. See the full
+[Migration Guide](MIGRATION_GUIDE_0.7.2.md) before upgrading.
+
+- `isDebug` defaults to `false`; enable it only in debug builds.
+- `request()` returns the final cache/network/retry result. Use
+  `executeStream()` for cache-first UI updates.
+- POST/PATCH are not retried by default. Use
+  `RetryPolicy.retryOnNonIdempotent` only when the endpoint is safe to repeat.
+- Path-based cache keys are hashed; existing path caches become misses once.
+- Interceptors may be asynchronous and are awaited. `TokenRefreshInterceptor`
+  now retries through `ErrorInterceptorHandler.retry`.
+- `IOClient` / `IOHttpClientAdapter` are exported only on IO platforms.
 
 ```dart
-await RxNet.init(config: RxNetConfig(baseUrl: "...", cacheMode: CacheMode.ONLY_REQUEST));
+await RxNet.init(
+  config: RxNetConfig(
+    baseUrl: 'https://api.example.com',
+    isDebug: kDebugMode,
+  ),
+);
 ```
+
 
 ---
 
